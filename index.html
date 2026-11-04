@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#161a20" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%237aa968%22/%3E%3Cpath d=%22M16 4a12 12 0 0 1 0 24M4 16h24%22 stroke=%22%23fff%22 stroke-width=%222%22 fill=%22none%22/%3E%3C/svg%3E" />
   <title>OpenWorld</title>
   <link rel="stylesheet" href="/src/style.css" />
 </head>
@@ -22,7 +24,7 @@
         <button id="s-resume" hidden>Resume at last spot (Roam)</button>
       </div>
       <div class="roam">
-        <label>…or Roam (projection) anywhere:</label>
+        <label for="s-roam">…or Roam (projection) anywhere:</label>
         <form id="s-roam-form" class="row">
           <input id="s-roam" placeholder="place name or lat, lon" autocomplete="off" />
           <button type="submit">Go</button>
@@ -41,57 +43,93 @@
 
   <!-- HUD -->
   <div id="hud" hidden>
-    <div class="panel left">
+    <div class="panel left" id="left">
       <div class="tabs">
         <button data-mode="present">Present</button>
         <button data-mode="home">Home</button>
         <button data-mode="roam">Roam</button>
+        <button id="more" class="more" aria-label="More" aria-expanded="true">▾</button>
       </div>
-      <p id="h-desc" class="desc"></p>
-      <div class="kv"><span>Position</span><b id="h-pos">–</b></div>
-      <div class="kv"><span>Device fix</span><b id="h-fix">none</b></div>
-      <div class="kv"><span>Home base</span><b id="h-home">not set</b></div>
-      <div class="btns">
-        <button id="b-locate">Locate (device)</button>
-        <button id="b-ip">Locate (IP)</button>
-        <button id="b-sethome">Set home base</button>
-        <button id="b-beacon">Place beacon [B]</button>
+      <div class="details">
+        <p id="h-desc" class="desc"></p>
+        <div class="kv"><span>Position</span><b id="h-pos">–</b></div>
+        <div class="kv"><span>Device fix</span><b id="h-fix">none</b></div>
+        <div class="kv"><span>Home base</span><b id="h-home">not set</b></div>
+        <div class="btns">
+          <button id="b-locate">Locate (device)</button>
+          <button id="b-ip">Locate (IP)</button>
+          <button id="b-sethome">Set home base</button>
+          <button id="b-beacon">Place beacon [B]</button>
+        </div>
+        <form id="h-roam-form" class="row">
+          <input id="h-roam" placeholder="Roam to place or lat, lon" autocomplete="off" aria-label="Roam to place" />
+          <button type="submit">Go</button>
+        </form>
       </div>
-      <form id="h-roam-form" class="row">
-        <input id="h-roam" placeholder="Roam to place or lat, lon" autocomplete="off" />
-        <button type="submit">Go</button>
-      </form>
     </div>
 
-    <div class="panel right">
+    <div class="panel right" id="right">
+      <div id="envline" class="envline"></div>
       <div class="stats">
         <div><b id="c-present">0</b><span>claimed</span></div>
         <div><b id="c-home">0</b><span>home</span></div>
         <div><b id="c-echo">0</b><span>echoes</span></div>
+        <div><b id="c-species">0</b><span>species</span></div>
         <div><b id="c-beacons">0</b><span>beacons</span></div>
       </div>
-      <div id="nearest" class="nearest"><span id="n-arrow">↑</span><div><b id="n-name">–</b><small id="n-dist"></small></div></div>
+      <button id="nearest" class="nearest"><span id="n-arrow">↑</span><div><b id="n-name">–</b><small id="n-dist"></small></div></button>
       <ol id="log"></ol>
       <div class="btns small">
-        <button id="p-export">Export profile</button>
+        <button id="p-export">Export</button>
         <label class="filebtn">Import<input id="p-import" type="file" accept="application/json" hidden /></label>
-        <button id="p-reset">Reset</button>
+        <button id="p-settings">Settings</button>
       </div>
     </div>
 
     <div class="bottom">
       <span id="w-status"></span>
-      <span class="help">WASD / arrows move · Shift run · drag to look · wheel zoom · B beacon · H hide UI</span>
+      <span class="help">WASD / arrows move · Shift run · drag to look · wheel zoom · B beacon · H hide UI · click a place for info</span>
     </div>
     <div id="stick" class="stick"><div></div></div>
-    <button id="ui-toggle" class="ui-toggle" aria-label="Hide interface" title="Hide / show interface (H)">
+    <button id="compass" class="fab compass" hidden aria-label="Follow compass">🧭</button>
+    <button id="ui-toggle" class="fab ui-toggle" aria-label="Hide interface" title="Hide / show interface (H)">
       <svg class="eye" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
       <svg class="eye-off" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
     </button>
   </div>
 
+  <!-- Place / species card -->
+  <section id="card" class="sheet" hidden aria-live="polite">
+    <button class="close" id="card-close" aria-label="Close">✕</button>
+    <div id="card-body"></div>
+  </section>
+
+  <!-- Settings -->
+  <div id="settings" class="modal" hidden>
+    <div class="card">
+      <h2>Settings</h2>
+      <label class="set">Graphics
+        <select id="set-quality">
+          <option value="auto">Auto (adapts to your device)</option>
+          <option value="high">High</option>
+          <option value="balanced">Balanced</option>
+          <option value="saver">Battery saver (30 fps)</option>
+        </select>
+      </label>
+      <label class="set check"><input type="checkbox" id="set-weather" /> Weather effects (rain, snow, fog)</label>
+      <label class="set check"><input type="checkbox" id="set-datasaver" /> Data saver (skip trees, opening hours and wildlife downloads)</label>
+      <label class="set check"><input type="checkbox" id="set-awake" /> Keep screen on while Present</label>
+      <label class="set check"><input type="checkbox" id="set-compass" /> Camera follows my phone's compass (Present)</label>
+      <p class="hint" id="set-info"></p>
+      <div class="row end">
+        <button id="p-reset" class="danger">Reset profile…</button>
+        <button id="set-close" class="primary">Done</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toasts"></div>
-  <div class="attrib">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> (ODbL) · Terrain: AWS Terrain Tiles (Mapzen/Tilezen)</div>
+  <div class="attrib">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> · Terrain: AWS/Mapzen · Weather: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> · Wildlife: <a href="https://www.inaturalist.org" target="_blank" rel="noopener">iNaturalist</a></div>
 
   <script type="module" src="/src/main.js"></script>
 </body>

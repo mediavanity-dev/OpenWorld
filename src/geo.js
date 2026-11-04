@@ -43,25 +43,30 @@ export function haversine(lat1, lon1, lat2, lon2) {
   return 2 * EARTH_R * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
-// ---- Chunk grid (fixed in WGS84 degrees, so chunk keys are stable forever) ----
-export const CHUNK_DEG = 0.01; // ~1.1 km north-south
-
-export function chunkIndex(lat, lon) {
-  return { i: Math.floor(lat / CHUNK_DEG), j: Math.floor(lon / CHUNK_DEG) };
-}
-export function chunkKey(i, j) { return `${i}_${j}`; }
-export function chunkBounds(i, j) {
-  const s = i * CHUNK_DEG, w = j * CHUNK_DEG;
-  // round to avoid float noise in query strings / cache keys
-  const r = (v) => Math.round(v * 1e6) / 1e6;
-  return { s: r(s), w: r(w), n: r(s + CHUNK_DEG), e: r(w + CHUNK_DEG) };
-}
-
-// ---- Web-mercator tile math (for elevation tiles) ----
+// ---- Web-mercator tile math ----
 export function lonToTileX(lon, z) { return ((lon + 180) / 360) * 2 ** z; }
 export function latToTileY(lat, z) {
   const r = lat * D2R;
   return ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** z;
+}
+export function tileXToLon(x, z) { return (x / 2 ** z) * 360 - 180; }
+export function tileYToLat(y, z) {
+  const n = Math.PI - (2 * Math.PI * y) / 2 ** z;
+  return (Math.atan(Math.sinh(n)) * 180) / Math.PI;
+}
+
+// ---- Chunk grid = web-mercator tiles at zoom 14 (~2.4 km at the equator, ~1.5 km at 51°) ----
+// Matches the vector tiles 1:1, and tile ids are stable forever.
+export const CHUNK_Z = 14;
+export function chunkIndex(lat, lon) {
+  return { i: Math.floor(lonToTileX(lon, CHUNK_Z)), j: Math.floor(latToTileY(lat, CHUNK_Z)) };
+}
+export function chunkKey(i, j) { return `${CHUNK_Z}/${i}/${j}`; }
+export function chunkBounds(i, j) {
+  return {
+    w: tileXToLon(i, CHUNK_Z), e: tileXToLon(i + 1, CHUNK_Z),
+    n: tileYToLat(j, CHUNK_Z), s: tileYToLat(j + 1, CHUNK_Z),
+  };
 }
 
 // ---- Tiny geohash (used to index the profile's task log by place) ----

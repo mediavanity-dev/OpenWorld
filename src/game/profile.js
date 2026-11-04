@@ -13,7 +13,8 @@ function fresh() {
     created: new Date().toISOString(),
     home: null,          // { lat, lon, source, accuracy, setAt }
     last: null,          // { lat, lon, mode }
-    discoveries: {},     // feature_ref -> { name, kind, grade, trust, anchor, first, last, visits }
+    discoveries: {},     // feature_ref -> { name, kind, grade, trust, anchor, first, last, visits, conditions, seen[] }
+    species: {},         // iNaturalist taxon id -> { name, sci, group, grade, anchor, first, conditions }
     beacons: [],         // { id, label, mode, anchor }
     stats: { meters: { present: 0, home: 0, roam: 0 } },
     log: [],             // [{ t, msg }]
@@ -43,23 +44,41 @@ export class Profile {
     this.save();
   }
 
-  // Returns 'new' | 'upgraded' | 'revisit'
-  recordDiscovery(poi, grade, trust, anchor) {
+  // Returns { result: 'new' | 'upgraded' | 'revisit', newTags: [...] }
+  recordDiscovery(poi, grade, trust, anchor, conditions = null, tags = []) {
     const d = this.data.discoveries[poi.ref];
     const now = new Date().toISOString();
     if (!d) {
-      this.data.discoveries[poi.ref] = { name: poi.name, kind: poi.kind, grade, trust, anchor, first: now, last: now, visits: 1 };
+      this.data.discoveries[poi.ref] = { name: poi.name, kind: poi.kind, grade, trust, anchor, first: now, last: now, visits: 1, conditions, seen: tags };
       this.save();
-      return 'new';
+      return { result: 'new', newTags: [] };
     }
     d.last = now;
     d.visits++;
-    let res = 'revisit';
+    d.seen = d.seen || [];
+    const newTags = tags.filter((t) => !d.seen.includes(t));
+    d.seen.push(...newTags);
+    let result = 'revisit';
     if (GRADE_RANK[grade] > GRADE_RANK[d.grade]) {
-      d.grade = grade; d.trust = trust; d.anchor = anchor; res = 'upgraded';
+      d.grade = grade; d.trust = trust; d.anchor = anchor; d.conditions = conditions; result = 'upgraded';
     }
     this.save();
-    return res;
+    return { result, newTags };
+  }
+
+  // Returns 'new' | 'upgraded' | 'revisit'
+  recordSpecies(sp, grade, anchor, conditions) {
+    this.data.species = this.data.species || {};
+    const d = this.data.species[sp.id];
+    if (!d) {
+      this.data.species[sp.id] = { name: sp.name, sci: sp.sci, group: sp.group, grade, anchor, conditions, first: new Date().toISOString(), sightings: 1 };
+      this.save();
+      return 'new';
+    }
+    d.sightings = (d.sightings || 1) + 1;
+    if (GRADE_RANK[grade] > GRADE_RANK[d.grade]) { d.grade = grade; d.anchor = anchor; d.conditions = conditions; this.save(); return 'upgraded'; }
+    this.save();
+    return 'revisit';
   }
 
   addBeacon(label, mode, anchor) {
@@ -70,7 +89,7 @@ export class Profile {
   }
 
   counts() {
-    const c = { present: 0, home: 0, echo: 0 };
+    const c = { present: 0, home: 0, echo: 0, species: Object.keys(this.data.species || {}).length };
     for (const d of Object.values(this.data.discoveries)) c[d.grade]++;
     return c;
   }

@@ -1,40 +1,53 @@
 import * as THREE from 'three';
 import { World } from './world/world.js';
+import { Sky } from './world/sky.js';
 import { Profile } from './game/profile.js';
 import { Game, MODES, RULES } from './game/game.js';
+import { Environment } from './game/environment.js';
 import { resolveAnchor } from './game/anchors.js';
 import { deviceFix, ipFix, watchDevice, trustOf } from './game/locator.js';
+import { aqiLabel } from './data/weather.js';
+import { GROUP_STYLE } from './data/wildlife.js';
 import { haversine } from './geo.js';
+import { settings, saveSettings, TIERS, startTier, isTouch } from './settings.js';
+import { startCompass, stopCompass, onHeading, currentHeading, compassSupported, keepAwake, watchBattery, buzz } from './sensors.js';
+import { Controls } from './ui/controls.js';
+import { initCard, showPlace, showSpecies, closeCard } from './ui/card.js';
 
 const $ = (id) => document.getElementById(id);
 const MODE_COLOR = { present: '#ff7a3d', home: '#3db8ff', roam: '#b07aff' };
 
-// ---------------------------------------------------------------- renderer
-const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// ---------------------------------------------------------------- renderer + quality
+const renderer = new THREE.WebGLRenderer({ antialias: !isTouch, powerPreference: 'high-performance' });
 renderer.setSize(innerWidth, innerHeight);
 $('app').appendChild(renderer.domElement);
-
-const SKY = new THREE.Color('#cfe3ef');
 const scene = new THREE.Scene();
-scene.background = SKY;
-scene.fog = new THREE.Fog(SKY, 400, 2600);
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.5, 8000);
-scene.add(new THREE.HemisphereLight('#eef6ff', '#8b9079', 1.3));
-const sun = new THREE.DirectionalLight('#fff3df', 1.7);
-sun.position.set(400, 700, 250);
-scene.add(sun);
-
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
 
+let tierName = startTier();
+let tier = TIERS[tierName];
+let batteryLow = false;
+const world = new World(scene, { anisotropy: Math.min(isTouch ? 4 : 8, renderer.capabilities.getMaxAnisotropy()) });
+function applyTier(name, why) {
+  tierName = name;
+  tier = TIERS[name];
+  renderer.setPixelRatio(Math.min(devicePixelRatio, tier.pixelRatio));
+  world.setQuality({ tex: tier.tex, maxTrees: tier.maxTrees, ring: tier.ring, detail: !settings.dataSaver });
+  if (why) toast(`Graphics: ${tier.label} (${why})`);
+}
+applyTier(tierName);
+
 // ---------------------------------------------------------------- core
-const world = new World(scene, { anisotropy: renderer.capabilities.getMaxAnisotropy() });
+const sky = new Sky(scene);
 const profile = new Profile();
-const game = new Game(world, profile, onGameEvent);
+const environment = new Environment(() => renderHud(true));
+const game = new Game(world, profile, environment, onGameEvent);
+game.dataSaver = settings.dataSaver;
 let stopWatch = null;
 
 // ---------------------------------------------------------------- avatar
@@ -50,7 +63,11 @@ const ring = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.5, 32), new THREE.Mesh
 ring.rotation.x = -Math.PI / 2; ring.position.y = 0.15;
 const pointer = new THREE.Mesh(new THREE.ConeGeometry(1, 2, 4), new THREE.MeshBasicMaterial({ color: MODE_COLOR.present }));
 pointer.rotation.x = Math.PI;
-avatar.add(body, head, nose, ring, pointer);
+const accuracyRing = new THREE.Mesh(new THREE.RingGeometry(0.97, 1, 64), new THREE.MeshBasicMaterial({ color: '#ff7a3d', transparent: true, opacity: 0.45, depthWrite: false }));
+accuracyRing.rotation.x = -Math.PI / 2; accuracyRing.position.y = 0.3;
+// the pointer and rings draw on top of everything, so you can always find yourself (even inside a building)
+for (const m of [pointer, ring, accuracyRing]) { m.material.depthTest = false; m.renderOrder = 10; }
+avatar.add(body, head, nose, ring, pointer, accuracyRing);
 scene.add(avatar);
 let avatarY = 0;
 
@@ -60,6 +77,8 @@ function styleAvatar() {
   avatarMat.opacity = game.mode === 'roam' ? 0.55 : 1;
   ring.material.color.set(c);
   pointer.material.color.set(c);
+  document.body.classList.toggle('no-stick', !MODES[game.mode]?.canMove);
+  $('compass').hidden = !(compassSupported && game.mode === 'present');
 }
 
 // ---------------------------------------------------------------- beacons, home, leash
@@ -68,8 +87,8 @@ scene.add(beaconGroup);
 const pillarGeo = new THREE.CylinderGeometry(0.6, 0.6, 60, 8, 1, true).translate(0, 30, 0);
 const orbGeo = new THREE.SphereGeometry(1.4, 16, 12);
 const homeGeo = new THREE.ConeGeometry(5, 7, 4).translate(0, 3.5, 0);
-const STATUS_COLOR = { feature: '#ffd36b', ground: '#5fe0d0', shifted: '#ffa04d', orphaned: '#ff5d5d' };
-const beaconObjs = new Map(); // id -> group
+const STATUS_COLOR = { feature: '#ffd36b', ground: '#5fe0d0', shifted: '#ffa04d', orphaned: '#ff5d5d', pending: '#c9c9c9' };
+const beaconObjs = new Map();
 let homeObj = null;
 let leashLine = null;
 
@@ -82,23 +101,21 @@ function refreshBeacons() {
   for (const b of profile.data.beacons) {
     let g = beaconObjs.get(b.id);
     if (!g) {
-      const mat = new THREE.MeshBasicMaterial({ color: '#ffd36b', transparent: true, opacity: 0.35, depthWrite: false });
       g = new THREE.Group();
-      g.add(new THREE.Mesh(pillarGeo, mat), new THREE.Mesh(orbGeo, new THREE.MeshLambertMaterial({ color: '#ffd36b', emissive: '#553b00' })));
+      g.add(new THREE.Mesh(pillarGeo, new THREE.MeshBasicMaterial({ color: '#ffd36b', transparent: true, opacity: 0.35, depthWrite: false })),
+        new THREE.Mesh(orbGeo, new THREE.MeshLambertMaterial({ color: '#ffd36b', emissive: '#553b00' })));
       g.children[1].position.y = 2.5;
       beaconObjs.set(b.id, g);
       beaconGroup.add(g);
     }
     const r = resolveAnchor(world, b.anchor);
-    g.visible = r.status !== 'pending';
+    g.visible = r.lat !== undefined;
     if (!g.visible) continue;
     placeAt(g, r.lat, r.lon, r.y);
     const c = STATUS_COLOR[r.status];
     g.children[0].material.color.set(c);
     g.children[1].material.color.set(c);
-    g.userData.status = r.status;
   }
-  // home marker
   const h = profile.data.home;
   if (h) {
     if (!homeObj) {
@@ -129,151 +146,210 @@ function refreshLeash() {
   scene.add(leashLine);
 }
 
-world.on((ev) => {
-  if (ev.type === 'chunk') {
-    for (const p of ev.chunk.pois) {
-      const d = profile.data.discoveries[p.ref];
-      if (d) ev.chunk.markPoi(p.ref, d.grade);
-    }
-    refreshBeacons();
+function markKnown(chunk) {
+  for (const p of chunk.pois) {
+    const d = profile.data.discoveries[p.ref];
+    if (d) chunk.markPoi(p.ref, d.grade);
   }
-  if (ev.type === 'status') updateWorldStatus();
-});
-
-// ---------------------------------------------------------------- camera + input
-const cam = { yaw: 0, pitch: 0.75, dist: 70 };
-const keys = new Set();
-addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT') return;
-  keys.add(e.code);
-  if (e.code === 'KeyB' && game.mode) { game.placeBeacon(); refreshBeacons(); renderHud(); }
-});
-addEventListener('keyup', (e) => keys.delete(e.code));
-addEventListener('blur', () => keys.clear());
-
-const canvas = renderer.domElement;
-let drag = null;
-canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, id: e.pointerId }; canvas.setPointerCapture(e.pointerId); });
-canvas.addEventListener('pointermove', (e) => {
-  if (!drag || drag.id !== e.pointerId) return;
-  cam.yaw -= (e.clientX - drag.x) * 0.006;
-  cam.pitch = Math.min(1.5, Math.max(0.08, cam.pitch + (e.clientY - drag.y) * 0.004));
-  drag.x = e.clientX; drag.y = e.clientY;
-});
-canvas.addEventListener('pointerup', () => (drag = null));
-canvas.addEventListener('pointercancel', () => (drag = null));
-canvas.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  cam.dist = Math.min(2500, Math.max(5, cam.dist * Math.pow(1.0015, e.deltaY)));
-}, { passive: false });
-
-// touch joystick
-const stick = { x: 0, y: 0 };
-const stickEl = $('stick');
-stickEl.addEventListener('pointermove', (e) => {
-  if (!e.pressure && e.pointerType !== 'touch') return;
-  const r = stickEl.getBoundingClientRect();
-  let x = (e.clientX - r.left - r.width / 2) / (r.width / 2), y = (e.clientY - r.top - r.height / 2) / (r.height / 2);
-  const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
-  stick.x = x; stick.y = y;
-  stickEl.firstElementChild.style.transform = `translate(${x * 35}px, ${y * 35}px)`;
-});
-const stickEnd = () => { stick.x = stick.y = 0; stickEl.firstElementChild.style.transform = ''; };
-stickEl.addEventListener('pointerup', stickEnd);
-stickEl.addEventListener('pointerleave', stickEnd);
-
-function moveInput() {
-  let f = 0, s = 0;
-  if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1;
-  if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1;
-  if (keys.has('KeyD') || keys.has('ArrowRight')) s += 1;
-  if (keys.has('KeyA') || keys.has('ArrowLeft')) s -= 1;
-  f -= stick.y; s += stick.x;
-  const m = Math.hypot(f, s);
-  if (m < 0.05) return null;
-  if (m > 1) { f /= m; s /= m; }
-  const sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);
-  // forward (north/east) = (-sin yaw east, cos yaw north); right = (cos yaw east, sin yaw north)
-  return {
-    east: -sy * f + cy * s,
-    north: cy * f + sy * s,
-    run: keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(stick.x, stick.y) > 0.95,
-  };
 }
+let firstChunk = true;
+world.on((ev) => {
+  if (ev.type === 'chunk' || ev.type === 'detail') {
+    markKnown(ev.chunk);
+    refreshBeacons();
+    if (firstChunk && ev.type === 'chunk') { firstChunk = false; snapAvatar(); }
+  }
+  if (ev.type === 'remote') refreshBeacons();
+  if (ev.type === 'status' || ev.type === 'detail') updateWorldStatus();
+});
+
+// ---------------------------------------------------------------- wildlife critters
+const critterGeo = new THREE.IcosahedronGeometry(0.7, 1);
+const critterObjs = new Map();
+function syncCritters(t) {
+  const alive = new Set(game.critters.map((c) => c.id));
+  for (const [id, m] of critterObjs) if (!alive.has(id)) { scene.remove(m); m.material.dispose(); critterObjs.delete(id); }
+  for (const c of game.critters) {
+    let m = critterObjs.get(c.id);
+    if (!m) {
+      m = new THREE.Mesh(critterGeo, new THREE.MeshLambertMaterial({ color: GROUP_STYLE[c.sp.group]?.color || '#5fd08a', emissive: '#113311' }));
+      m.userData.critter = c;
+      critterObjs.set(c.id, m);
+      scene.add(m);
+    }
+    const g = world.groundAt(c.lat, c.lon);
+    if (g === null) { m.visible = false; continue; }
+    m.visible = true;
+    placeAt(m, c.lat, c.lon, g + 0.8 + Math.abs(Math.sin(t / 260 + c.born)) * 1.2);
+  }
+}
+
+// ---------------------------------------------------------------- input, picking, card
+const controls = new Controls(renderer.domElement, $('stick'), { onTap: pick });
+const raycaster = new THREE.Raycaster();
+function pick(cx, cy) {
+  if (!game.pos) return;
+  const ndc = new THREE.Vector2((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const targets = [...critterObjs.values()];
+  for (const ch of world.readyChunks()) { const m = ch.group.getObjectByName('pois'); if (m) targets.push(m); }
+  const hit = raycaster.intersectObjects(targets, false)[0];
+  if (!hit) return closeCard();
+  if (hit.object.userData.critter) {
+    const c = hit.object.userData.critter;
+    const label = GROUP_STYLE[c.sp.group]?.label || 'creature';
+    return toast(`${/^[aeiou]/.test(label) ? 'An' : 'A'} ${label}: walk up to it to see what it is.`, 'species');
+  }
+  const chunkKey = hit.object.parent.name.replace('chunk:', '');
+  const ch = world.readyChunks().find((c) => c.key === chunkKey);
+  const poi = ch?.pois[hit.instanceId];
+  if (poi) openPlace(poi);
+}
+function openPlace(poi) {
+  showPlace(poi, { game, profile, distance: haversine(game.pos.lat, game.pos.lon, poi.lat, poi.lon) });
+}
+initCard();
+
+addEventListener('keydown', (e) => {
+  if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || !game.mode) return;
+  if (e.code === 'KeyB') { game.placeBeacon(); refreshBeacons(); renderHud(true); }
+  if (e.code === 'KeyH') setClean(!document.body.classList.contains('clean'));
+});
 
 // ---------------------------------------------------------------- floating labels
 const labelsEl = $('labels');
 const labelPool = [];
 const v3 = new THREE.Vector3();
+labelsEl.addEventListener('click', (e) => {
+  const el = e.target.closest('.label');
+  if (!el || !game.pos) return;
+  if (el._poi) openPlace(el._poi);
+});
 function updateLabels() {
   const list = [];
   if (game.pos) {
-    for (const { poi, chunk } of world.pois()) {
+    for (const { poi, chunk } of world.pois(game.pos.lat, game.pos.lon, 220)) {
       const d = haversine(game.pos.lat, game.pos.lon, poi.lat, poi.lon);
       if (d < 220) list.push({ poi, chunk, d });
     }
   }
   list.sort((a, b) => a.d - b.d);
-  list.length = Math.min(list.length, 14);
+  list.length = Math.min(list.length, tier.labels);
   while (labelPool.length < list.length) { const el = document.createElement('div'); el.className = 'label'; labelsEl.appendChild(el); labelPool.push(el); }
   labelPool.forEach((el, k) => {
     const it = list[k];
-    if (!it) { el.style.display = 'none'; return; }
+    if (!it) { if (el.style.display !== 'none') el.style.display = 'none'; return; }
     v3.set(it.poi.x, it.poi.y + 3.5, it.poi.z).add(it.chunk.group.position).project(camera);
     if (v3.z > 1 || Math.abs(v3.x) > 1.1 || Math.abs(v3.y) > 1.1) { el.style.display = 'none'; return; }
     el.style.display = '';
-    el.style.left = ((v3.x + 1) / 2) * innerWidth + 'px';
-    el.style.top = ((1 - v3.y) / 2) * innerHeight + 'px';
-    const known = profile.data.discoveries[it.poi.ref];
-    el.textContent = it.poi.name;
-    el.className = 'label' + (known ? ' done' : '');
+    el.style.transform = `translate3d(${((v3.x + 1) / 2) * innerWidth}px, ${((1 - v3.y) / 2) * innerHeight}px, 0) translate(-50%, -100%)`;
+    if (el._poi !== it.poi) { el._poi = it.poi; el.textContent = it.poi.name; }
+    const st = game.openState(it.poi);
+    const cls = 'label' + (profile.data.discoveries[it.poi.ref] ? ' done' : '') + (st && !st.open ? ' closed' : '');
+    if (el.className !== cls) el.className = cls;
   });
 }
 
-// ---------------------------------------------------------------- loop
-let last = performance.now();
-let hudT = 0, labelT = 0;
-let facing = 0;
+// ---------------------------------------------------------------- compass / heading
+let compassOn = false;
+onHeading((h) => { game.heading = h; });
+$('compass').onclick = async () => {
+  if (compassOn) { stopCompass(); compassOn = false; settings.compassFollow = false; }
+  else if (await startCompass()) { compassOn = true; settings.compassFollow = true; toast('Compass on: the camera turns with your phone.'); }
+  else toast('Compass not available on this device/browser.', 'error');
+  saveSettings();
+  $('compass').classList.toggle('on', compassOn);
+};
+
+// ---------------------------------------------------------------- loop (adaptive quality + frame cap)
+let last = performance.now(), lastRender = 0;
+let hudT = 0, labelT = 0, envT = 0;
+let facing = 0, wasMoving = false;
+const perf = { frames: 0, time: 0, lowSince: 0 };
+let skyState = { night: 0, precip: null };
+
+function snapAvatar() {
+  if (!game.pos) return;
+  const g = world.groundAt(game.pos.lat, game.pos.lon);
+  if (g !== null) avatarY = g;
+}
+
 function frame(now) {
+  requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  const move = MODES[game.mode]?.canMove ? moveInput() : null;
-  game.tick(dt, move);
+
+  const move = MODES[game.mode]?.canMove ? controls.move() : null;
+  const moving = game.tick(dt, move);
+  const busy = controls.active() || moving || wasMoving || skyState.precip || game.critters.length || !$('card').hidden;
+  wasMoving = moving;
+  const cap = busy ? tier.fps : 20; // idle: save battery
+  if (now - lastRender < 1000 / cap - 2) return;
+  const rdt = Math.min(0.25, (now - lastRender) / 1000);
+  lastRender = now;
+
+  // measure real frame rate while busy; step quality down if it can't keep up
+  if (busy && settings.quality === 'auto') {
+    perf.frames++; perf.time += rdt;
+    if (perf.time > 3) {
+      const fps = perf.frames / perf.time;
+      perf.frames = 0; perf.time = 0;
+      if (fps < tier.fps * 0.7 && tierName !== 'saver') applyTier(tierName === 'high' ? 'balanced' : 'saver', 'adjusted for smoother play');
+    }
+  }
 
   if (game.pos) {
     const rebased = world.update(game.pos.lat, game.pos.lon);
     if (rebased) refreshBeacons();
     const o = world.toLocal(game.pos.lat, game.pos.lon);
     const g = world.groundAt(game.pos.lat, game.pos.lon);
-    if (g !== null) avatarY += (g - avatarY) * (Math.abs(g - avatarY) > 50 ? 1 : Math.min(1, dt * 12));
+    if (g !== null) avatarY += (g - avatarY) * (Math.abs(g - avatarY) > 50 ? 1 : Math.min(1, rdt * 12));
     avatar.position.set(o.x, avatarY, o.z);
+
+    // facing: movement, else compass, else GPS course
     if (move) facing = Math.atan2(-move.east, move.north);
+    else if (game.mode === 'present' && (game.heading ?? game.gpsCourse) != null) facing = (-(game.heading ?? game.gpsCourse) * Math.PI) / 180;
     const turn = Math.atan2(Math.sin(facing - avatar.rotation.y), Math.cos(facing - avatar.rotation.y));
-    avatar.rotation.y += turn * Math.min(1, dt * 10);
-    const ps = Math.max(1, cam.dist / 25);
+    avatar.rotation.y += turn * Math.min(1, rdt * 10);
+    if (move && game.heading == null) game.heading = (-facing * 180) / Math.PI;
+
+    if (compassOn && settings.compassFollow && game.mode === 'present' && currentHeading() != null) {
+      const target = (-currentHeading() * Math.PI) / 180;
+      const d = Math.atan2(Math.sin(target - controls.yaw), Math.cos(target - controls.yaw));
+      controls.yaw += d * Math.min(1, rdt * 4);
+    }
+
+    const ps = Math.max(1, controls.dist / 25);
     pointer.scale.setScalar(ps);
     pointer.position.y = 3 + ps * 2;
-    ring.scale.setScalar(Math.max(1, cam.dist / 40));
+    ring.scale.setScalar(Math.max(1, controls.dist / 40));
+    const acc = game.mode === 'present' && game.fix?.source === 'device' ? game.fix.accuracy : 0;
+    accuracyRing.visible = acc > 4 && acc < 300;
+    if (accuracyRing.visible) accuracyRing.scale.setScalar(acc);
 
-    const tx = avatar.position.x, ty = avatarY + 1.6, tz = avatar.position.z;
+    const tx = avatar.position.x, ty = avatarY + 1.6, tz = avatar.position.z, dist = controls.dist;
     camera.position.set(
-      tx + Math.sin(cam.yaw) * Math.cos(cam.pitch) * cam.dist,
-      ty + Math.sin(cam.pitch) * cam.dist,
-      tz + Math.cos(cam.yaw) * Math.cos(cam.pitch) * cam.dist,
+      tx + Math.sin(controls.yaw) * Math.cos(controls.pitch) * dist,
+      ty + Math.sin(controls.pitch) * dist,
+      tz + Math.cos(controls.yaw) * Math.cos(controls.pitch) * dist,
     );
     const cg = world.toGeo(camera.position.x, camera.position.z);
     const floor = world.groundAt(cg.lat, cg.lon);
     if (floor !== null && camera.position.y < floor + 2) camera.position.y = floor + 2;
     camera.lookAt(tx, ty, tz);
-    scene.fog.far = Math.max(2600, cam.dist * 3);
-    scene.fog.near = Math.max(400, cam.dist * 0.8);
+    const near = Math.min(4, Math.max(0.3, dist * 0.01)), far = Math.max(4000, dist * 8);
+    if (Math.abs(camera.near - near) > 0.05 || camera.far !== far) { camera.near = near; camera.far = far; camera.updateProjectionMatrix(); }
+
+    skyState = sky.update(environment, game.pos, camera.position, rdt, { particles: settings.weatherFx ? tier.particles : 0, viewDist: dist });
+    document.body.classList.toggle('night', skyState.night > 0.6);
+    syncCritters(now);
   }
   beaconGroup.children.forEach((b) => (b.children[1].position.y = 2.5 + Math.sin(now / 500) * 0.4));
 
-  labelT += dt; if (labelT > 0.05) { labelT = 0; updateLabels(); }
-  hudT += dt; if (hudT > 0.25) { hudT = 0; renderHud(); }
+  labelT += rdt; if (labelT > 0.05) { labelT = 0; updateLabels(); }
+  hudT += rdt; if (hudT > 0.3) { hudT = 0; renderHud(); }
+  envT += rdt; if (envT > 10 && game.pos) { envT = 0; environment.refresh(game.pos.lat, game.pos.lon); }
   renderer.render(scene, camera);
-  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
@@ -283,15 +359,25 @@ function toast(msg, cls = '') {
   el.className = 'toast ' + cls;
   el.textContent = msg;
   $('toasts').appendChild(el);
-  setTimeout(() => el.remove(), 4200);
-  while ($('toasts').children.length > 4) $('toasts').firstElementChild.remove();
+  setTimeout(() => el.remove(), 4500);
+  while ($('toasts').children.length > 3) $('toasts').firstElementChild.remove();
 }
 
 function onGameEvent(ev) {
   if (ev.type === 'error') toast(ev.msg, 'error');
-  else if (ev.type === 'discover') toast(ev.msg, ev.grade);
-  else if (ev.type === 'mode') { toast(ev.msg, ev.mode === 'roam' ? 'echo' : ev.mode); styleAvatar(); refreshLeash(); }
-  else toast(ev.msg);
+  else if (ev.type === 'discover') { toast(ev.msg, ev.grade); buzz(ev.grade === 'echo' ? 30 : [40, 60, 40]); }
+  else if (ev.type === 'mode') {
+    toast(ev.msg, ev.mode === 'roam' ? 'echo' : ev.mode);
+    styleAvatar(); refreshLeash();
+    keepAwake(ev.mode === 'present' && settings.keepAwake);
+  } else if (ev.type === 'critter') { toast(ev.msg, 'species'); buzz(25); }
+  else if (ev.type === 'critter-gone') { /* it wandered off */ }
+  else if (ev.type === 'spotted') {
+    buzz([30, 40, 30, 40, 60]);
+    showSpecies(ev.critter.sp, { result: ev.result, grade: ev.grade, autoClose: 9000 });
+    renderHud(true);
+  } else if (ev.type === 'beacon') { toast(ev.msg); refreshBeacons(); }
+  else if (ev.msg) toast(ev.msg);
 }
 
 // ---------------------------------------------------------------- HUD
@@ -300,35 +386,50 @@ function fixText(f) {
   if (!f) return 'none';
   return f.source === 'ip' ? `IP · ${f.place || '≈ city'} (±5 km)` : `${trustOf(f)} · ±${Math.round(f.accuracy)} m`;
 }
+function setText(id, text) { const el = $(id); if (el.textContent !== text) el.textContent = text; }
 
 function renderHud() {
   if (!game.mode) return;
-  document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.mode === game.mode));
-  $('h-desc').textContent = MODES[game.mode].desc;
-  $('h-pos').textContent = game.pos ? `${fmt(game.pos.lat)}, ${fmt(game.pos.lon)}` : '–';
-  $('h-fix').textContent = fixText(game.fix);
+  document.querySelectorAll('.tabs button[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === game.mode));
+  setText('h-desc', MODES[game.mode].desc);
+  setText('h-pos', game.pos ? `${fmt(game.pos.lat)}, ${fmt(game.pos.lon)}` : '–');
+  setText('h-fix', fixText(game.fix));
   const h = profile.data.home;
-  $('h-home').textContent = h
-    ? `${h.trust} · ${game.pos ? Math.round(haversine(h.lat, h.lon, game.pos.lat, game.pos.lon)) + ' m away' : ''}`
-    : 'not set';
+  setText('h-home', h ? `${h.trust} · ${game.pos ? Math.round(haversine(h.lat, h.lon, game.pos.lat, game.pos.lon)) + ' m away' : ''}` : 'not set');
   $('b-sethome').disabled = game.mode !== 'present' || !game.fix;
   $('b-beacon').disabled = !MODES[game.mode].beacons;
 
   const c = profile.counts();
-  $('c-present').textContent = c.present;
-  $('c-home').textContent = c.home;
-  $('c-echo').textContent = c.echo;
-  $('c-beacons').textContent = profile.data.beacons.length;
+  setText('c-present', String(c.present));
+  setText('c-home', String(c.home));
+  setText('c-echo', String(c.echo));
+  setText('c-species', String(c.species));
+  setText('c-beacons', String(profile.data.beacons.length));
+
+  // live conditions
+  if (game.pos) {
+    const w = environment.weather;
+    const sun = environment.sun(game.pos.lat, game.pos.lon);
+    const parts = [];
+    if (w) parts.push(`${w.icon} ${Math.round(w.tempC)}°C ${w.label}`);
+    parts.push(`<span class="muted">${environment.localTimeText()} · ${environment.sunPhase(sun.alt)}</span>`);
+    const air = aqiLabel(w?.aqi);
+    if (air && air !== 'good' && air !== 'fair') parts.push(`<span class="muted">air ${air}</span>`);
+    if (environment.holiday) parts.push(`<span class="holiday">🎉 ${environment.holiday}</span>`);
+    const html = parts.map((p) => `<span>${p}</span>`).join('');
+    const el = $('envline');
+    if (el.dataset.v !== html) { el.innerHTML = html; el.dataset.v = html; }
+  }
 
   const n = game.nearest;
   if (n) {
-    $('n-name').textContent = n.poi.name;
-    $('n-dist').textContent = `${Math.round(n.dist)} m · ${n.poi.kind.replace(':', ' ')}`;
-    const rel = n.bearing + (cam.yaw * 180) / Math.PI;
-    $('n-arrow').style.transform = `rotate(${rel}deg)`;
+    setText('n-name', n.poi.name);
+    const st = game.openState(n.poi);
+    setText('n-dist', `${Math.round(n.dist)} m · ${n.poi.kind.split(':')[1]?.replace(/_/g, ' ') || ''}${st?.open ? ' · open' : ''}`);
+    $('n-arrow').style.transform = `rotate(${n.bearing + (controls.yaw * 180) / Math.PI}deg)`;
   } else {
-    $('n-name').textContent = 'Nothing new nearby';
-    $('n-dist').textContent = '';
+    setText('n-name', 'Nothing new nearby');
+    setText('n-dist', '');
   }
 
   const logEl = $('log');
@@ -338,12 +439,14 @@ function renderHud() {
 
 function updateWorldStatus() {
   const s = world.status();
-  $('w-status').textContent = s.loading
-    ? `Loading world… ${s.ready}/${s.ready + s.loading} areas${s.error ? ` · ${s.error} failed (retrying)` : ''}`
-    : s.error ? `${s.error} area(s) failed to load: the public OSM server may be busy; retrying` : '';
+  let text = '';
+  if (s.loading) text = `Loading world… ${s.ready}/${s.ready + s.loading} areas`;
+  else if (s.error) text = `${s.error} area(s) failed to load, retrying`;
+  else if (!settings.dataSaver && s.detail < s.ready) text = `Adding trees & place details… ${s.detail}/${s.ready}`;
+  setText('w-status', text);
 }
 
-function escapeHtml(s) { return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
 
 // ---------------------------------------------------------------- actions
 async function parsePlace(q) {
@@ -353,7 +456,6 @@ async function parsePlace(q) {
     if (Math.abs(lat) > 85 || Math.abs(lon) > 180) throw new Error('Coordinates out of range');
     return { lat, lon };
   }
-  // Place names: OSM Nominatim (open, rate-limited; one lookup per user action)
   const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`);
   const j = await res.json();
   if (!j[0]) throw new Error(`No place found for "${q}"`);
@@ -371,8 +473,9 @@ function begin(mode, opts) {
     $('start').hidden = true;
     $('hud').hidden = false;
     if (mode === 'present' && game.fix?.source === 'device') startWatching();
-    avatarY = world.groundAt(game.pos.lat, game.pos.lon) ?? avatarY;
+    snapAvatar();
     styleAvatar();
+    environment.refresh(game.pos.lat, game.pos.lon);
     renderHud();
     return true;
   }
@@ -380,11 +483,11 @@ function begin(mode, opts) {
 }
 
 async function locateDevice(msgEl) {
-  msgEl && (msgEl.textContent = 'Asking your device for its location…');
+  if (msgEl) msgEl.textContent = 'Asking your device for its location…';
   try {
     const f = await deviceFix();
     game.setFix(f);
-    msgEl && (msgEl.textContent = '');
+    if (msgEl) msgEl.textContent = '';
     return f;
   } catch (e) {
     const m = `Device location failed: ${e.message}. Try "via internet" instead.`;
@@ -394,11 +497,11 @@ async function locateDevice(msgEl) {
 }
 
 async function locateIp(msgEl) {
-  msgEl && (msgEl.textContent = 'Looking up your internet connection’s location…');
+  if (msgEl) msgEl.textContent = 'Looking up your internet connection’s location…';
   try {
     const f = await ipFix();
     game.setFix(f);
-    msgEl && (msgEl.textContent = '');
+    if (msgEl) msgEl.textContent = '';
     return f;
   } catch (e) {
     const m = `IP location failed: ${e.message}`;
@@ -431,14 +534,19 @@ document.querySelectorAll('.presets a').forEach((a) => (a.onclick = () => {
 }));
 
 // HUD
-document.querySelectorAll('.tabs button').forEach((b) => (b.onclick = async () => {
+document.querySelectorAll('.tabs button[data-mode]').forEach((b) => (b.onclick = async () => {
   const mode = b.dataset.mode;
   if (mode === game.mode) return;
   if (mode === 'present' && !game.fix && !(await locateDevice())) return;
   begin(mode, mode === 'roam' ? { to: game.pos } : {});
 }));
-$('b-locate').onclick = async () => { if (await locateDevice() && game.mode === 'present') begin('present'); else if (game.fix) toast('Device fix updated: ' + fixText(game.fix)); };
-$('b-ip').onclick = async () => { if (await locateIp() && game.mode === 'present') begin('present'); else if (game.fix) toast('Fix updated: ' + fixText(game.fix)); };
+const left = $('left');
+function setCollapsed(on) { left.classList.toggle('collapsed', on); $('more').setAttribute('aria-expanded', String(!on)); }
+setCollapsed(isTouch);
+$('more').onclick = () => setCollapsed(!left.classList.contains('collapsed'));
+$('nearest').onclick = () => { if (game.nearest) openPlace(game.nearest.poi); else $('right').classList.toggle('expanded'); };
+$('b-locate').onclick = async () => { if (await locateDevice()) { if (game.mode === 'present') begin('present'); else toast('Device fix updated: ' + fixText(game.fix)); } };
+$('b-ip').onclick = async () => { if (await locateIp()) { if (game.mode === 'present') begin('present'); else toast('Fix updated: ' + fixText(game.fix)); } };
 $('b-sethome').onclick = () => {
   if (profile.data.home && !confirm('Move your home base here? It can then not be moved again for 30 days.')) return;
   if (!profile.data.home && !confirm('Set your permanent home base at your current real location?')) return;
@@ -447,7 +555,7 @@ $('b-sethome').onclick = () => {
 $('b-beacon').onclick = () => { const label = prompt('Beacon label?', `Beacon ${profile.data.beacons.length + 1}`); if (label !== null) { game.placeBeacon(label); refreshBeacons(); renderHud(); } };
 $('h-roam-form').onsubmit = async (e) => {
   e.preventDefault();
-  try { const to = await parsePlace($('h-roam').value); begin('roam', { to }); $('h-roam').value = ''; }
+  try { const to = await parsePlace($('h-roam').value); begin('roam', { to }); $('h-roam').value = ''; $('h-roam').blur(); }
   catch (err) { toast(err.message, 'error'); }
 };
 $('p-export').onclick = () => {
@@ -455,7 +563,7 @@ $('p-export').onclick = () => {
   a.href = URL.createObjectURL(new Blob([profile.export()], { type: 'application/json' }));
   a.download = `openworld-profile-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
 $('p-import').onchange = async (e) => {
   const f = e.target.files[0];
@@ -463,12 +571,44 @@ $('p-import').onchange = async (e) => {
   try {
     profile.import(await f.text());
     beaconObjs.forEach((g) => beaconGroup.remove(g)); beaconObjs.clear();
-    for (const ch of world.readyChunks()) for (const p of ch.pois) { const d = profile.data.discoveries[p.ref]; if (d) ch.markPoi(p.ref, d.grade); }
+    for (const ch of world.readyChunks()) markKnown(ch);
     refreshBeacons(); renderHud(); toast('Profile imported');
   } catch (err) { toast('Import failed: ' + err.message, 'error'); }
   e.target.value = '';
 };
-$('p-reset').onclick = () => { if (confirm('Erase this profile (discoveries, beacons, home base)?')) { profile.reset(); location.reload(); } };
+
+// settings
+function openSettings() {
+  $('set-quality').value = settings.quality;
+  $('set-weather').checked = settings.weatherFx;
+  $('set-datasaver').checked = settings.dataSaver;
+  $('set-awake').checked = settings.keepAwake;
+  $('set-compass').checked = settings.compassFollow;
+  $('set-awake').disabled = !('wakeLock' in navigator);
+  $('set-compass').disabled = !compassSupported;
+  $('set-info').textContent = `Now: ${tier.label}${settings.quality === 'auto' ? ' (auto)' : ''}${batteryLow ? ' · battery low' : ''}`;
+  $('settings').hidden = false;
+}
+$('p-settings').onclick = openSettings;
+$('set-close').onclick = () => { $('settings').hidden = true; };
+$('set-quality').onchange = (e) => { settings.quality = e.target.value; saveSettings(); applyTier(startTier()); $('set-info').textContent = `Now: ${tier.label}`; };
+$('set-weather').onchange = (e) => { settings.weatherFx = e.target.checked; saveSettings(); };
+$('set-datasaver').onchange = (e) => { settings.dataSaver = e.target.checked; game.dataSaver = settings.dataSaver; saveSettings(); applyTier(tierName); };
+$('set-awake').onchange = (e) => { settings.keepAwake = e.target.checked; saveSettings(); keepAwake(game.mode === 'present' && settings.keepAwake); };
+$('set-compass').onchange = async (e) => {
+  settings.compassFollow = e.target.checked; saveSettings();
+  if (e.target.checked && !compassOn) { compassOn = await startCompass(); $('compass').classList.toggle('on', compassOn); }
+};
+$('p-reset').onclick = () => { if (confirm('Erase this profile (discoveries, species, beacons, home base)?')) { profile.reset(); location.reload(); } };
+
+// battery-aware quality
+watchBattery((b) => {
+  const wasLow = batteryLow;
+  batteryLow = b.low;
+  if (settings.quality !== 'auto' || wasLow === batteryLow) return;
+  if (batteryLow) applyTier('saver', 'battery low');
+  else applyTier(startTier(), 'charging / battery ok');
+});
 
 // map-only view toggle (button, or H on a keyboard); remembered per device
 const UI_KEY = 'openworld.cleanView';
@@ -479,13 +619,10 @@ function setClean(on) {
 }
 try { setClean(localStorage.getItem(UI_KEY) === '1'); } catch { setClean(false); }
 $('ui-toggle').onclick = () => setClean(!document.body.classList.contains('clean'));
-addEventListener('keydown', (e) => {
-  if (e.code === 'KeyH' && e.target.tagName !== 'INPUT' && !$('hud').hidden) setClean(!document.body.classList.contains('clean'));
-});
 
 // deep link: ?at=lat,lon starts directly in Roam there
 const at = new URLSearchParams(location.search).get('at');
 if (at) parsePlace(at).then((to) => begin('roam', { to })).catch((e) => (sMsg.textContent = e.message));
 
 // debug handle
-window.openworld = { world, game, profile };
+window.openworld = { world, game, profile, environment, settings, applyTier, get tier() { return tierName; } };

@@ -15,7 +15,7 @@ export function deviceFix(timeout = 20000) {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('Geolocation not supported by this browser'));
     navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy, source: 'device', t: Date.now() }),
+      (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy, heading: p.coords.heading, speed: p.coords.speed, source: 'device', t: Date.now() }),
       (e) => reject(new Error(e.message || 'Location permission denied')),
       { enableHighAccuracy: true, timeout, maximumAge: 10000 },
     );
@@ -34,7 +34,7 @@ export async function ipFix() {
 export function watchDevice(onFix, onError) {
   if (!navigator.geolocation) return () => {};
   const id = navigator.geolocation.watchPosition(
-    (p) => onFix({ lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy, source: 'device', t: Date.now() }),
+    (p) => onFix({ lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy, heading: p.coords.heading, speed: p.coords.speed, source: 'device', t: Date.now() }),
     (e) => onError?.(new Error(e.message)),
     { enableHighAccuracy: true, maximumAge: 5000 },
   );

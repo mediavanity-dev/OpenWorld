@@ -1,0 +1,31 @@
+// Per-device settings (not part of the portable profile) and quality tiers.
+
+const KEY = 'openworld.settings.v1';
+const coarse = matchMedia('(pointer: coarse)').matches;
+const conn = navigator.connection;
+const saveDataHint = !!(conn && (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || '')));
+
+export const TIERS = {
+  high:     { label: 'High',          pixelRatio: 2,   tex: 1024, maxTrees: 5000, ring: 1, particles: 2200, labels: 14, fps: 60 },
+  balanced: { label: 'Balanced',      pixelRatio: 1.5, tex: 768,  maxTrees: 3000, ring: 1, particles: 1200, labels: 10, fps: 60 },
+  saver:    { label: 'Battery saver', pixelRatio: 1,   tex: 512,  maxTrees: 1200, ring: 1, particles: 500,  labels: 6,  fps: 30 },
+};
+
+const defaults = {
+  quality: 'auto',          // auto | high | balanced | saver
+  dataSaver: saveDataHint,  // skip background detail + wildlife lookups
+  compassFollow: false,     // camera turns with the phone (Present mode)
+  keepAwake: coarse,        // keep the screen on while Present
+  weatherFx: true,
+};
+
+export const settings = (() => {
+  try { return { ...defaults, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return { ...defaults }; }
+})();
+
+export function saveSettings() {
+  try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch { /* ignore */ }
+}
+
+export const isTouch = coarse;
+export function startTier() { return settings.quality !== 'auto' ? settings.quality : coarse ? 'balanced' : 'high'; }
