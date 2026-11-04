@@ -36,9 +36,15 @@ bottom). You can play while that happens.
 |---|---|---|
 | Walk | **W A S D** or arrow keys | the round joystick, bottom left |
 | Run | hold **Shift** | push the joystick all the way out |
-| Look around | click and drag | drag with one finger, or twist two fingers |
+| Look around | click and drag | twist two fingers; move two fingers up/down to tilt |
 | Zoom | mouse wheel | pinch |
 | Info about a place | click its marker or name | tap its marker or name |
+| Look around the map (any mode) | right-click and drag | (in Present mode) drag with one finger |
+| Back to your character | **C**, or the ◎ button | the orange ◎ button |
+
+In **Present** mode your character only moves when you really walk, so dragging moves
+the map instead: zoom out and look around freely, then tap **◎** to jump back to where you
+are. Moving with the joystick also brings the view back.
 
 You're the small coloured figure with the arrow above its head. The arrow shows through
 buildings, so you can always find yourself.

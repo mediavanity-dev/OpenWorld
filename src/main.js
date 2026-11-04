@@ -78,6 +78,7 @@ function styleAvatar() {
   ring.material.color.set(c);
   pointer.material.color.set(c);
   document.body.classList.toggle('no-stick', !MODES[game.mode]?.canMove);
+  controls.panMode = game.mode === 'present';
   $('compass').hidden = !(compassSupported && game.mode === 'present');
 }
 
@@ -214,6 +215,7 @@ addEventListener('keydown', (e) => {
   if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || !game.mode) return;
   if (e.code === 'KeyB') { game.placeBeacon(); refreshBeacons(); renderHud(true); }
   if (e.code === 'KeyH') setClean(!document.body.classList.contains('clean'));
+  if (e.code === 'KeyC') controls.recenter();
 });
 
 // ---------------------------------------------------------------- floating labels
@@ -228,9 +230,11 @@ labelsEl.addEventListener('click', (e) => {
 function updateLabels() {
   const list = [];
   if (game.pos) {
-    for (const { poi, chunk } of world.pois(game.pos.lat, game.pos.lon, 220)) {
-      const d = haversine(game.pos.lat, game.pos.lon, poi.lat, poi.lon);
-      if (d < 220) list.push({ poi, chunk, d });
+    const c = viewGeo || game.pos;
+    const r = Math.max(220, Math.min(900, controls.dist * 2.5));
+    for (const { poi, chunk } of world.pois(c.lat, c.lon, r)) {
+      const d = haversine(c.lat, c.lon, poi.lat, poi.lon);
+      if (d < r) list.push({ poi, chunk, d });
     }
   }
   list.sort((a, b) => a.d - b.d);
@@ -267,6 +271,7 @@ let hudT = 0, labelT = 0, envT = 0;
 let facing = 0, wasMoving = false;
 const perf = { frames: 0, time: 0, lowSince: 0 };
 let skyState = { night: 0, precip: null };
+let viewGeo = null; // where the camera is looking (labels follow the view, not just the character)
 
 function snapAvatar() {
   if (!game.pos) return;
@@ -281,6 +286,7 @@ function frame(now) {
 
   const move = MODES[game.mode]?.canMove ? controls.move() : null;
   const moving = game.tick(dt, move);
+  if (move && controls.isAway() && !controls.recentering) controls.recenter();
   const busy = controls.active() || moving || wasMoving || skyState.precip || game.critters.length || !$('card').hidden;
   wasMoving = moving;
   const cap = busy ? tier.fps : 20; // idle: save battery
@@ -327,7 +333,12 @@ function frame(now) {
     accuracyRing.visible = acc > 4 && acc < 300;
     if (accuracyRing.visible) accuracyRing.scale.setScalar(acc);
 
-    const tx = avatar.position.x, ty = avatarY + 1.6, tz = avatar.position.z, dist = controls.dist;
+    controls.step(rdt);
+    const tx = avatar.position.x + controls.pan.x, tz = avatar.position.z + controls.pan.z, dist = controls.dist;
+    const tg = world.toGeo(tx, tz);
+    const ty = (controls.pan.x || controls.pan.z ? world.groundAt(tg.lat, tg.lon) ?? avatarY : avatarY) + 1.6;
+    viewGeo = tg;
+    $('recenter').hidden = !controls.isAway();
     camera.position.set(
       tx + Math.sin(controls.yaw) * Math.cos(controls.pitch) * dist,
       ty + Math.sin(controls.pitch) * dist,
@@ -472,6 +483,7 @@ function begin(mode, opts) {
   if (game.enter(mode, opts)) {
     $('start').hidden = true;
     $('hud').hidden = false;
+    controls.pan.x = controls.pan.z = 0;
     if (mode === 'present' && game.fix?.source === 'device') startWatching();
     snapAvatar();
     styleAvatar();
@@ -619,6 +631,7 @@ function setClean(on) {
 }
 try { setClean(localStorage.getItem(UI_KEY) === '1'); } catch { setClean(false); }
 $('ui-toggle').onclick = () => setClean(!document.body.classList.contains('clean'));
+$('recenter').onclick = () => controls.recenter();
 
 // deep link: ?at=lat,lon starts directly in Roam there
 const at = new URLSearchParams(location.search).get('at');

@@ -130,6 +130,8 @@ body.night .attrib { color: #b7c2cc; }
   background: var(--panel); border: 1px solid var(--line); color: var(--text); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-size: 20px; }
 .ui-toggle { bottom: calc(26px + var(--safe-b)); }
 .compass { bottom: calc(84px + var(--safe-b)); }
+.recenter { bottom: calc(142px + var(--safe-b)); background: var(--present); color: #1b1007; border-color: transparent; }
+body.clean .recenter { display: grid; }
 .compass.on { background: var(--present); color: #1b1007; }
 .ui-toggle .eye-off { display: none; }
 body.clean .ui-toggle { opacity: 0.55; }
@@ -147,7 +149,7 @@ body.clean .panel, body.clean .bottom, body.clean #labels, body.clean #toasts, b
 }
 @media (max-width: 720px) {
   .panel { width: calc(100vw - 24px); left: 12px !important; right: auto !important; padding: 8px; }
-  .panel.right { top: auto; bottom: calc(170px + var(--safe-b)); max-height: 34vh; overflow: auto; }
+  .panel.right { top: auto; bottom: calc(170px + var(--safe-b)); max-height: 34vh; overflow: auto; width: calc(100vw - 88px); }
   .panel.right #log, .panel.right .btns { display: none; }
   .panel.right.expanded #log, .panel.right.expanded .btns { display: grid; }
   .panel.left .btns { grid-template-columns: repeat(4, 1fr); font-size: 11px; }
