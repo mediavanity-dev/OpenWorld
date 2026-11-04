@@ -470,6 +470,19 @@ $('p-import').onchange = async (e) => {
 };
 $('p-reset').onclick = () => { if (confirm('Erase this profile (discoveries, beacons, home base)?')) { profile.reset(); location.reload(); } };
 
+// map-only view toggle (button, or H on a keyboard); remembered per device
+const UI_KEY = 'openworld.cleanView';
+function setClean(on) {
+  document.body.classList.toggle('clean', on);
+  $('ui-toggle').setAttribute('aria-label', on ? 'Show interface' : 'Hide interface');
+  try { localStorage.setItem(UI_KEY, on ? '1' : '0'); } catch { /* ignore */ }
+}
+try { setClean(localStorage.getItem(UI_KEY) === '1'); } catch { setClean(false); }
+$('ui-toggle').onclick = () => setClean(!document.body.classList.contains('clean'));
+addEventListener('keydown', (e) => {
+  if (e.code === 'KeyH' && e.target.tagName !== 'INPUT' && !$('hud').hidden) setClean(!document.body.classList.contains('clean'));
+});
+
 // deep link: ?at=lat,lon starts directly in Roam there
 const at = new URLSearchParams(location.search).get('at');
 if (at) parsePlace(at).then((to) => begin('roam', { to })).catch((e) => (sMsg.textContent = e.message));
