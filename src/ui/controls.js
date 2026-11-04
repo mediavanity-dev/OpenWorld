@@ -43,7 +43,7 @@ export class Controls {
         this.zoomBy(gesture.d / Math.max(1, g.d));
         let da = g.a - gesture.a;
         if (da > Math.PI) da -= 2 * Math.PI; else if (da < -Math.PI) da += 2 * Math.PI;
-        this.yaw -= da;
+        this.yaw += da; // map turns the same way the fingers twist
         // two fingers moving up/down together tilts the view
         this.pitch = Math.min(1.5, Math.max(0.08, this.pitch + (g.my - gesture.my) * 0.004));
         gesture = g;
