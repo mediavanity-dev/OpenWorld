@@ -267,15 +267,21 @@ export class Game {
     for (const c of [...this.critters]) {
       if ((now - c.born) / 1000 > c.ttl) { this.critters = this.critters.filter((x) => x !== c); this.emit('critter-gone', null, { critter: c }); continue; }
       if (haversine(this.pos.lat, this.pos.lon, c.lat, c.lon) > reach) continue;
-      this.critters = this.critters.filter((x) => x !== c);
-      const grade = MODES[this.mode].grade;
-      const { snap } = this.conditions();
-      const anchor = makeAnchor(this.world, { lat: c.lat, lon: c.lon });
-      const res = this.profile.recordSpecies(c.sp, grade, anchor, snap);
-      const what = c.sp.name;
-      if (res === 'new') this.profile.log(`Spotted ${what} [${grade}]`);
-      this.emit('spotted', res === 'new' ? `New species: ${what}` : res === 'upgraded' ? `${what}: now ${grade.toUpperCase()}` : `Spotted ${what} again`, { critter: c, result: res, grade });
+      this.spot(c);
     }
+  }
+
+  // Record a creature as seen (walking up to it, or photographing it in AR).
+  spot(c, how = 'spotted') {
+    if (!this.critters.includes(c)) return;
+    this.critters = this.critters.filter((x) => x !== c);
+    const grade = MODES[this.mode].grade;
+    const { snap } = this.conditions();
+    const anchor = makeAnchor(this.world, { lat: c.lat, lon: c.lon });
+    const res = this.profile.recordSpecies(c.sp, grade, anchor, how === 'photo' ? { ...snap, photo: true } : snap);
+    const what = c.sp.name;
+    if (res === 'new') this.profile.log(`${how === 'photo' ? 'Photographed' : 'Spotted'} ${what} [${grade}]`);
+    this.emit('spotted', res === 'new' ? `New species: ${what}` : res === 'upgraded' ? `${what}: now ${grade.toUpperCase()}` : `Spotted ${what} again`, { critter: c, result: res, grade });
   }
 
   // ---------------- beacons ----------------

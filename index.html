@@ -9,7 +9,9 @@
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
+  <video id="ar-video" playsinline muted autoplay></video>
   <div id="app"></div>
+  <div id="ar-flash"></div>
   <div id="labels"></div>
 
   <!-- Start screen -->
@@ -92,6 +94,8 @@
     </div>
     <div id="stick" class="stick"><div></div></div>
     <button id="compass" class="fab compass" hidden aria-label="Follow compass">🧭</button>
+    <button id="ar-btn" class="fab ar-btn" hidden aria-label="Camera AR view" title="Camera AR view">📷</button>
+    <div id="ar-bar" class="ar-bar"><span>AR view · point your phone around · tap a creature to photograph it</span><button id="ar-exit">✕ Exit AR</button></div>
     <button id="recenter" class="fab recenter" hidden aria-label="Return to my position" title="Return to my position (C)">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></svg>
     </button>

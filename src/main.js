@@ -13,12 +13,13 @@ import { settings, saveSettings, TIERS, startTier, isTouch } from './settings.js
 import { startCompass, stopCompass, onHeading, currentHeading, compassSupported, keepAwake, watchBattery, buzz } from './sensors.js';
 import { Controls } from './ui/controls.js';
 import { initCard, showPlace, showSpecies, closeCard } from './ui/card.js';
+import { ARView, arSupported } from './ar.js';
 
 const $ = (id) => document.getElementById(id);
 const MODE_COLOR = { present: '#ff7a3d', home: '#3db8ff', roam: '#b07aff' };
 
 // ---------------------------------------------------------------- renderer + quality
-const renderer = new THREE.WebGLRenderer({ antialias: !isTouch, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ antialias: !isTouch, alpha: true, powerPreference: 'high-performance' });
 renderer.setSize(innerWidth, innerHeight);
 $('app').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
@@ -80,6 +81,7 @@ function styleAvatar() {
   document.body.classList.toggle('no-stick', !MODES[game.mode]?.canMove);
   controls.panMode = game.mode === 'present';
   $('compass').hidden = !(compassSupported && game.mode === 'present');
+  $('ar-btn').hidden = !(arSupported() && game.mode === 'present');
 }
 
 // ---------------------------------------------------------------- beacons, home, leash
@@ -159,6 +161,7 @@ world.on((ev) => {
     markKnown(ev.chunk);
     refreshBeacons();
     if (firstChunk && ev.type === 'chunk') { firstChunk = false; snapAvatar(); }
+    if (ar.active) setWorldVisible(ev.chunk, false);
   }
   if (ev.type === 'remote') refreshBeacons();
   if (ev.type === 'status' || ev.type === 'detail') updateWorldStatus();
@@ -198,6 +201,12 @@ function pick(cx, cy) {
   if (!hit) return closeCard();
   if (hit.object.userData.critter) {
     const c = hit.object.userData.critter;
+    if (ar.active) {
+      const d = haversine(game.pos.lat, game.pos.lon, c.lat, c.lon);
+      if (d > AR_PHOTO_M) return toast(`Get a bit closer to photograph it (${Math.round(d)} m, need ${AR_PHOTO_M} m).`, 'species');
+      flash();
+      return game.spot(c, 'photo');
+    }
     const label = GROUP_STYLE[c.sp.group]?.label || 'creature';
     return toast(`${/^[aeiou]/.test(label) ? 'An' : 'A'} ${label}: walk up to it to see what it is.`, 'species');
   }
@@ -230,24 +239,32 @@ labelsEl.addEventListener('click', (e) => {
 function updateLabels() {
   const list = [];
   if (game.pos) {
-    const c = viewGeo || game.pos;
-    const r = Math.max(220, Math.min(900, controls.dist * 2.5));
+    const c = ar.active ? game.pos : viewGeo || game.pos;
+    const r = ar.active ? 400 : Math.max(220, Math.min(900, controls.dist * 2.5));
     for (const { poi, chunk } of world.pois(c.lat, c.lon, r)) {
       const d = haversine(c.lat, c.lon, poi.lat, poi.lon);
-      if (d < r) list.push({ poi, chunk, d });
+      if (d >= r) continue;
+      if (ar.active) {
+        // AR: only places in front of the camera compete for the label slots
+        v3.set(poi.x, poi.y + 3.5, poi.z).add(chunk.group.position).project(camera);
+        if (v3.z > 1 || Math.abs(v3.x) > 0.95 || Math.abs(v3.y) > 0.95) continue;
+      }
+      list.push({ poi, chunk, d });
     }
   }
   list.sort((a, b) => a.d - b.d);
-  list.length = Math.min(list.length, tier.labels);
+  list.length = Math.min(list.length, ar.active ? Math.max(8, tier.labels) : tier.labels);
   while (labelPool.length < list.length) { const el = document.createElement('div'); el.className = 'label'; labelsEl.appendChild(el); labelPool.push(el); }
   labelPool.forEach((el, k) => {
     const it = list[k];
     if (!it) { if (el.style.display !== 'none') el.style.display = 'none'; return; }
     v3.set(it.poi.x, it.poi.y + 3.5, it.poi.z).add(it.chunk.group.position).project(camera);
+    if (ar.active && (Math.abs(v3.x) > 0.95 || Math.abs(v3.y) > 0.95)) { el.style.display = 'none'; return; }
     if (v3.z > 1 || Math.abs(v3.x) > 1.1 || Math.abs(v3.y) > 1.1) { el.style.display = 'none'; return; }
     el.style.display = '';
     el.style.transform = `translate3d(${((v3.x + 1) / 2) * innerWidth}px, ${((1 - v3.y) / 2) * innerHeight}px, 0) translate(-50%, -100%)`;
-    if (el._poi !== it.poi) { el._poi = it.poi; el.textContent = it.poi.name; }
+    const text = ar.active ? `${it.poi.name} · ${Math.round(it.d)} m` : it.poi.name;
+    if (el._poi !== it.poi || el.textContent !== text) { el._poi = it.poi; el.textContent = text; }
     const st = game.openState(it.poi);
     const cls = 'label' + (profile.data.discoveries[it.poi.ref] ? ' done' : '') + (st && !st.open ? ' closed' : '');
     if (el.className !== cls) el.className = cls;
@@ -264,6 +281,52 @@ $('compass').onclick = async () => {
   saveSettings();
   $('compass').classList.toggle('on', compassOn);
 };
+
+// ---------------------------------------------------------------- camera AR (Present mode, phones)
+const AR_PHOTO_M = 40;
+const ar = new ARView($('ar-video'));
+const arQ = new THREE.Quaternion();
+let arSaved = null;
+function setWorldVisible(chunk, on) {
+  for (const o of chunk.group.children) if (o.name !== 'pois') o.visible = on;
+}
+async function enterAR() {
+  if (game.mode !== 'present') return toast('AR works in Present mode, where you really are.', 'error');
+  try {
+    await ar.start();
+  } catch (err) {
+    return toast(err.name === 'NotAllowedError' ? "Camera permission was refused, so AR can't start." : `AR unavailable: ${err.message}`, 'error');
+  }
+  arSaved = { fov: camera.fov, near: camera.near, far: camera.far, bg: scene.background, fog: scene.fog };
+  scene.background = null;
+  scene.fog = null;
+  for (const ch of world.readyChunks()) setWorldVisible(ch, false);
+  avatar.visible = false;
+  if (leashLine) leashLine.visible = false;
+  if (sky.particles) sky.particles.visible = false;
+  document.body.classList.add('ar');
+  closeCard();
+  toast(ar.absolute ? 'AR on: point your phone around. Tap a creature to photograph it.' : "AR on, but this phone isn't reporting north, so directions may be off.", 'species');
+}
+function exitAR() {
+  if (!ar.active) return;
+  ar.stop();
+  document.body.classList.remove('ar');
+  if (arSaved) {
+    scene.background = arSaved.bg; scene.fog = arSaved.fog;
+    camera.fov = arSaved.fov; camera.near = arSaved.near; camera.far = arSaved.far; camera.updateProjectionMatrix();
+  }
+  for (const ch of world.readyChunks()) setWorldVisible(ch, true);
+  avatar.visible = true;
+  if (leashLine) leashLine.visible = true;
+}
+function flash() {
+  const el = $('ar-flash');
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  buzz(40);
+}
+$('ar-btn').onclick = () => (ar.active ? exitAR() : enterAR());
+$('ar-exit').onclick = exitAR;
 
 // ---------------------------------------------------------------- loop (adaptive quality + frame cap)
 let last = performance.now(), lastRender = 0;
@@ -287,7 +350,7 @@ function frame(now) {
   const move = MODES[game.mode]?.canMove ? controls.move() : null;
   const moving = game.tick(dt, move);
   if (move && controls.isAway() && !controls.recentering) controls.recenter();
-  const busy = controls.active() || moving || wasMoving || skyState.precip || game.critters.length || !$('card').hidden;
+  const busy = ar.active || controls.active() || moving || wasMoving || skyState.precip || game.critters.length || !$('card').hidden;
   wasMoving = moving;
   const cap = busy ? tier.fps : 20; // idle: save battery
   if (now - lastRender < 1000 / cap - 2) return;
@@ -333,6 +396,15 @@ function frame(now) {
     accuracyRing.visible = acc > 4 && acc < 300;
     if (accuracyRing.visible) accuracyRing.scale.setScalar(acc);
 
+    if (ar.active) {
+      // AR: stand at the character's eyes and look where the phone points
+      camera.position.set(avatar.position.x, avatarY + 1.6, avatar.position.z);
+      camera.quaternion.slerp(ar.quaternion(arQ), 0.35);
+      const fov = ar.fov(camera.aspect);
+      if (Math.abs(camera.fov - fov) > 0.5 || camera.near !== 0.3) { camera.fov = fov; camera.near = 0.3; camera.far = 3000; camera.updateProjectionMatrix(); }
+      viewGeo = game.pos;
+      syncCritters(now);
+    } else {
     controls.step(rdt);
     const tx = avatar.position.x + controls.pan.x, tz = avatar.position.z + controls.pan.z, dist = controls.dist;
     const tg = world.toGeo(tx, tz);
@@ -354,6 +426,7 @@ function frame(now) {
     skyState = sky.update(environment, game.pos, camera.position, rdt, { particles: settings.weatherFx ? tier.particles : 0, viewDist: dist });
     document.body.classList.toggle('night', skyState.night > 0.6);
     syncCritters(now);
+    }
   }
   beaconGroup.children.forEach((b) => (b.children[1].position.y = 2.5 + Math.sin(now / 500) * 0.4));
 
@@ -378,6 +451,7 @@ function onGameEvent(ev) {
   if (ev.type === 'error') toast(ev.msg, 'error');
   else if (ev.type === 'discover') { toast(ev.msg, ev.grade); buzz(ev.grade === 'echo' ? 30 : [40, 60, 40]); }
   else if (ev.type === 'mode') {
+    if (ev.mode !== 'present') exitAR();
     toast(ev.msg, ev.mode === 'roam' ? 'echo' : ev.mode);
     styleAvatar(); refreshLeash();
     keepAwake(ev.mode === 'present' && settings.keepAwake);
@@ -638,4 +712,4 @@ const at = new URLSearchParams(location.search).get('at');
 if (at) parsePlace(at).then((to) => begin('roam', { to })).catch((e) => (sMsg.textContent = e.message));
 
 // debug handle
-window.openworld = { world, game, profile, environment, settings, applyTier, get tier() { return tierName; } };
+window.openworld = { world, game, profile, environment, settings, applyTier, camera, ar, get tier() { return tierName; } };

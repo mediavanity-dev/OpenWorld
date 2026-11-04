@@ -158,3 +158,21 @@ body.clean .panel, body.clean .bottom, body.clean #labels, body.clean #toasts, b
   .bottom { bottom: calc(26px + var(--safe-b)); left: 140px; right: 72px; }
   .attrib { font-size: 8.5px; }
 }
+
+/* camera AR */
+#ar-video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; display: none; background: #000; }
+body.ar #ar-video { display: block; }
+#app { z-index: 1; }
+#labels { z-index: 2; }
+.ar-btn { bottom: calc(200px + var(--safe-b)); }
+.ar-bar { display: none; }
+body.ar .ar-bar { display: flex; position: fixed; z-index: 32; left: 12px; right: 12px; top: calc(12px + var(--safe-t)); gap: 10px; align-items: center; justify-content: space-between;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; font-size: 12px; color: var(--muted); }
+body.ar .ar-bar button { background: var(--present); color: #1b1007; border-color: transparent; font-weight: 600; flex: none; }
+body.ar .panel, body.ar .stick, body.ar .compass, body.ar .recenter, body.ar .ar-btn, body.ar .ui-toggle, body.ar .bottom { display: none !important; }
+body.ar #labels { display: block !important; }
+body.ar #toasts { top: calc(70px + var(--safe-t)); display: grid !important; }
+body.ar .label { font-size: 12px; background: rgba(22,26,32,0.8); }
+#ar-flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 50; }
+#ar-flash.on { animation: arflash 0.45s ease-out; }
+@keyframes arflash { 0% { opacity: 0.85; } 100% { opacity: 0; } }

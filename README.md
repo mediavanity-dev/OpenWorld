@@ -107,14 +107,27 @@ actually recorded in that area** (from iNaturalist), shown with a photo. Birds a
 are common; at night you'll meet different animals. Your collection appears under
 **species**.
 
-### 7. Set your home base
+### 7. Camera AR (phones, Present mode)
+
+Tap **📷** to see the game through your phone's camera. Place names float over the real
+streets with their distance ("Café Nero · 120 m"), beacons rise up as glowing pillars, and
+nearby creatures appear in front of you. **Tap a creature to photograph it** from up to
+40 m away, with no need to walk right up to it. Tap **✕ Exit AR** to go back to the map.
+
+- Your browser will ask to use the **camera** (and on iPhone, **Motion & Orientation**); allow both.
+- Hold the phone upright and turn around slowly. Direction comes from the phone's compass,
+  so it can be off by a few degrees, and positions are as accurate as your GPS (usually 5–15 m).
+- AR is only available in **Present** mode, because it shows what's around where you really are.
+- The camera picture is **only shown on your screen**: it is never recorded, saved or uploaded.
+
+### 8. Set your home base
 
 While playing **Present**, tap **Set home base** to make your current real location your
 home. After that you can play **Home** mode from anywhere.
 
 Choose carefully: **a home base can only be moved once every 30 days.**
 
-### 8. Leave beacons
+### 9. Leave beacons
 
 Tap **Place beacon** (or press **B**) to drop a glowing marker where you're standing, with
 a label of your choice. Beacons stay put for good, even when the map data changes.
@@ -125,12 +138,12 @@ Their colour tells you what they're attached to:
 - **orange**: the building it was on has moved on the map, so the beacon moved with it
 - **red**: the building it was on no longer exists on the map; the beacon stays at its spot
 
-### 9. See just the map
+### 10. See just the map
 
 Tap the **eye button** (bottom right), or press **H** on a computer, to hide everything
 except the map. Tap it again to bring it all back.
 
-### 10. Phone extras and settings
+### 11. Phone extras and settings
 
 - **🧭 Compass** (Present mode, phones): tap it and the camera turns as you turn your phone.
   Your character faces the way you're facing.
@@ -142,7 +155,7 @@ except the map. Tap it again to bring it all back.
   When nothing is moving, it slows down drawing to save power.
 - Discoveries and creatures give a short **vibration** (Android).
 
-### 11. Keep your progress safe
+### 12. Keep your progress safe
 
 Your progress is saved **only in this browser on this device**. It isn't stored online.
 To keep a backup or move to another device, use **Export** to save a file, then
@@ -169,7 +182,8 @@ Overpass), terrain (AWS), weather and air quality (Open-Meteo, to about 1 km), y
 country (OpenStreetMap Nominatim, to about 10 km) and its holidays (Nager.Date), and
 wildlife (iNaturalist, to about 5 km). Wikipedia is contacted only when you open a place
 card. "Locate via internet" asks geojs.io where your connection is. Your discoveries,
-species, beacons and home base are never uploaded.
+species, beacons and home base are never uploaded. In AR, the camera image stays on your
+screen and is never recorded or sent anywhere.
 
 ---
 
@@ -218,6 +232,7 @@ src/game/profile.js       the only durable state (localStorage, JSON export/impo
 src/game/game.js          rules: modes, leash, discovery, opening hours, wildlife, beacons, home base
 src/game/locator.js       device + IP location
 src/sensors.js            compass, wake lock, battery, vibration
+src/ar.js                 camera AR: rear-camera passthrough + device-orientation camera (no libraries)
 src/settings.js           per-device settings + quality tiers
 src/ui/                   controls (touch/pinch/keys), place & species card
 src/main.js               renderer, adaptive quality + frame cap, avatar, labels, HUD
