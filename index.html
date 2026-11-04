@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>OpenWorld</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app"></div>
+  <div id="labels"></div>
+
+  <!-- Start screen -->
+  <div id="start" class="modal">
+    <div class="card">
+      <h1>OpenWorld</h1>
+      <p class="sub">The real Earth, abstracted. Open data, true coordinates.</p>
+      <div class="choices">
+        <button id="s-device" class="primary">Be here: use my device location</button>
+        <button id="s-ip">Locate me via my internet connection</button>
+        <button id="s-home" hidden>Go to my home base</button>
+        <button id="s-resume" hidden>Resume at last spot (Roam)</button>
+      </div>
+      <div class="roam">
+        <label>…or Roam (projection) anywhere:</label>
+        <form id="s-roam-form" class="row">
+          <input id="s-roam" placeholder="place name or lat, lon" autocomplete="off" />
+          <button type="submit">Go</button>
+        </form>
+        <div class="presets">
+          <a data-to="51.4779,-0.0015">Greenwich</a>
+          <a data-to="40.7812,-73.9665">Central Park</a>
+          <a data-to="35.0037,135.7788">Gion, Kyoto</a>
+          <a data-to="48.8530,2.3499">Île de la Cité</a>
+          <a data-to="-33.8568,151.2153">Sydney Harbour</a>
+        </div>
+      </div>
+      <p id="s-msg" class="msg"></p>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud" hidden>
+    <div class="panel left">
+      <div class="tabs">
+        <button data-mode="present">Present</button>
+        <button data-mode="home">Home</button>
+        <button data-mode="roam">Roam</button>
+      </div>
+      <p id="h-desc" class="desc"></p>
+      <div class="kv"><span>Position</span><b id="h-pos">–</b></div>
+      <div class="kv"><span>Device fix</span><b id="h-fix">none</b></div>
+      <div class="kv"><span>Home base</span><b id="h-home">not set</b></div>
+      <div class="btns">
+        <button id="b-locate">Locate (device)</button>
+        <button id="b-ip">Locate (IP)</button>
+        <button id="b-sethome">Set home base</button>
+        <button id="b-beacon">Place beacon [B]</button>
+      </div>
+      <form id="h-roam-form" class="row">
+        <input id="h-roam" placeholder="Roam to place or lat, lon" autocomplete="off" />
+        <button type="submit">Go</button>
+      </form>
+    </div>
+
+    <div class="panel right">
+      <div class="stats">
+        <div><b id="c-present">0</b><span>claimed</span></div>
+        <div><b id="c-home">0</b><span>home</span></div>
+        <div><b id="c-echo">0</b><span>echoes</span></div>
+        <div><b id="c-beacons">0</b><span>beacons</span></div>
+      </div>
+      <div id="nearest" class="nearest"><span id="n-arrow">↑</span><div><b id="n-name">–</b><small id="n-dist"></small></div></div>
+      <ol id="log"></ol>
+      <div class="btns small">
+        <button id="p-export">Export profile</button>
+        <label class="filebtn">Import<input id="p-import" type="file" accept="application/json" hidden /></label>
+        <button id="p-reset">Reset</button>
+      </div>
+    </div>
+
+    <div class="bottom">
+      <span id="w-status"></span>
+      <span class="help">WASD / arrows move · Shift run · drag to look · wheel zoom · B beacon</span>
+    </div>
+    <div id="stick" class="stick"><div></div></div>
+  </div>
+
+  <div id="toasts"></div>
+  <div class="attrib">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> (ODbL) · Terrain: AWS Terrain Tiles (Mapzen/Tilezen)</div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
