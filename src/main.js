@@ -20,7 +20,7 @@ import { Journal, TASKS } from './game/journal.js';
 import { Minimap } from './ui/minimap.js';
 import { initJournal, openJournal } from './ui/journalView.js';
 import { showHere } from './ui/card.js';
-import { maybeShowTips } from './ui/tips.js';
+import { runTutorial, tutorialDone } from './ui/tips.js';
 import { Ambience } from './audio.js';
 import { fmtDist, fmtTemp } from './units.js';
 import { pruneCache } from './data/cache.js';
@@ -881,7 +881,7 @@ function begin(mode, opts) {
     styleAvatar();
     environment.refresh(game.pos.lat, game.pos.lon);
     renderHud();
-    setTimeout(() => maybeShowTips(isTouch), 1500);
+    if (!tutorialDone()) setTimeout(startTutorial, 900);
     return true;
   }
   return false;
@@ -1063,7 +1063,17 @@ function setClean(on) {
   $('ui-toggle').setAttribute('aria-label', on ? 'Show interface' : 'Hide interface');
   try { localStorage.setItem(UI_KEY, on ? '1' : '0'); } catch { /* ignore */ }
 }
-try { setClean(localStorage.getItem(UI_KEY) === '1'); } catch { setClean(false); }
+// first-ever visit: start with everything hidden; the mini tutorial points at the eye
+const firstRun = (() => { try { return !tutorialDone() && localStorage.getItem(UI_KEY) === null && !profile.data.last; } catch { return false; } })();
+try { setClean(firstRun || localStorage.getItem(UI_KEY) === '1'); } catch { setClean(false); }
+function startTutorial() {
+  if (tutorialDone() || ar.active) return;
+  // deliberately tiny: show the eye, then one pointer, then never again
+  const steps = [];
+  if (document.body.classList.contains('clean')) steps.push({ target: () => $('ui-toggle'), text: '<b>Tap to show the menus.</b>', waitFor: 'click' });
+  steps.push({ target: () => $('nearest'), text: `Walk to places to discover them. Tap any icon for details. ${isTouch ? 'Pinch to zoom.' : 'Scroll to zoom.'} More in Settings → Help.` });
+  runTutorial(steps);
+}
 $('ui-toggle').onclick = () => setClean(!document.body.classList.contains('clean'));
 $('recenter').onclick = () => controls.recenter();
 

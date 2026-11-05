@@ -26,6 +26,9 @@ When the game opens, pick one of these:
 - **Roam anywhere.** Type a place name ("Eiffel Tower") or tap one of the suggestions to
   visit it virtually.
 
+**First time?** The game opens with just the map and points at the 👁 button: tap it to
+show the menus. One more short pointer follows, and then it never appears again.
+
 The world appears within a few seconds. Trees, opening hours and extra place details
 then fill in over the next half-minute or so ("Adding trees & place details…" at the
 bottom). You can play while that happens.
@@ -310,7 +313,7 @@ src/game/locator.js       device + IP location
 src/sensors.js            compass, wake lock, battery, vibration
 src/ar.js                 camera AR: rear-camera passthrough + device-orientation camera (no libraries)
 src/settings.js           per-device settings + quality tiers
-src/ui/                   controls, place/species/this-spot cards, field journal, minimap, tips
+src/ui/                   controls, place/species/this-spot cards, field journal, minimap, mini tutorial
 src/audio.js              optional synthesised ambience (Web Audio)
 public/                   app manifest, icons, service worker (caches the app shell only)
 src/main.js               renderer, adaptive quality + frame cap, avatar, labels, HUD
