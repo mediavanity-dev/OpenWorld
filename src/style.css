@@ -196,7 +196,14 @@ body.ar .label { font-size: 12px; background: rgba(22,26,32,0.8); }
 body.clean .minimap { display: none; }
 body.ar .minimap { display: block !important; top: calc(74px + var(--safe-t)); bottom: auto; left: auto; right: 12px; width: 104px; height: 104px; }
 
-.card.journal { width: min(620px, 100%); position: relative; }
+/* One fixed size and place: switching tabs never moves or resizes the window; the title and
+   tabs stay put and only the content below them scrolls. Nearly the full height of the screen. */
+.card.journal { position: relative; width: min(620px, 100%); height: min(1100px, calc(100vh - 32px)); height: min(1100px, calc(100dvh - 32px));
+  display: flex; flex-direction: column; overflow: hidden; background: rgba(22, 26, 32, 0.97); }
+/* the first-run tip waits while a full-screen window (journal, settings, help) is open */
+body:has(.modal:not([hidden])) .tips, body:has(.modal:not([hidden])) .tip-ring { display: none; }
+.card.journal > h2, .card.journal > .jtabs { flex: none; }
+#journal-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
 .card .close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; padding: 0; border-radius: 50%; }
 .jtabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; }
 .jtabs button.active, .row button.active { background: var(--accent); color: #1c1606; border-color: transparent; }
