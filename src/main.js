@@ -748,7 +748,7 @@ function onGameEvent(ev) {
   else if (ev.type === 'mode') {
     if (ev.mode !== 'present') exitAR();
     toast(ev.msg, ev.mode === 'roam' ? 'echo' : ev.mode);
-    styleAvatar(); refreshLeash();
+    styleAvatar(); refreshLeash(); requestAnimationFrame(placeToasts);
     keepAwake(ev.mode === 'present' && settings.keepAwake);
   } else if (ev.type === 'critter') { toast(ev.msg, 'species'); buzz(25); }
   else if (ev.type === 'critter-gone') { /* it wandered off */ }
@@ -932,7 +932,18 @@ document.querySelectorAll('.tabs button[data-mode]').forEach((b) => (b.onclick =
   begin(mode, mode === 'roam' ? { to: game.pos } : {});
 }));
 const left = $('left');
-function setCollapsed(on) { left.classList.toggle('collapsed', on); $('more').setAttribute('aria-expanded', String(!on)); }
+function setCollapsed(on) {
+  left.classList.toggle('collapsed', on);
+  document.body.classList.toggle('menu-open', !on); // phones: the minimap steps aside while the menu is open
+  $('more').setAttribute('aria-expanded', String(!on));
+  placeToasts();
+}
+// phones: while the menu is open, messages appear just below it instead of on top of it
+function placeToasts() {
+  const open = document.body.classList.contains('menu-open') && innerWidth <= 720 && !$('hud').hidden;
+  $('toasts').style.top = open ? `${Math.round(left.getBoundingClientRect().bottom + 8)}px` : '';
+}
+addEventListener('resize', placeToasts);
 setCollapsed(isTouch);
 $('more').onclick = () => setCollapsed(!left.classList.contains('collapsed'));
 $('nearest').onclick = () => { if (game.nearest) openPlace(game.nearest.poi); else $('right').classList.toggle('expanded'); };

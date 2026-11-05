@@ -249,6 +249,7 @@ body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after 
 
 @media (max-width: 720px) {
   .minimap { top: calc(68px + var(--safe-t)); bottom: auto; left: auto; right: 12px; width: 96px; height: 96px; }
+  body.menu-open:not(.ar) .minimap { display: none; }
   #toasts { left: 12px; transform: none; width: calc(100vw - 132px); }
   .jgrid { grid-template-columns: repeat(2, 1fr); }
   .area { grid-template-columns: 1fr 70px 34px; }
