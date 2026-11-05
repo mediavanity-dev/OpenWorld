@@ -201,3 +201,78 @@ Opencaching's open API (OKAPI) works directly from the browser with a free key p
 (e.g. opencaching.de, .pl, .us, opencache.uk). Needs: keys registered by the project owner.
 Then: caches as a collectible type (difficulty, terrain, hint, size), finds in the journal;
 later, OAuth to log finds. Coverage is strong in Germany and Poland, thinner elsewhere.
+
+---
+
+## 7. Make it feel like a game, not another map app
+
+**Problem:** the more useful features land (icons, street names, directions), the more it
+looks and behaves like a mapping app. It needs an identity of its own: a clear fantasy, a
+core loop, and visuals that don't read as "a map".
+
+### A fantasy to build around (suggestion)
+
+**You are a field surveyor of the hidden layers of the real world**: time, nature, rock
+and sky. Maps show where things are; OpenWorld shows *what a place is, was, and is
+becoming*. Every feature should serve that fantasy; anything that's only "map utility"
+stays secondary (e.g. directions remain, but tucked away).
+
+### Pillars and ideas
+
+1. **Look: not a map.**
+   - A stylised, art-directed world (papercraft / diorama / watercolour) rather than a
+     neutral basemap; strong silhouettes, a signature palette per season and time of day.
+   - Default camera closer to the character (third-person explorer), with the overview as
+     an occasional "survey view" rather than the starting point.
+   - Diegetic interface: the journal looks like a field notebook, cards like specimen labels,
+     the minimap like a hand-held instrument.
+
+2. **Time layer: the standout differentiator.**
+   - A **time lens** to scrub a place through the years: buildings appear and vanish by
+     their build date (OSM `start_date`), old names and lost places from
+     **OpenHistoricalMap** (open data, vector tiles; *verify*), historic photos via
+     Wikimedia Commons.
+   - "Lost places": discoveries of things that *used to be* here, found only with the lens.
+
+3. **A living world.**
+   - Creatures with simple behaviours: birds that flock and fly off when you approach,
+     animals that hide in woods, insects on warm days; real weather changes who appears
+     (rain brings amphibians, night brings moths and owls).
+   - Rare real events become in-game events: meteor showers, full moons, first frost,
+     migrations (iNaturalist seasonality), solstices.
+
+4. **Expeditions with a story.**
+   - Short procedural quests generated from real data: "Follow the river to its oldest
+     bridge", "Trace the 1666 fire line", "Find three rocks older than the dinosaurs".
+     Clues come from Wikipedia/Wikidata and geology; solved on site.
+   - Chapters per neighbourhood that unlock as you survey it; a narrator voice in text.
+
+5. **Progression that isn't cheesy: a field kit.**
+   - Tools unlocked by real accomplishments: **binoculars** (spot creatures further away),
+     **hand lens** (rarer species and minerals), **lantern** (night discoveries),
+     **rock hammer** (deeper geology layers), **time lens** (history), **sound recorder**
+     (birdsong identification).
+   - Each tool changes how you see the world rather than adding numbers.
+
+6. **Stewardship and belonging.**
+   - "Adopt" places you visit often; see their seasons change over a year; a personal
+     yearly almanac ("your Greenwich, 2026").
+   - Light asynchronous presence of others (with item 1): footprints, notes, beacons.
+
+7. **Play in the moment (AR + senses).**
+   - Photo challenges scored on composition and conditions (golden hour, rain).
+   - Listening mode: identify birdsong nearby; sound as a discovery channel.
+   - Adaptive music and ambience that respond to place, weather and time.
+
+### What to avoid
+
+Loot boxes, energy timers, streak guilt, XP pop-ups, mascots, and anything that rewards
+travelling fast or trespassing. Keep the honesty rules (Roam never counts as real).
+
+### Suggested path
+
+1. Decide the fantasy and art direction (a one-page vision + mood board).
+2. Prototype **one pillar end to end in the beta channel (item 4)**: recommended the
+   **time lens** (most distinctive) or the **field kit** (clearest progression).
+3. Restyle the world and journal to match; demote map-utility features in the interface.
+4. Playtest with a few people walking real routes; keep what makes them want to go outside.
