@@ -128,9 +128,9 @@ body.night .attrib { color: #b7c2cc; }
 
 .fab { position: fixed; right: 16px; z-index: 31; width: 48px; height: 48px; padding: 0; border-radius: 50%; display: grid; place-items: center;
   background: var(--panel); border: 1px solid var(--line); color: var(--text); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-size: 20px; }
-.ui-toggle { bottom: calc(26px + var(--safe-b)); }
-.compass { bottom: calc(84px + var(--safe-b)); }
-.recenter { bottom: calc(142px + var(--safe-b)); background: var(--present); color: #1b1007; border-color: transparent; }
+.ui-toggle { bottom: calc(44px + var(--safe-b)); } /* clears the two-line credits on phones */
+.compass { bottom: calc(102px + var(--safe-b)); }
+.recenter { bottom: calc(160px + var(--safe-b)); background: var(--present); color: #1b1007; border-color: transparent; }
 body.clean .recenter { display: grid; }
 .compass.on { background: var(--present); color: #1b1007; }
 .ui-toggle .eye-off { display: none; }
@@ -155,7 +155,7 @@ body.clean .panel, body.clean .bottom, body.clean #labels, body.clean #toasts, b
   .panel.left .btns { grid-template-columns: repeat(4, 1fr); font-size: 11px; }
   #toasts { top: calc(64px + var(--safe-t)); }
   .sheet { left: 12px; right: 12px; width: auto; bottom: calc(12px + var(--safe-b)); max-height: 55vh; }
-  .bottom { bottom: calc(26px + var(--safe-b)); left: 140px; right: 72px; }
+  .bottom { bottom: calc(44px + var(--safe-b)); left: 140px; right: 72px; }
   .attrib { font-size: 8.5px; }
 }
 
@@ -164,7 +164,7 @@ body.clean .panel, body.clean .bottom, body.clean #labels, body.clean #toasts, b
 body.ar #ar-video { display: block; }
 #app { z-index: 1; }
 #labels { z-index: 2; }
-.ar-btn { bottom: calc(200px + var(--safe-b)); }
+.ar-btn { bottom: calc(218px + var(--safe-b)); }
 .ar-bar { display: none; }
 body.ar .ar-bar { display: flex; position: fixed; z-index: 32; left: 12px; right: 12px; top: calc(12px + var(--safe-t)); gap: 10px; align-items: center; justify-content: space-between;
   background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; font-size: 12px; color: var(--muted); }
