@@ -48,19 +48,23 @@ export const poiMat = new THREE.MeshLambertMaterial({ emissive: '#222222' });
 
 // Place icons: camera-facing quads from one atlas. Size stays roughly constant on screen
 // (never huge up close, never vanishing far away); state fades discovered/closed places.
-export const iconUniforms = { uAtlas: { value: null }, uFogFar: { value: 2600 }, uSize: { value: 1 } };
+export const iconUniforms = { uAtlas: { value: null }, uFogFar: { value: 2600 }, uSize: { value: 1 }, uViewDist: { value: 70 } };
 export const iconMat = new THREE.ShaderMaterial({
   uniforms: iconUniforms,
   transparent: true,
   depthWrite: false,
   depthTest: false, // map pins read above buildings, like labels
   vertexShader: `
-    attribute float aIcon; attribute float aState;
-    uniform float uSize;
-    varying vec2 vUv; varying float vState; varying float vDepth;
+    attribute float aIcon; attribute float aState; attribute float aPri;
+    uniform float uSize; uniform float uViewDist;
+    varying vec2 vUv; varying float vState; varying float vDepth; varying float vVis;
     void main() {
       vec4 mv = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
       float depth = -mv.z;
+      // zoom hierarchy + distance fade (see icons.js iconVisibility)
+      float T = aPri < 0.5 ? 1e9 : aPri < 1.5 ? 650.0 : 280.0;
+      vVis = (1.0 - smoothstep(T * 0.75, T, uViewDist)) * (1.0 - smoothstep(uViewDist * 1.6 + 250.0, uViewDist * 2.6 + 500.0, depth));
+      if (vVis < 0.01) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; } // hidden: skip all pixel work
       float size = clamp(depth * 0.05, 1.6, 46.0) * uSize;
       mv.xy += position.xy * size;
       mv.y += size * 0.55;               // float just above the spot
@@ -71,7 +75,7 @@ export const iconMat = new THREE.ShaderMaterial({
     }`,
   fragmentShader: `
     uniform sampler2D uAtlas; uniform float uFogFar;
-    varying vec2 vUv; varying float vState; varying float vDepth;
+    varying vec2 vUv; varying float vState; varying float vDepth; varying float vVis;
     void main() {
       vec4 t = texture2D(uAtlas, vUv);
       if (t.a < 0.04) discard;
@@ -79,7 +83,7 @@ export const iconMat = new THREE.ShaderMaterial({
       if (vState > 2.5) { c *= 0.45; a *= 0.7; }                                        // closed now
       else if (vState > 1.5) { c = mix(c, vec3(1.0), 0.45); a *= 0.85; }               // echo
       else if (vState > 0.5) { c = mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))), 0.85) * 0.8; a *= 0.65; } // found
-      a *= 1.0 - smoothstep(uFogFar * 0.55, uFogFar, vDepth);
+      a *= (1.0 - smoothstep(uFogFar * 0.55, uFogFar, vDepth)) * vVis;
       gl_FragColor = vec4(c, a);
     }`,
 });

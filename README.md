@@ -46,7 +46,11 @@ In **Present** mode your character only moves when you really walk, so dragging 
 the map instead: zoom out and look around freely, then tap **◎** to jump back to where you
 are. Moving with the joystick also brings the view back.
 
-**Street names** appear along the streets when you zoom in close, and fade away as you zoom out.
+**Street names** follow the road hierarchy: major roads are named even when zoomed well
+out, secondary roads at mid zoom, and small streets and paths as you get closer.
+**Place icons** work the same way: landmarks (sights, history, museums, parks, nature,
+stations) always show; civic and cultural places join at mid zoom; cafés, shops and sport
+appear close up. Icons far from where you're looking fade away to keep the view calm.
 
 You're the small coloured figure with the arrow above its head. The arrow shows through
 buildings, so you can always find yourself.

@@ -214,7 +214,9 @@ async function build({ x, y, opts }) {
     .slice(0, opts.maxPois || 300)
     .map((x) => x.p);
   // ---------- street names: compact polylines in local metres, merged per name ----------
-  const byName = new Map();
+  const byName = new Map(), rankOf = new Map();
+  // road hierarchy: 3 arteries, 2 secondary/tertiary, 1 minor streets, 0 paths
+  const RANK = { motorway: 3, trunk: 3, primary: 3, secondary: 2, tertiary: 2, path: 0, track: 0 };
   for (const st of fabric.streets || []) {
     const out = [];
     let lx = null, lz = null;
@@ -228,9 +230,10 @@ async function build({ x, y, opts }) {
     const list = byName.get(st.name) || [];
     list.push(new Float32Array(out));
     byName.set(st.name, list);
+    rankOf.set(st.name, Math.max(rankOf.get(st.name) ?? 0, RANK[st.cls] ?? 1));
     if (byName.size > 500) break;
   }
-  const streets = [...byName].map(([name, lines]) => ({ name, lines }));
+  const streets = [...byName].map(([name, lines]) => ({ name, lines, rank: rankOf.get(name) }));
 
   const pois = [];
   for (const p of chosen) {

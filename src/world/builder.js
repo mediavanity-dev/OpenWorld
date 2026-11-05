@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { lonToTileX, latToTileY, CHUNK_Z, offsetMeters, rng } from '../geo.js';
 import { HABITATS } from './habitats.js';
 import { terrainMaterial, treeMat, trunkMat, buildingMat, treeGeoHi, treeGeoLo, coneGeo, trunkGeo, iconMat, iconQuad, gridIndex } from './materials.js';
-import { iconIndex } from './icons.js';
+import { iconIndex, priorityOf } from './icons.js';
 import { treeInstance, treeType, packTrees } from './trees.js';
 import { parseHours } from '../data/hours.js';
 
@@ -86,8 +86,9 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
     for (const q of pois) features.set(q.ref, { lat: q.lat, lon: q.lon, ground: q.ground, top: q.y - 5, kind: q.kind, name: q.name });
     if (!pois.length) return;
     const geo = iconQuad.clone();
-    const icon = new Float32Array(pois.length), state = new Float32Array(pois.length);
+    const icon = new Float32Array(pois.length), state = new Float32Array(pois.length), pri = new Float32Array(pois.length);
     geo.setAttribute('aIcon', new THREE.InstancedBufferAttribute(icon, 1));
+    geo.setAttribute('aPri', new THREE.InstancedBufferAttribute(pri, 1));
     geo.setAttribute('aState', new THREE.InstancedBufferAttribute(state, 1));
     poiMesh = new THREE.InstancedMesh(geo, iconMat, pois.length);
     poiMesh.frustumCulled = false; // billboards grow with distance; 1 draw call either way
@@ -99,6 +100,7 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
       m.makeTranslation(q.x, q.y - 2.5, q.z);
       poiMesh.setMatrixAt(k, m);
       icon[k] = q.icon;
+      pri[k] = q.pri = priorityOf(q.icon);
       state[k] = stateOf(q);
       poiIndex.set(q.ref, k);
     });

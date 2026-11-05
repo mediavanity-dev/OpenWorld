@@ -156,3 +156,15 @@ export function atlasCss(index, size = 18) {
   return `background-image:url(${atlasURL});background-size:${size * N}px ${size * N}px;background-position:${-col * size}px ${-row * size}px;width:${size}px;height:${size}px`;
 }
 export const ATLAS_N = N;
+
+// Zoom hierarchy: 0 landmarks (always), 1 civic & culture (mid zoom), 2 everyday places (close up)
+const PRIORITY = { sight: 0, history: 0, museum: 0, nature: 0, transport: 0, park: 0, culture: 1, education: 1, worship: 1, civic: 1, lodging: 1, food: 2, shop: 2, sport: 2, other: 2 };
+export const priorityOf = (index) => PRIORITY[GROUPS[index]?.id] ?? 2;
+export const PRIORITY_MAX_DIST = [Infinity, 650, 280]; // camera distance (m) at which each tier has faded out
+// visibility 0..1 of an icon (same maths as the shader; used for tapping)
+export function iconVisibility(pri, viewDist, depth) {
+  const T = PRIORITY_MAX_DIST[pri];
+  const s = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const zoom = T === Infinity ? 1 : 1 - s(T * 0.75, T, viewDist);
+  return zoom * (1 - s(viewDist * 1.6 + 250, viewDist * 2.6 + 500, depth));
+}

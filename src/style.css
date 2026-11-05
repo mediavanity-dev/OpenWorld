@@ -289,3 +289,7 @@ body.ar .ar-bar button { min-height: 40px; min-width: 44px; }
 .credit.center { text-align: center; margin-top: 10px; }
 
 .sheet h3 .ico { display: inline-block; vertical-align: -6px; margin-right: 8px; border-radius: 50%; }
+
+/* road hierarchy for street names */
+.street.major { font-size: 13.5px; font-weight: 600; font-style: normal; letter-spacing: 0.05em; }
+.street.mid { font-size: 12.5px; }

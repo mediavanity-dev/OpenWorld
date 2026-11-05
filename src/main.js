@@ -8,7 +8,7 @@ import { resolveAnchor } from './game/anchors.js';
 import { deviceFix, ipFix, watchDevice, trustOf } from './game/locator.js';
 import { aqiLabel } from './data/weather.js';
 import { GROUP_STYLE } from './data/wildlife.js';
-import { getAtlas, atlasCss, groupInfo } from './world/icons.js';
+import { getAtlas, atlasCss, groupInfo, iconVisibility } from './world/icons.js';
 import { iconUniforms, iconMat } from './world/materials.js';
 import { haversine, offsetMeters } from './geo.js';
 import { settings, saveSettings, TIERS, startTier, isTouch } from './settings.js';
@@ -243,6 +243,7 @@ function pickPlace(cx, cy) {
   for (const { poi, chunk } of world.pois(c.lat, c.lon, Math.max(700, controls.dist * 4))) {
     pv.set(poi.x, poi.y - 2.5, poi.z).add(chunk.group.position);
     const depth = pv.distanceTo(camera.position), size = Math.min(46, Math.max(1.6, depth * 0.05));
+    if (iconVisibility(poi.pri ?? 2, controls.dist, depth) < 0.3) continue; // can't tap what you can't see
     pu.copy(pv).addScaledVector(camera.up, size * 0.55).project(camera); // icon centre
     if (pu.z > 1) continue;
     const dx = ((pu.x + 1) / 2) * innerWidth - cx, dy = ((1 - pu.y) / 2) * innerHeight - cy, d = dx * dx + dy * dy;
@@ -294,8 +295,13 @@ function fits(l, t, r, b) {
 function screenOf(v) { return [((v.x + 1) / 2) * innerWidth, ((1 - v.y) / 2) * innerHeight]; }
 const textW = (str, px) => str.length * px * 0.56 + 18;
 
+// Street names by road class: arteries show from far out, small streets only up close.
+// (camera distance in metres under which each rank appears; fades in over the last quarter)
+const STREET_SHOW = [140, 300, 520, 1100]; // paths, minor, secondary/tertiary, arteries
+const streetFade = (rank) => Math.max(0, Math.min(1, (STREET_SHOW[rank ?? 1] - controls.dist) / (STREET_SHOW[rank ?? 1] * 0.25)));
+
 // nearest point of each named street to a reference point (local metres)
-function streetCandidates(rx, rz, maxD, maxN) {
+function streetCandidates(rx, rz, maxD, maxN, minRank = 0) {
   const best = new Map();
   const g = world.toGeo(rx, rz), pad = maxD / 111320, padLon = pad / Math.max(0.2, Math.cos((g.lat * Math.PI) / 180));
   for (const ch of world.readyChunks()) {
@@ -303,6 +309,7 @@ function streetCandidates(rx, rz, maxD, maxN) {
     if (g.lat < b.s - pad || g.lat > b.n + pad || g.lon < b.w - padLon || g.lon > b.e + padLon) continue;
     const ox = ch.group.position.x, oz = ch.group.position.z, x0 = rx - ox, z0 = rz - oz;
     for (const st of ch.streets) {
+      if ((st.rank ?? 1) < minRank) continue; // zoomed out: only bigger roads are even considered
       for (const L of st.lines) {
         for (let i = 0; i + 3 < L.length; i += 2) {
           const ax = L[i], az = L[i + 1], dx = L[i + 2] - ax, dz = L[i + 3] - az;
@@ -311,12 +318,13 @@ function streetCandidates(rx, rz, maxD, maxN) {
           const px = ax + dx * t, pz = az + dz * t, d = Math.hypot(x0 - px, z0 - pz);
           if (d > maxD) continue;
           const cur = best.get(st.name);
-          if (!cur || d < cur.d) best.set(st.name, { name: st.name, d, x: px + ox, z: pz + oz, dx, dz });
+          if (!cur || d < cur.d) best.set(st.name, { name: st.name, rank: st.rank ?? 1, d, x: px + ox, z: pz + oz, dx, dz });
         }
       }
     }
   }
-  const list = [...best.values()].sort((a, b) => a.d - b.d).slice(0, maxN);
+  // bigger roads win a slot when they're comparably close (each rank ≈ 120 m of priority)
+  const list = [...best.values()].sort((a, b) => (a.d - a.rank * 120) - (b.d - b.rank * 120)).slice(0, maxN);
   for (const s2 of list) { const gg = world.toGeo(s2.x, s2.z); s2.y = (world.groundAt(gg.lat, gg.lon) ?? avatarY) + 0.6; }
   return list;
 }
@@ -336,8 +344,9 @@ function refreshCandidates() {
     // streets ahead of you: around a point ~25 m in front, at ground level
     fwd.set(0, 0, -1).applyQuaternion(camera.quaternion); fwd.y = 0; fwd.normalize();
     cand.streets = streetCandidates(camera.position.x + fwd.x * 25, camera.position.z + fwd.z * 25, 45, 3);
-  } else if (controls.dist < 170) {
-    cand.streets = streetCandidates(viewLocal.x, viewLocal.z, 160, 6);
+  } else if (controls.dist < STREET_SHOW[3]) {
+    const minRank = STREET_SHOW.findIndex((v) => v > controls.dist);
+    cand.streets = streetCandidates(viewLocal.x, viewLocal.z, Math.min(2200, Math.max(160, controls.dist * 2.2)), 8, minRank);
   }
 }
 
@@ -405,9 +414,10 @@ function updateLabels() {
       el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -100%)${sc !== 1 ? ` scale(${sc.toFixed(2)})` : ''}`;
     }
     // 3) street names: quiet map text, only when zoomed in (or ahead of you in AR)
-    const fade = ar.active ? 1 : Math.max(0, Math.min(1, (170 - controls.dist) / 50));
-    if (fade > 0) {
+    {
       for (const sn of cand.streets) {
+        const fade = ar.active ? 1 : streetFade(sn.rank);
+        if (fade <= 0) continue;
         v3.set(sn.x, sn.y, sn.z).project(camera);
         if (v3.z > 1 || Math.abs(v3.x) > 0.95 || Math.abs(v3.y) > 0.95) continue;
         const [x, y] = screenOf(v3);
@@ -418,12 +428,15 @@ function updateLabels() {
           ang = (Math.atan2(y2 - y, x2 - x) * 180) / Math.PI;
           if (ang > 90) ang -= 180; else if (ang < -90) ang += 180; // keep text upright
         }
-        const w = textW(sn.name, 12 * big), h = 16 * big, a = (ang * Math.PI) / 180;
+        const fs = (sn.rank >= 3 ? 13.5 : sn.rank === 2 ? 12.5 : 12) * big;
+        const w = textW(sn.name, fs), h = 16 * big, a = (ang * Math.PI) / 180;
         const bw = Math.abs(w * Math.cos(a)) + Math.abs(h * Math.sin(a)), bh = Math.abs(w * Math.sin(a)) + Math.abs(h * Math.cos(a));
         if (!fits(x - bw / 2, y - bh / 2, x + bw / 2, y + bh / 2)) continue;
         const el = streetPool[nSt] || newEl(streetPool, 'street');
         nSt++;
         if (el.textContent !== sn.name) el.textContent = sn.name;
+        const cls = sn.rank >= 3 ? 'street major' : sn.rank === 2 ? 'street mid' : 'street';
+        if (el.className !== cls) el.className = cls;
         const op = fade.toFixed(1);
         if (el.style.opacity !== op) el.style.opacity = op;
         el.style.display = '';
@@ -685,6 +698,7 @@ function frame(now) {
       syncCritters(now);
     } else {
     controls.step(rdt);
+    iconUniforms.uViewDist.value = controls.dist;
     const tx = avatar.position.x + controls.pan.x, tz = avatar.position.z + controls.pan.z, dist = controls.dist;
     const tg = world.toGeo(tx, tz);
     const ty = (controls.pan.x || controls.pan.z ? world.groundAt(tg.lat, tg.lon) ?? avatarY : avatarY) + 1.6;
@@ -1066,7 +1080,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 }
 
 // debug handle
-window.openworld = { iconMat, iconUniforms, world, game, profile, environment, settings, applyTier, camera, ar, journal, ambience, __refresh: () => refreshCandidates(), __labels: () => updateLabels(), get __cand() { return cand; }, get __view() { return { viewLocal, dist: controls.dist }; }, get tier() { return tierName; } };
+window.openworld = { iconMat, iconUniforms, world, game, profile, environment, settings, applyTier, camera, ar, journal, ambience, __refresh: () => refreshCandidates(), __labels: () => updateLabels(), get __cand() { return cand; }, get __view() { return { viewLocal, dist: controls.dist }; }, __setDist: (d) => { controls.dist = d; }, get tier() { return tierName; } };
 
 // help & about (static page; opened from settings or the start screen)
 function openAbout(e) { e?.preventDefault(); $('settings').hidden = true; $('about').hidden = false; }
