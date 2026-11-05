@@ -94,6 +94,10 @@ discover it.**
   place's own local time, even when you're roaming abroad.
 - **Tap a place for its card**: whether it's open, when it was built (with a 🎂 on its
   anniversary), whether it's heritage-listed, and a short Wikipedia summary when one exists.
+- **🚶 Walking directions** on a place card opens your phone's maps app (Apple Maps on
+  iPhone, Google Maps on Android, with *Other app* to choose another; Google Maps or an
+  OpenStreetMap route on a computer). Only the destination is sent, so the route starts
+  from where you really are.
 
 ### 5. Real weather, time and seasons
 

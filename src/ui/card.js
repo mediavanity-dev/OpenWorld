@@ -31,6 +31,24 @@ function builtText(start, localNow) {
   return s;
 }
 
+// Walking directions in the device's maps app. Only the destination is passed, so the maps
+// app starts from the person's real current location; nothing else leaves the device.
+const UA = navigator.userAgent || '';
+const IS_IOS = /iPad|iPhone|iPod/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1);
+const IS_ANDROID = /Android/i.test(UA);
+export function directionLinks(lat, lon, name) {
+  const ll = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+  if (IS_IOS) return { main: `https://maps.apple.com/?daddr=${ll}&dirflg=w`, label: 'Walking directions', alt: null };
+  if (IS_ANDROID) return {
+    main: `https://www.google.com/maps/dir/?api=1&destination=${ll}&travelmode=walking`, label: 'Walking directions',
+    alt: { href: `geo:${ll}?q=${ll}(${encodeURIComponent(name || 'Destination')})`, label: 'Other app' },
+  };
+  return {
+    main: `https://www.google.com/maps/dir/?api=1&destination=${ll}&travelmode=walking`, label: 'Walking directions',
+    alt: { href: `https://www.openstreetmap.org/directions?engine=fossgis_osrm_foot&route=;${encodeURIComponent(ll)}`, label: 'OpenStreetMap route' },
+  };
+}
+
 export function showPlace(poi, { game, profile, distance }) {
   current = poi.ref;
   clearTimeout(closeTimer);
@@ -60,6 +78,7 @@ export function showPlace(poi, { game, profile, distance }) {
     <div class="chips">${chips.join('')}</div>
     ${lines.join('')}
     <div id="card-wiki"></div>
+    ${directionsRow(poi, game)}
     <p class="credit"><a href="${osmUrl}" target="_blank" rel="noopener">View on OpenStreetMap</a>${safeUrl(poi.tags?.website) ? ` · <a href="${esc(safeUrl(poi.tags.website))}" target="_blank" rel="noopener nofollow">Website</a>` : ''}</p>`;
   $('card').hidden = false;
   if (poi.tags?.wikipedia || poi.tags?.wikidata) {
@@ -71,6 +90,12 @@ export function showPlace(poi, { game, profile, distance }) {
         : '';
     });
   }
+}
+
+function directionsRow(poi, game) {
+  const d = directionLinks(poi.lat, poi.lon, poi.name);
+  const note = game.mode === 'roam' ? '<span class="credit">From where you really are</span>' : '';
+  return `<div class="dirs"><a class="dirbtn" href="${esc(d.main)}" target="_blank" rel="noopener">🚶 ${d.label}</a>${d.alt ? `<a class="diralt" href="${esc(d.alt.href)}" target="_blank" rel="noopener">${esc(d.alt.label)}</a>` : ''}${note}</div>`;
 }
 
 const MONTHS = 'JFMAMJJASOND';
