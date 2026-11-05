@@ -24,7 +24,7 @@ export function initJournal(c) {
   $('journal').addEventListener('click', (e) => {
     if (e.target.id === 'journal') closeJournal();
     const t = e.target.closest('[data-tab]');
-    if (t) { tab = t.dataset.tab; render(); }
+    if (t) { tab = t.dataset.tab; render(true); }
     const r = e.target.closest('[data-radius]');
     if (r) { mapRadius = +r.dataset.radius; render(); }
     const sp = e.target.closest('[data-species]');
@@ -32,7 +32,7 @@ export function initJournal(c) {
     if (e.target.id === 'j-share') shareCard();
   });
 }
-export function openJournal(which) { if (which) tab = which; $('journal').hidden = false; render(); }
+export function openJournal(which) { if (which) tab = which; $('journal').hidden = false; render(true); }
 export function closeJournal() { $('journal').hidden = true; }
 
 // ---------- derived numbers ----------
@@ -60,12 +60,13 @@ export function summary(profile) {
 }
 
 // ---------- tabs ----------
-function render() {
+function render(toTop = false) {
   const { profile } = ctx;
   const tabs = [['overview', 'Overview'], ['collections', 'Collections'], ['records', 'Records'], ['areas', 'Areas'], ['map', 'Map']];
   $('journal-tabs').innerHTML = tabs.map(([k, l]) => `<button data-tab="${k}" class="${k === tab ? 'active' : ''}">${l}</button>`).join('');
   const body = $('journal-body');
   body.innerHTML = ({ overview, collections, records, areas, map })[tab](profile);
+  if (toTop) body.scrollTop = 0; // a new tab starts at its top (zooming the map doesn't)
   if (tab === 'map') drawMap($('j-map'), profile, mapRadius);
 }
 

@@ -5,6 +5,7 @@
 //   npm run build && npm run smoke            (CHROME_PATH=... to pick a browser)
 //   SMOKE_SHOT=shot.png npm run smoke         (also save a screenshot)
 //   SMOKE_PATH=/beta/ npm run smoke           (the beta build)
+//   SMOKE_SIZE=390,844 SMOKE_OPEN=journal:records   (window size; leave a panel open for the shot)
 
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -34,7 +35,7 @@ const profileDir = mkdtempSync(join(tmpdir(), 'ow-smoke-'));
 const browser = spawn(browserPath, [
   '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profileDir}`,
   '--no-first-run', '--no-default-browser-check', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
-  '--window-size=1280,800', 'about:blank',
+  `--window-size=${process.env.SMOKE_SIZE || '1280,800'}`, 'about:blank',
 ], { stdio: 'ignore' });
 
 let failures = [];
@@ -94,12 +95,26 @@ try {
     if (document.body.classList.contains('clean')) click('ui-toggle');
     await wait(500);
     if (!document.getElementById('h-desc').textContent) return 'HUD did not render';
-    click('b-journal'); await wait(300); click('journal-close'); click('p-settings'); await wait(200); click('set-close');
+    click('b-journal'); await wait(300);
+    // the journal window must stay in one place and size whichever tab is open
+    const box = () => { const r = document.querySelector('.card.journal').getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round).join(','); };
+    const first = box();
+    for (const b of document.querySelectorAll('#journal-tabs button[data-tab]')) {
+      document.querySelector('#journal-tabs button[data-tab="' + b.dataset.tab + '"]').click(); await wait(150);
+      if (box() !== first) return 'journal window moved on tab ' + b.dataset.tab + ': ' + first + ' -> ' + box();
+    }
+    click('journal-close'); click('p-settings'); await wait(200); click('set-close');
     click('b-here'); await wait(500); document.getElementById('card-close')?.click();
     return 'ok'; })()` });
   if (r.result?.value !== 'ok') failures.push(`panel exercise failed: ${JSON.stringify(r)}`);
   await sleep(800);
 
+  // SMOKE_OPEN=journal:collections leaves that panel open for the screenshot
+  if (process.env.SMOKE_OPEN?.startsWith('journal')) {
+    const t = process.env.SMOKE_OPEN.split(':')[1] || 'overview';
+    await send('Runtime.evaluate', { expression: `document.getElementById('b-journal').click(); document.querySelector('#journal-tabs button[data-tab="${t}"]')?.click();` });
+    await sleep(600);
+  }
   if (process.env.SMOKE_SHOT) {
     const shot = await send('Page.captureScreenshot', { format: 'png' });
     writeFileSync(process.env.SMOKE_SHOT, Buffer.from(shot.data, 'base64'));
