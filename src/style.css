@@ -150,13 +150,18 @@ body.clean .panel, body.clean .bottom, body.clean #labels .label, body.clean #to
 }
 @media (max-width: 720px) {
   .panel { width: calc(100vw - 24px); left: 12px !important; right: auto !important; padding: 8px; }
-  .panel.right { top: auto; bottom: calc(170px + var(--safe-b)); max-height: 34vh; overflow: auto; width: calc(100vw - 88px); }
+  /* stats panel: anchored to the bottom, just above the map credits */
+  .panel.right { top: auto; bottom: calc(36px + var(--safe-b)); max-height: 40vh; overflow: auto; width: calc(100vw - 88px); }
   .panel.right #log, .panel.right .btns { display: none; }
   .panel.right.expanded #log, .panel.right.expanded .btns { display: grid; }
   .panel.left .btns { grid-template-columns: repeat(4, 1fr); font-size: 11px; }
   #toasts { top: calc(64px + var(--safe-t)); }
   .sheet { left: 12px; right: 12px; width: auto; bottom: calc(12px + var(--safe-b)); max-height: 55vh; }
-  .bottom { bottom: calc(44px + var(--safe-b)); left: 140px; right: 72px; }
+  /* loading text and joystick sit just above the stats panel (its height tracked by a ResizeObserver) */
+  .bottom { bottom: calc(var(--panel-h, 230px) + 44px + var(--safe-b)); left: 12px; right: 76px; }
+  body:not(.no-stick) .bottom { left: 140px; }
+  .stick { bottom: calc(var(--panel-h, 230px) + 44px + var(--safe-b)); }
+  body.clean .stick { bottom: calc(46px + var(--safe-b)); }
   .attrib { font-size: 8.5px; }
 }
 

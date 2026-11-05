@@ -944,6 +944,8 @@ function placeToasts() {
   $('toasts').style.top = open ? `${Math.round(left.getBoundingClientRect().bottom + 8)}px` : '';
 }
 addEventListener('resize', placeToasts);
+// phones: the joystick and loading text sit just above the bottom-anchored stats panel
+if ('ResizeObserver' in window) new ResizeObserver(([e]) => document.documentElement.style.setProperty('--panel-h', `${Math.round(e.target.offsetHeight)}px`)).observe($('right'));
 setCollapsed(isTouch);
 $('more').onclick = () => setCollapsed(!left.classList.contains('collapsed'));
 $('nearest').onclick = () => { if (game.nearest) openPlace(game.nearest.poi); else $('right').classList.toggle('expanded'); };
