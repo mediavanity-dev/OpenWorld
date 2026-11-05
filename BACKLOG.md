@@ -310,7 +310,11 @@ travelling fast or trespassing. Keep the honesty rules (Roam never counts as rea
 ### Suggested path
 
 1. Decide the fantasy and art direction (a one-page vision + mood board).
-2. Prototype **one pillar end to end in the beta channel (item 4)**: recommended the
-   **time lens** (most distinctive) or the **field kit** (clearest progression).
-3. Restyle the world and journal to match; demote map-utility features in the interface.
-4. Playtest with a few people walking real routes; keep what makes them want to go outside.
+2. Prototype **the hunt + daily treasure** end to end in the beta channel (item 4): the
+   fastest route to "something worth chasing within two minutes", using data we already have.
+3. Add **rephotography** (the time lens as a game) as the signature feature, then the
+   **field kit** as progression.
+4. Restyle the world and journal to match; demote map-utility features in the interface.
+5. Playtest with a few people walking real routes; keep what makes them want to go outside.
+
+*Status: parked for later testing (owner's call, Nov 2026).*
