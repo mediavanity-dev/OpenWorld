@@ -4,7 +4,8 @@
 import * as THREE from 'three';
 import { lonToTileX, latToTileY, CHUNK_Z, offsetMeters, rng } from '../geo.js';
 import { HABITATS } from './habitats.js';
-import { terrainMaterial, treeMat, trunkMat, buildingMat, poiMat, treeGeoHi, treeGeoLo, coneGeo, trunkGeo, poiGeo, gridIndex } from './materials.js';
+import { terrainMaterial, treeMat, trunkMat, buildingMat, treeGeoHi, treeGeoLo, coneGeo, trunkGeo, iconMat, iconQuad, gridIndex } from './materials.js';
+import { iconIndex } from './icons.js';
 import { treeInstance, treeType, packTrees } from './trees.js';
 import { parseHours } from '../data/hours.js';
 
@@ -79,37 +80,44 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
   const poiIndex = new Map();
   const poiState = new Map(); // ref -> { grade, closed }
   function rebuildPois() {
-    if (poiMesh) { group.remove(poiMesh); poiMesh.dispose(); poiMesh = null; }
+    if (poiMesh) { group.remove(poiMesh); poiMesh.geometry.dispose(); poiMesh.dispose(); poiMesh = null; }
     poiIndex.clear();
     features.clear();
     for (const q of pois) features.set(q.ref, { lat: q.lat, lon: q.lon, ground: q.ground, top: q.y - 5, kind: q.kind, name: q.name });
     if (!pois.length) return;
-    poiMesh = new THREE.InstancedMesh(poiGeo, poiMat, pois.length);
+    const geo = iconQuad.clone();
+    const icon = new Float32Array(pois.length), state = new Float32Array(pois.length);
+    geo.setAttribute('aIcon', new THREE.InstancedBufferAttribute(icon, 1));
+    geo.setAttribute('aState', new THREE.InstancedBufferAttribute(state, 1));
+    poiMesh = new THREE.InstancedMesh(geo, iconMat, pois.length);
+    poiMesh.frustumCulled = false; // billboards grow with distance; 1 draw call either way
+    poiMesh.renderOrder = 5;
     const m = new THREE.Matrix4();
     pois.forEach((q, k) => {
       q.index = k;
-      m.makeTranslation(q.x, q.y, q.z);
+      q.icon = iconIndex(q.kind, q.cls);
+      m.makeTranslation(q.x, q.y - 2.5, q.z);
       poiMesh.setMatrixAt(k, m);
-      poiMesh.setColorAt(k, colorFor(q));
+      icon[k] = q.icon;
+      state[k] = stateOf(q);
       poiIndex.set(q.ref, k);
     });
-    poiMesh.computeBoundingSphere();
     poiMesh.name = 'pois';
     group.add(poiMesh);
   }
-  function colorFor(q) {
+  // 0 = to find, 1 = found, 2 = echo, 3 = closed now
+  function stateOf(q) {
     const st = poiState.get(q.ref) || {};
-    const c = kindColor(q.kind);
-    if (st.grade === 'echo') c.lerp(new THREE.Color('#ffffff'), 0.55);
-    else if (st.grade) c.lerp(new THREE.Color('#555555'), 0.75);
-    if (st.closed) c.lerp(new THREE.Color('#2a2a2a'), 0.6);
-    return c;
+    if (st.closed) return 3;
+    if (st.grade === 'echo') return 2;
+    return st.grade ? 1 : 0;
   }
   function recolor(ref) {
     const k = poiIndex.get(ref);
     if (k === undefined || !poiMesh) return;
-    poiMesh.setColorAt(k, colorFor(pois[k]));
-    poiMesh.instanceColor.needsUpdate = true;
+    const a = poiMesh.geometry.getAttribute('aState');
+    a.array[k] = stateOf(pois[k]);
+    a.needsUpdate = true;
   }
   rebuildPois();
 
@@ -182,7 +190,7 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
     },
 
     dispose() {
-      if (poiMesh) poiMesh.dispose();
+      if (poiMesh) { poiMesh.geometry.dispose(); poiMesh.dispose(); }
       disposables.forEach((d) => d.dispose());
       p.texture.close?.();
     },

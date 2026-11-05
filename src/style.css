@@ -137,7 +137,8 @@ body.clean .recenter { display: grid; }
 body.clean .ui-toggle { opacity: 0.55; }
 body.clean .ui-toggle .eye { display: none; }
 body.clean .ui-toggle .eye-off { display: block; }
-body.clean .panel, body.clean .bottom, body.clean #labels, body.clean #toasts, body.clean .compass { display: none; }
+body.clean .panel, body.clean .bottom, body.clean #labels .label, body.clean #toasts, body.clean .compass { display: none !important; }
+/* street names stay in the map-only view */
 
 .stick { display: none; }
 @media (pointer: coarse) {
@@ -260,7 +261,8 @@ body.ar .street { font-style: normal; font-size: 13px; padding: 1px 8px; border-
 .label { transition: opacity 0.2s; }
 .label.arpin { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 9px; background: rgba(16,20,26,0.82); border: 1px solid rgba(255,255,255,0.14);
   text-shadow: 0 1px 1px rgba(0,0,0,0.5); transform-origin: 50% 100%; }
-.label.arpin::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--c, #888); flex: none; }
+.label.arpin i { flex: none; border-radius: 50%; display: block; }
+.label.arpin { padding: 3px 9px 3px 3px; border-radius: 16px; }
 .label.pin { font-size: 13px; padding: 8px 12px; min-height: 34px; display: flex; align-items: center; border-radius: 18px; background: rgba(30,90,58,0.9);
   border: 1px solid rgba(160,255,200,0.4); font-weight: 600; }
 .label.pin.near { background: rgba(40,140,80,0.95); box-shadow: 0 0 0 3px rgba(95,208,138,0.35); }
@@ -278,3 +280,5 @@ body.ar .ar-bar button { min-height: 40px; min-width: 44px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .about p { margin: 4px 0 8px; line-height: 1.5; }
 .credit.center { text-align: center; margin-top: 10px; }
+
+.sheet h3 .ico { display: inline-block; vertical-align: -6px; margin-right: 8px; border-radius: 50%; }

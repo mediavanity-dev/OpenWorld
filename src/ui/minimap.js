@@ -2,7 +2,7 @@
 // home and creatures are dots. Drawn a few times per second on a small canvas.
 
 import { geohashBounds, offsetMeters } from '../geo.js';
-import { POI_COLORS } from '../world/builder.js';
+import { groupInfo } from '../world/icons.js';
 
 const CELL_FILL = { 1: 'rgba(176,122,255,0.30)', 2: 'rgba(120,200,255,0.42)', 3: 'rgba(225,235,210,0.55)' };
 
@@ -62,7 +62,7 @@ export class Minimap {
     for (const p of pois) {
       const [x, y] = P(p.lat, p.lon);
       if ((x - R) ** 2 + (y - R) ** 2 > (R - 2) ** 2) continue;
-      g.fillStyle = discovered[p.ref] ? 'rgba(160,160,160,0.6)' : POI_COLORS[p.kind.split(':')[0]] || '#888';
+      g.fillStyle = discovered[p.ref] ? 'rgba(160,160,160,0.6)' : groupInfo(p.kind, p.cls).color;
       g.beginPath(); g.arc(x, y, dot, 0, Math.PI * 2); g.fill();
     }
     if (home) {

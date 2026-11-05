@@ -187,7 +187,7 @@ export function normalizeTile(vt) {
       if (!g || g.x < 0 || g.y < 0 || g.x >= E || g.y >= E) continue;
       const ref = osmRef(f.id);
       if (!ref) continue;
-      out.pois.push({ ref, px: g.x, py: g.y, name: p.name, kind: `${kind}:${p.subclass || p.class}`, rank: p.rank || 99 });
+      out.pois.push({ ref, px: g.x, py: g.y, name: p.name, kind: `${kind}:${p.subclass || p.class}`, cls: p.class, rank: p.rank || 99 });
     }
   }
   // the most local recognisable place name in this tile (for survey/journal labels)

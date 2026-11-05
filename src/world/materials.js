@@ -46,6 +46,45 @@ export const trunkMat = new THREE.MeshLambertMaterial({ color: '#7a5c42' });
 export const buildingMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
 export const poiMat = new THREE.MeshLambertMaterial({ emissive: '#222222' });
 
+// Place icons: camera-facing quads from one atlas. Size stays roughly constant on screen
+// (never huge up close, never vanishing far away); state fades discovered/closed places.
+export const iconUniforms = { uAtlas: { value: null }, uFogFar: { value: 2600 }, uSize: { value: 1 } };
+export const iconMat = new THREE.ShaderMaterial({
+  uniforms: iconUniforms,
+  transparent: true,
+  depthWrite: false,
+  depthTest: false, // map pins read above buildings, like labels
+  vertexShader: `
+    attribute float aIcon; attribute float aState;
+    uniform float uSize;
+    varying vec2 vUv; varying float vState; varying float vDepth;
+    void main() {
+      vec4 mv = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+      float depth = -mv.z;
+      float size = clamp(depth * 0.05, 1.6, 46.0) * uSize;
+      mv.xy += position.xy * size;
+      mv.y += size * 0.55;               // float just above the spot
+      gl_Position = projectionMatrix * mv;
+      float col = mod(aIcon, 4.0), row = floor(aIcon / 4.0);
+      vUv = vec2((col + uv.x) / 4.0, 1.0 - (row + 1.0 - uv.y) / 4.0);
+      vState = aState; vDepth = depth;
+    }`,
+  fragmentShader: `
+    uniform sampler2D uAtlas; uniform float uFogFar;
+    varying vec2 vUv; varying float vState; varying float vDepth;
+    void main() {
+      vec4 t = texture2D(uAtlas, vUv);
+      if (t.a < 0.04) discard;
+      vec3 c = t.rgb; float a = t.a;
+      if (vState > 2.5) { c *= 0.45; a *= 0.7; }                                        // closed now
+      else if (vState > 1.5) { c = mix(c, vec3(1.0), 0.45); a *= 0.85; }               // echo
+      else if (vState > 0.5) { c = mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))), 0.85) * 0.8; a *= 0.65; } // found
+      a *= 1.0 - smoothstep(uFogFar * 0.55, uFogFar, vDepth);
+      gl_FragColor = vec4(c, a);
+    }`,
+});
+export const iconQuad = new THREE.PlaneGeometry(1, 1);
+
 export const treeGeoHi = new THREE.IcosahedronGeometry(1, 1);
 export const treeGeoLo = new THREE.IcosahedronGeometry(1, 0);
 export const coneGeo = new THREE.ConeGeometry(1, 1, 7);

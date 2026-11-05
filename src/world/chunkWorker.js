@@ -239,7 +239,7 @@ async function build({ x, y, opts }) {
       if (p.px < f.bb.x0 || p.px > f.bb.x1 || p.py < f.bb.y0 || p.py > f.bb.y1) continue;
       if (inside(p.px, p.py, f.ring)) { base = Math.max(base, f.top); break; }
     }
-    pois.push({ ref: p.ref, lat: latOf(p.py), lon: lonOf(p.px), x: X(p.px), z: Z(p.py), y: base + 5, ground: H(p.px, p.py), name: p.name, kind: p.kind, rank: p.rank });
+    pois.push({ ref: p.ref, lat: latOf(p.py), lon: lonOf(p.px), x: X(p.px), z: Z(p.py), y: base + 5, ground: H(p.px, p.py), name: p.name, kind: p.kind, cls: p.cls || null, rank: p.rank });
   }
 
   const payload = {

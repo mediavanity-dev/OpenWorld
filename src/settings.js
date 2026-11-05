@@ -21,6 +21,7 @@ const defaults = {
   textSize: 'normal',       // normal | large
   reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
   sound: false,             // ambient soundscape (off by default)
+  placeNames: 'zoom',       // zoom (only when zoomed in) | always | never
 };
 
 export const settings = (() => {

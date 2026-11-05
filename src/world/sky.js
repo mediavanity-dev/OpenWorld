@@ -3,7 +3,7 @@
 // one GPU-animated particle draw call.
 
 import * as THREE from 'three';
-import { env as uniforms, buildingMat, poiMat } from './materials.js';
+import { env as uniforms, buildingMat, iconUniforms } from './materials.js';
 
 const C = (h) => new THREE.Color(h);
 const SKY = { day: C('#bcd8ec'), overcast: C('#c2c8ce'), golden: C('#f0c49a'), night: C('#16233a'), haze: C('#cbbfa8') };
@@ -130,7 +130,7 @@ export class Sky {
 
     // night glow on buildings and places
     buildingMat.emissive.setRGB(1, 0.8, 0.55).multiplyScalar(0.11 * (1 - day));
-    poiMat.emissive.setScalar(0.13 + 0.55 * (1 - day));
+    iconUniforms.uFogFar.value = far * 1.4; // icons fade a little after the fog
 
     // ground & tree effects
     const wind = w ? w.wind : 8;

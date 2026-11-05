@@ -8,7 +8,8 @@ import { resolveAnchor } from './game/anchors.js';
 import { deviceFix, ipFix, watchDevice, trustOf } from './game/locator.js';
 import { aqiLabel } from './data/weather.js';
 import { GROUP_STYLE } from './data/wildlife.js';
-import { POI_COLORS } from './world/builder.js';
+import { getAtlas, atlasCss, groupInfo } from './world/icons.js';
+import { iconUniforms, iconMat } from './world/materials.js';
 import { haversine, offsetMeters } from './geo.js';
 import { settings, saveSettings, TIERS, startTier, isTouch } from './settings.js';
 import { startCompass, stopCompass, onHeading, currentHeading, compassSupported, keepAwake, watchBattery, buzz } from './sensors.js';
@@ -33,6 +34,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: !isTouch, alpha: true, pow
 renderer.setSize(innerWidth, innerHeight);
 $('app').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
+iconUniforms.uAtlas.value = new THREE.CanvasTexture(getAtlas()); // place-class icons (drawn once)
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.5, 8000);
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
@@ -224,20 +226,29 @@ function pick(cx, cy) {
   if (!game.pos) return;
   const ndc = new THREE.Vector2((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1);
   raycaster.setFromCamera(ndc, camera);
-  const targets = [...critterObjs.values()];
-  for (const ch of world.readyChunks()) { const m = ch.group.getObjectByName('pois'); if (m) targets.push(m); }
-  const hit = raycaster.intersectObjects(targets, false)[0];
-  if (!hit) return closeCard();
+  const hit = raycaster.intersectObjects([...critterObjs.values()], false)[0];
+  if (!hit) { const poi = ar.active ? null : pickPlace(cx, cy); return poi ? openPlace(poi) : closeCard(); }
   if (hit.object.userData.critter) {
     const c = hit.object.userData.critter;
     if (ar.active) return photographCritter(c);
     const label = GROUP_STYLE[c.sp.group]?.label || 'creature';
     return toast(`${/^[aeiou]/.test(label) ? 'An' : 'A'} ${label}: walk up to it to see what it is.`, 'species');
   }
-  const chunkKey = hit.object.parent.name.replace('chunk:', '');
-  const ch = world.readyChunks().find((c) => c.key === chunkKey);
-  const poi = ch?.pois[hit.instanceId];
-  if (poi) openPlace(poi);
+}
+// nearest place icon to a tap, in screen space (generous ~30 px target)
+const pv = new THREE.Vector3(), pu = new THREE.Vector3();
+function pickPlace(cx, cy) {
+  const c = viewGeo || game.pos;
+  let best = null, bestD = 30 * 30;
+  for (const { poi, chunk } of world.pois(c.lat, c.lon, Math.max(700, controls.dist * 4))) {
+    pv.set(poi.x, poi.y - 2.5, poi.z).add(chunk.group.position);
+    const depth = pv.distanceTo(camera.position), size = Math.min(46, Math.max(1.6, depth * 0.05));
+    pu.copy(pv).addScaledVector(camera.up, size * 0.55).project(camera); // icon centre
+    if (pu.z > 1) continue;
+    const dx = ((pu.x + 1) / 2) * innerWidth - cx, dy = ((1 - pu.y) / 2) * innerHeight - cy, d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = poi; }
+  }
+  return best;
 }
 function photographCritter(c) {
   const d = haversine(game.pos.lat, game.pos.lon, c.lat, c.lon);
@@ -357,28 +368,39 @@ function updateLabels() {
         el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -100%)`;
       }
     }
-    // 2) places
+    // 2) places: AR pins always; on the map only when zoomed in close (or per setting)
     const maxPoi = ar.active ? Math.max(8, tier.labels) : tier.labels;
-    for (const it of cand.pois) {
+    const nameFade = ar.active ? 1 : settings.placeNames === 'always' ? 1 : settings.placeNames === 'never' ? 0 : Math.max(0, Math.min(1, (48 - controls.dist) / 14)); // names fade in below ~48 m
+    for (const it of (nameFade > 0 ? cand.pois : [])) {
       if (nPoi >= maxPoi) break;
-      v3.set(it.poi.x, it.poi.y + (ar.active ? 0 : 3.5), it.poi.z).add(it.chunk.group.position).project(camera);
+      v3.set(it.poi.x, it.poi.y + (ar.active ? 0 : 4.5), it.poi.z).add(it.chunk.group.position).project(camera);
       const lim = ar.active ? 0.95 : 1.1;
       if (v3.z > 1 || Math.abs(v3.x) > lim || Math.abs(v3.y) > lim) continue;
       let [x, y] = screenOf(v3);
       const d = ar.active ? haversine(game.pos.lat, game.pos.lon, it.poi.lat, it.poi.lon) : it.d;
-      const text = ar.active ? `${it.poi.name} · ${fmtDist(d)}` : it.poi.name;
+      const text = ar.active ? fmtDist(d) : it.poi.name;
       const sc = ar.active ? Math.max(0.82, Math.min(1.12, 1.15 - d / 700)) : 1;
-      const w = textW(text, 11 * big * sc) + (ar.active ? 12 : 0), h = 20 * big * sc;
+      const w = textW(text, 11 * big * sc) + (ar.active ? 26 : 0), h = (ar.active ? 30 : 20) * big * sc;
       if (ar.active) x = Math.max(w / 2 + 6, Math.min(innerWidth - w / 2 - 6, x)); // keep pins fully on screen
       if (!fits(x - w / 2, y - h, x + w / 2, y)) continue;
       const el = labelPool[nPoi] || newEl(labelPool, 'label');
       nPoi++;
       el._poi = it.poi;
-      if (el.textContent !== text) el.textContent = text;
+      if (ar.active) {
+        if (!el._ico) { el.textContent = ''; el._ico = el.appendChild(document.createElement('i')); el._txt = el.appendChild(document.createElement('span')); }
+        if (el._iconFor !== it.poi.icon) { el._iconFor = it.poi.icon; el._ico.style.cssText = atlasCss(it.poi.icon, 22); }
+        if (el._txt.textContent !== text) el._txt.textContent = text;
+        el.title = it.poi.name;
+      } else {
+        if (el._ico) { el._ico = null; el._txt = null; el._iconFor = null; }
+        if (el.textContent !== text) el.textContent = text;
+        const op = nameFade.toFixed(1);
+        if (el.style.opacity !== op) el.style.opacity = op;
+      }
       const st = game.openState(it.poi);
       const cls = 'label' + (ar.active ? ' arpin' : '') + (profile.data.discoveries[it.poi.ref] ? ' done' : '') + (st && !st.open ? ' closed' : '');
       if (el.className !== cls) el.className = cls;
-      if (ar.active) { const col = POI_COLORS[it.poi.kind.split(':')[0]] || '#888'; if (el._col !== col) { el._col = col; el.style.setProperty('--c', col); } }
+      if (ar.active && el.style.opacity !== '1') el.style.opacity = '1';
       el.style.display = '';
       el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -100%)${sc !== 1 ? ` scale(${sc.toFixed(2)})` : ''}`;
     }
@@ -958,6 +980,7 @@ function openSettings() {
   $('set-text').value = settings.textSize;
   $('set-motion').checked = settings.reduceMotion;
   $('set-sound').checked = settings.sound;
+  $('set-names').value = settings.placeNames;
   $('set-awake').disabled = !('wakeLock' in navigator);
   $('set-compass').disabled = !compassSupported;
   $('set-info').textContent = `Now: ${tier.label}${settings.quality === 'auto' ? ' (auto)' : ''}${batteryLow ? ' · battery low' : ''}`;
@@ -973,6 +996,7 @@ $('set-compass').onchange = async (e) => {
   settings.compassFollow = e.target.checked; saveSettings();
   if (e.target.checked && !compassOn) { compassOn = await startCompass(); $('compass').classList.toggle('on', compassOn); }
 };
+$('set-names').onchange = (e) => { settings.placeNames = e.target.value; saveSettings(); };
 $('set-units').onchange = (e) => { settings.units = e.target.value; saveSettings(); renderHud(); };
 $('set-text').onchange = (e) => { settings.textSize = e.target.value; saveSettings(); applyLook(); };
 $('set-motion').onchange = (e) => { settings.reduceMotion = e.target.checked; saveSettings(); applyLook(); };
@@ -1029,7 +1053,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 }
 
 // debug handle
-window.openworld = { world, game, profile, environment, settings, applyTier, camera, ar, journal, ambience, __refresh: () => refreshCandidates(), __labels: () => updateLabels(), get __cand() { return cand; }, get __view() { return { viewLocal, dist: controls.dist }; }, get tier() { return tierName; } };
+window.openworld = { iconMat, iconUniforms, world, game, profile, environment, settings, applyTier, camera, ar, journal, ambience, __refresh: () => refreshCandidates(), __labels: () => updateLabels(), get __cand() { return cand; }, get __view() { return { viewLocal, dist: controls.dist }; }, get tier() { return tierName; } };
 
 // help & about (static page; opened from settings or the start screen)
 function openAbout(e) { e?.preventDefault(); $('settings').hidden = true; $('about').hidden = false; }

@@ -5,6 +5,7 @@ import { GROUP_STYLE } from '../data/wildlife.js';
 import { TAG_ICONS } from '../game/environment.js';
 import { taxonDetails, seasonality, skyNotes, climateToday, wikiNearby, quakesNear, rockAt, ageText } from '../data/science.js';
 import { fmtDist, fmtElev, fmtTemp, fmtTempDelta } from '../units.js';
+import { groupInfo, iconIndex, atlasCss } from '../world/icons.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -54,8 +55,8 @@ export function showPlace(poi, { game, profile, distance }) {
   }
   const osmUrl = `https://www.openstreetmap.org/${poi.ref.replace('osm:', '')}`;
   $('card-body').innerHTML = `
-    <h3>${esc(poi.name)}</h3>
-    <div class="kind">${esc((sub || cls).replace(/_/g, ' '))} · ${fmtDist(distance)} away</div>
+    <h3><i class="ico" style="${atlasCss(iconIndex(poi.kind, poi.cls), 26)}"></i>${esc(poi.name)}</h3>
+    <div class="kind">${esc(groupInfo(poi.kind, poi.cls).label)} · ${esc((sub || cls).replace(/_/g, ' '))} · ${fmtDist(distance)} away</div>
     <div class="chips">${chips.join('')}</div>
     ${lines.join('')}
     <div id="card-wiki"></div>

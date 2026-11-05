@@ -70,13 +70,16 @@ The buttons at the top switch between them. Each one has a different rule:
 
 ### 4. Discover places
 
-Floating diamond markers are real named places: cafés, monuments, shops, parks and
-landmarks. Their names appear as you get close. **Walk within about 30 m of one to
+Small round **icons** mark real named places. Each icon shows the kind of place, taken
+from OpenStreetMap's own categories: ☕ food & drink, 🛍 shops, 🏛 museums & galleries,
+★ sights, ⏳ history, 📖 culture & entertainment, 🎓 education, places of worship, civic
+buildings & services, 🛏 lodging, 🌳 parks, ⚽ sport & play, ⛰ nature, 🚆 transport.
+Tap an icon for its name and details. Names also appear on their own when you zoom in
+close (you can change this in Settings → *Place names*). **Walk within about 30 m of one to
 discover it.**
 
-- Marker colours: orange = sights, purple = historic, blue = cafés, schools and services,
-  yellow = shops, green = parks and sport.
-- Once discovered, a marker fades (or turns pale for an echo).
+- Once discovered, an icon turns grey (or pale for an echo); places that are closed right
+  now look dark.
 - The panel (top-right on computers, bottom on phones) shows your **claimed / home /
   echoes** scores and an arrow pointing to the **nearest place you haven't found yet**.
   Follow the arrow!
@@ -148,8 +151,8 @@ locally, and which months it's usually seen around here.
 
 ### 9. Camera AR (phones, Present mode)
 
-Tap **📷** to see the game through your phone's camera. Places appear as small pins with
-their distance ("● Café Nero · 120 m"), the names of streets ahead of you show near the
+Tap **📷** to see the game through your phone's camera. Places appear as small icon pins
+with their distance (tap one for its name and details), the names of streets ahead of you show near the
 ground, beacons rise up as glowing pillars, and nearby creatures appear with a green
 "tap to photograph" tag. **Tap a creature to photograph it** from up to 40 m away.
 Tap **✕ Exit AR** to go back to the map.
@@ -189,7 +192,7 @@ Their colour tells you what they're attached to:
 ### 12. See just the map
 
 Tap the **eye button** (bottom right), or press **H** on a computer, to hide everything
-except the map. Tap it again to bring it all back.
+except the map, place icons and street names. Tap it again to bring it all back.
 
 ### 13. Phone extras and settings
 
@@ -248,6 +251,8 @@ screen and is never recorded or sent anywhere.
 ---
 
 ## For developers
+
+Planned work and ideas: see [BACKLOG.md](BACKLOG.md).
 
 ```
 npm install
