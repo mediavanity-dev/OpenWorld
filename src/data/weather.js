@@ -1,13 +1,15 @@
 // Live weather + air quality from Open-Meteo (free, keyless, non-commercial use).
 // Fetched for the character's area at most every 15 minutes or after moving ~5 km.
 
+import { tryJson } from './net.js';
+
 const FIELDS = 'temperature_2m,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,precipitation,snowfall,snow_depth,is_day';
 
 export async function fetchWeather(lat, lon) {
   const la = lat.toFixed(2), lo = lon.toFixed(2);
   const [w, a] = await Promise.all([
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${lo}&current=${FIELDS}&timezone=auto`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${la}&longitude=${lo}&current=european_aqi`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    tryJson(`https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${lo}&current=${FIELDS}&timezone=auto`, { retries: 1 }),
+    tryJson(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${la}&longitude=${lo}&current=european_aqi`),
   ]);
   if (!w?.current) return null;
   const c = w.current;

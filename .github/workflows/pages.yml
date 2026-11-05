@@ -33,9 +33,18 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
       - run: npm test
       - run: npm run build          # main site  -> dist/
       - run: npm run build:beta     # beta site  -> dist/beta/ (experiments on, separate profile)
+      - run: npm run smoke          # headless browser: the built app starts and runs without errors
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - run: npm run smoke          # ...and the beta build
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+          SMOKE_PATH: /beta/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

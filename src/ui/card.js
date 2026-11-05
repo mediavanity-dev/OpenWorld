@@ -7,10 +7,9 @@ import { taxonDetails, seasonality, skyNotes, climateToday, wikiNearby, quakesNe
 import { fmtDist, fmtElev, fmtTemp, fmtTempDelta } from '../units.js';
 import { groupInfo, iconIndex, atlasCss } from '../world/icons.js';
 import { sizeLabel } from '../data/geocaching.js';
+import { esc, safeUrl } from '../util/html.js';
 
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const safeUrl = (u) => (/^https?:\/\//i.test(u || '') ? u : null);
 const GRADE_TEXT = { present: 'Claimed', home: 'Found from home', echo: 'Echo (seen virtually)' };
 let closeTimer = null;
 let current = null;
@@ -65,7 +64,7 @@ function showGeocache(poi, { game, profile, distance, onLogged }) {
     ${g.hint ? `<details class="gchint"><summary>Show the hint</summary><p class="small">${esc(g.hint)}</p></details>` : ''}
     <p class="credit">${g.founds != null ? `Found ${g.founds} times` : ''}${g.lastFound ? ` · last ${new Date(g.lastFound).toLocaleDateString()}` : ''}${g.owner ? ` · hidden by ${esc(g.owner)}` : ''}</p>
     ${directionsRow(poi, game)}
-    <div class="dirs">${mine ? '' : `<button id="gc-found" class="dirbtn found" ${can.ok ? '' : 'disabled'}>✓ I found it</button>`}${g.url ? `<a class="diralt" href="${esc(g.url)}" target="_blank" rel="noopener">Open listing &amp; log on ${esc(g.site)}</a>` : ''}</div>
+    <div class="dirs">${mine ? '' : `<button id="gc-found" class="dirbtn found" ${can.ok ? '' : 'disabled'}>✓ I found it</button>`}${safeUrl(g.url) ? `<a class="diralt" href="${esc(g.url)}" target="_blank" rel="noopener">Open listing &amp; log on ${esc(g.site)}</a>` : ''}</div>
     ${!mine && !can.ok ? `<p class="credit">${esc(can.why)}</p>` : ''}
     <p class="credit">${esc(g.attribution || `Listing from ${g.site}`)}. Please follow the cache's rules, respect private land, and re-hide it as you found it.</p>`;
   $('card').hidden = false;
@@ -110,7 +109,7 @@ export function showPlace(poi, { game, profile, distance, onLogged }) {
     wikiSummary(poi.tags).then((w) => {
       if (current !== poi.ref) return;
       $('card-wiki').innerHTML = w
-        ? `<div class="wiki">${safeUrl(w.thumb) ? `<img src="${esc(w.thumb)}" alt="" loading="lazy" />` : ''}<div>${esc(w.extract.length > 420 ? w.extract.slice(0, 400) + '…' : w.extract)} <a href="${esc(w.url)}" target="_blank" rel="noopener">Wikipedia</a></div></div>`
+        ? `<div class="wiki">${safeUrl(w.thumb) ? `<img src="${esc(w.thumb)}" alt="" loading="lazy" />` : ''}<div>${esc(w.extract.length > 420 ? w.extract.slice(0, 400) + '…' : w.extract)} ${safeUrl(w.url) ? `<a href="${esc(w.url)}" target="_blank" rel="noopener">Wikipedia</a>` : ''}</div></div>`
         : '';
     });
   }

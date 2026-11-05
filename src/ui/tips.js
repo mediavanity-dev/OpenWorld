@@ -3,12 +3,13 @@
 // Shown once per device; skippable; never shown again.
 
 import { storeKey } from '../channel.js';
+import { storage } from '../storage.js';
 
 const KEY = storeKey('tipsDone');
 const $ = (id) => document.getElementById(id);
 
-export function tutorialDone() { try { return !!localStorage.getItem(KEY); } catch { return true; } }
-function markDone() { try { localStorage.setItem(KEY, '1'); } catch { /* ignore */ } }
+export function tutorialDone() { return !!storage.get(KEY); }
+function markDone() { storage.set(KEY, '1'); }
 
 // steps: [{ target: () => Element, text, waitFor?: 'click' }]
 export function runTutorial(steps, { onDone } = {}) {
@@ -24,7 +25,7 @@ export function runTutorial(steps, { onDone } = {}) {
     ring.style.cssText = `left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px;border-radius:${Math.min(r.width, r.height) > 60 ? 14 : 999}px`;
     const bw = box.offsetWidth, bh = box.offsetHeight, gap = 16;
     const below = r.top < bh + gap + 20; // not enough room above: go below
-    let left = Math.max(10, Math.min(innerWidth - bw - 10, r.left + r.width / 2 - bw / 2));
+    const left = Math.max(10, Math.min(innerWidth - bw - 10, r.left + r.width / 2 - bw / 2));
     const top = below ? r.bottom + gap : r.top - bh - gap;
     box.style.left = `${left}px`; box.style.top = `${Math.max(10, top)}px`;
     box.dataset.side = below ? 'below' : 'above';

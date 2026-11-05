@@ -1,3 +1,4 @@
+// @ts-check
 // Anchors: how character task data is pinned to the world.
 //
 // An anchor never stores render coordinates. It stores:

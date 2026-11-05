@@ -6,6 +6,7 @@
 // Loaded in the background after the base tile; the world is playable without it.
 
 import { cacheGet, cachePut } from './cache.js';
+import { request, backoff } from './net.js';
 
 const ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
@@ -15,19 +16,22 @@ const DETAIL_VERSION = 2;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Alternates between public instances. The client timeout sits just above the query's own
+// server-side [timeout:N], so a stalled request frees its slot instead of hanging forever.
 export async function overpass(query, attempts = 5) {
   const body = 'data=' + encodeURIComponent(query);
+  const serverTimeout = +(/\[timeout:(\d+)\]/.exec(query)?.[1] || 30);
   let lastErr;
   for (let a = 0; a < attempts; a++) {
     try {
-      const res = await fetch(ENDPOINTS[a % ENDPOINTS.length], {
-        method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      const res = await request(ENDPOINTS[a % ENDPOINTS.length], {
+        init: { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
+        timeout: (serverTimeout + 10) * 1000, service: 'place details',
       });
-      if (!res.ok) throw new Error('overpass ' + res.status);
       return await res.json();
     } catch (err) {
       lastErr = err;
-      await sleep(2000 * (a + 1));
+      if (a < attempts - 1) await sleep(backoff(a, 2000));
     }
   }
   throw lastErr;

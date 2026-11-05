@@ -335,4 +335,4 @@ minimap rustle that tightens, a 5-dot warmer/colder tracker, tracks on the groun
 close, flee if rushed, trail goes cold) and **daily treasure** (3 finds per area per day along
 public streets, seeded by date + area so everyone shares them; cool/warm/hot hints, a faint
 golden mote when close; real visits only). **Promoted to the main version** (Nov 2026, owner's decision) with on/off switches in
-Settings → Game features. Next: real-world playtest and tuning, then rephotography in the beta.*
+Settings → Game features. **Rephotography** ("Then & now") is now **in the beta** (Nov 2026): at historic places with a pre-1970 Commons photo taken nearby, the photo appears as a ghost over the AR camera; an edge-map match meter scores the line-up; captures go to the journal and can be saved as a side-by-side image. Local-only **playtest stats** (Settings → Playtest stats) measure time to first chase, first find and hunt outcomes. Next: real-world playtests using those stats, then tune hunt distances, encounter rate and treasure radius from them.*

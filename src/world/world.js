@@ -138,6 +138,10 @@ export class World {
       this.emit({ type: 'detail', chunk: entry.chunk });
     } catch (err) {
       console.warn('detail failed (world still playable)', key, err.message);
+      entry.detailFailed = true;
+      this.emit({ type: 'status' });
+      // try again later, at most twice (the shared server is often just busy)
+      if ((entry.detailRetries = (entry.detailRetries || 0) + 1) <= 2) setTimeout(() => { if (this.chunks.get(key) === entry && entry.chunk && !entry.chunk.detail) { entry.detailFailed = false; this.loadDetail(key, entry, season); } }, 90000);
     }
   }
 
@@ -155,11 +159,11 @@ export class World {
   }
 
   status() {
-    let ready = 0, loading = 0, error = 0, detail = 0;
+    let ready = 0, loading = 0, error = 0, detail = 0, detailFailed = 0;
     for (const c of this.chunks.values()) {
-      if (c.state === 'ready') { ready++; if (c.chunk.detail) detail++; } else if (c.state === 'error') error++; else loading++;
+      if (c.state === 'ready') { ready++; if (c.chunk.detail) detail++; else if (c.detailFailed) detailFailed++; } else if (c.state === 'error') error++; else loading++;
     }
-    return { ready, loading, error, detail };
+    return { ready, loading, error, detail, detailFailed };
   }
 
   readyChunks() { const out = []; for (const c of this.chunks.values()) if (c.chunk) out.push(c.chunk); return out; }

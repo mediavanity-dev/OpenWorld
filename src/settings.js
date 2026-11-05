@@ -1,6 +1,7 @@
 // Per-device settings (not part of the portable profile) and quality tiers.
 
 import { storeKey } from './channel.js';
+import { storage } from './storage.js';
 
 const KEY = storeKey('settings.v1');
 const coarse = matchMedia('(pointer: coarse)').matches;
@@ -28,11 +29,11 @@ const defaults = {
 };
 
 export const settings = (() => {
-  try { return { ...defaults, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return { ...defaults }; }
+  return { ...defaults, ...(storage.getJson(KEY) || {}) };
 })();
 
 export function saveSettings() {
-  try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch { /* ignore */ }
+  storage.setJson(KEY, settings);
 }
 
 export const isTouch = coarse;

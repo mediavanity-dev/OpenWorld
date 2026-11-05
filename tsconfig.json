@@ -1,0 +1,18 @@
+{
+  // Type-checks plain JavaScript (no build step, no TypeScript files): `npm run typecheck`.
+  // Files opt in with a `// @ts-check` first line: the game rules, geometry and data logic.
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable", "WebWorker.ImportScripts"],
+    "types": ["vite/client"],
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.js"]
+}

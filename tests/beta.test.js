@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { startHunt, stepHunt } from '../src/game/hunt.js';
 import { treasuresFor, bandOf, PER_AREA } from '../src/game/treasure.js';
-import { offsetGeo, haversine, rng } from '../src/geo.js';
+import { haversine, rng } from '../src/geo.js';
 
 const HOME = { lat: 51.48, lon: 0 };
 const sp = { id: 1, name: 'Robin', group: 'Aves', count: 120, rarity: 'common' };
@@ -15,7 +15,8 @@ function walk(from, to, metres) {
 test('hunt: signal rises, tracks appear, then it reveals up close', () => {
   const r = rng(7), h = startHunt(HOME, sp, 0, r);
   assert.ok(h.d > 50 && h.d < 115);
-  let pos = { ...HOME }, events = [], t = Date.now();
+  let pos = { ...HOME }, t = Date.now();
+  const events = [];
   for (let k = 0; k < 60 && !h.revealed; k++) { pos = walk(pos, h, 3); t += 2000; const ev = stepHunt(h, pos, 1.4, t, r); if (ev) events.push(ev); }
   assert.ok(events.includes('signal-up'));
   assert.ok(events.includes('tracks'));

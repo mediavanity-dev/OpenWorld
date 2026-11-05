@@ -12,7 +12,6 @@ import { parseHours } from '../data/hours.js';
 export const POI_COLORS = {
   tourism: '#e2703a', historic: '#9a6bd2', amenity: '#3b8fe0', shop: '#e2bd3a', leisure: '#36b874', natural: '#8b6b4b', transport: '#2bb3b1',
 };
-const kindColor = (kind) => new THREE.Color(POI_COLORS[kind.split(':')[0]] || '#888888');
 
 function instanced(geo, mat, packed, matKey = 'mat', withColor = true) {
   const m = new THREE.InstancedMesh(geo, mat, packed.n);
@@ -75,7 +74,7 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
 
   // places
   const features = new Map();
-  let pois = p.pois.map((x, i) => ({ ...x, chunk: p.key, index: i, tags: null, hours: null }));
+  const pois = p.pois.map((x, i) => ({ ...x, chunk: p.key, index: i, tags: null, hours: null }));
   let poiMesh = null;
   const poiIndex = new Map();
   const poiState = new Map(); // ref -> { grade, closed }

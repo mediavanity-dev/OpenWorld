@@ -318,6 +318,13 @@ body.beta::after { content: 'BETA'; position: fixed; z-index: 60; top: calc(2px 
   background: rgba(16,20,26,0.55); pointer-events: none; }
 .beta-box { margin-top: 10px; padding-top: 6px; border-top: 1px solid var(--line); }
 .beta-box button { margin-top: 6px; }
+#playtest-box summary { cursor: pointer; list-style: none; }
+#playtest-box summary h4 { display: inline; }
+#playtest-box summary::before { content: "▸ "; color: var(--muted); }
+#playtest-box[open] summary::before { content: "▾ "; }
+.stats-list { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin: 6px 0; font-size: 13px; }
+.stats-list dt { color: var(--muted); }
+.stats-list dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 .toast.gold { border-left-color: #ffd36b; background: linear-gradient(90deg, rgba(255,211,107,0.14), var(--panel) 45%); }
 
 /* tracker: one small, quiet pill; fades in only while there's something to follow */
@@ -370,3 +377,16 @@ body.beta::after { content: 'BETA'; position: fixed; z-index: 60; top: calc(2px 
 .tracker .tk-task { display: inline-flex; align-items: center; gap: 3px; color: rgba(255,211,107,0.7); font-size: 13px; }
 .tracker .tk-task i { font-style: normal; display: inline-block; font-size: 12px; color: rgba(255,255,255,0.6); transition: transform 0.4s ease; }
 .tracker.tappable { pointer-events: auto; cursor: pointer; }
+
+/* rephotography (beta): an old photo as a ghost over the camera view */
+#rephoto-ghost { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contain; z-index: 1; pointer-events: none; filter: sepia(0.25) contrast(1.05); }
+.rephoto-btn, .rephoto-panel { display: none; }
+body.ar .rephoto-btn:not([hidden]) { display: block; position: fixed; z-index: 33; left: 50%; transform: translateX(-50%); bottom: calc(24px + var(--safe-b, 0px));
+  background: rgba(30,24,14,0.85); color: #ffd36b; border: 1px solid #ffd36b; border-radius: 20px; padding: 8px 14px; font-weight: 600; }
+body.ar .rephoto-panel:not([hidden]) { display: grid; gap: 6px; position: fixed; z-index: 33; left: 12px; right: 12px; bottom: calc(12px + var(--safe-b, 0px));
+  background: rgba(16,20,26,0.88); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.rephoto-panel .row { justify-content: space-between; align-items: center; }
+.rephoto-panel input[type=range] { width: 100%; }
+.rephoto-meter { position: relative; height: 22px; border-radius: 11px; background: rgba(255,255,255,0.08); overflow: hidden; font-size: 12px; }
+.rephoto-meter i { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, #8a6a2a, #ffd36b); transition: width 0.3s; }
+.rephoto-meter span { position: relative; display: block; text-align: center; line-height: 22px; }

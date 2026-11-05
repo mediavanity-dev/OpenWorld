@@ -1,3 +1,4 @@
+// @ts-check
 // Display units (metric / imperial), read live from settings.
 import { settings } from './settings.js';
 

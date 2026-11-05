@@ -1,3 +1,4 @@
+// @ts-check
 // Game rules. Knows nothing about rendering: state is WGS84 positions,
 // the profile, the live environment, and the reference fabric exposed by World.
 
@@ -14,7 +15,7 @@ import { startHunt, stepHunt } from './hunt.js';
 import { treasuresFor, bandOf, PER_AREA } from './treasure.js';
 import { TASKS, taskMatches } from './journal.js';
 
-const DEV = new URLSearchParams(location.search).has('dev');
+const DEV = typeof location !== 'undefined' && new URLSearchParams(location.search).has('dev');
 
 export const RULES = {
   LEASH_M: 600,             // home-base free movement radius
@@ -161,6 +162,7 @@ export class Game {
     if (dt > 0) this._spd += (moved / dt - this._spd) * Math.min(1, dt * 3);
     if (moved < 500) {
       this.profile.data.stats.meters[this.mode] += moved;
+      if (moved > 0) this.profile.dirty = true; // written on the next save, or when the page closes
       // wildlife and walking records only at human speeds
       // (Present: judged by the GPS's real speed, not the smoothed on-screen glide)
       const speed = this.mode === 'present' ? (this.fixSpeed ?? 0) : dt > 0 ? moved / dt : 0;
@@ -179,6 +181,8 @@ export class Game {
     }
     this._saveT += dt;
     if (this._saveT > 5) { this._saveT = 0; this.persistLast(); }
+    this._fullSaveT = (this._fullSaveT || 0) + dt;
+    if (this._fullSaveT > 60) { this._fullSaveT = 0; if (this.profile.dirty) this.profile.flush(); }
     return moved > 0.01;
   }
 
@@ -226,30 +230,29 @@ export class Game {
       if (d <= RULES.DISCOVER_M) {
         stillNear.add(poi.ref);
         if (this.nearby.has(poi.ref)) continue; // already handled this visit
-        if (st && !st.open) {
-          if (!this.closedNotified.has(poi.ref)) {
-            this.closedNotified.add(poi.ref);
-            this.emit('info', `${poi.name} is closed right now${st.next ? ` (opens ${st.next})` : ''}. Come back when it's open to discover it.`);
-          }
-          stillNear.delete(poi.ref);
-          continue;
-        }
+        // Closed places still count: finding out a place exists shouldn't depend on its
+        // hours. Visiting while it's open earns the "open" badge instead.
         const { snap, tags } = this.conditions();
+        if (st?.open) tags.push('open');
+        if (st && !st.open && !this.closedNotified.has(poi.ref)) {
+          this.closedNotified.add(poi.ref);
+          this.emit('info', `${poi.name} is closed right now${st.next ? ` (opens ${st.next})` : ''}. Visit while it's open for the 🔔 badge.`);
+        }
         const anchor = makeAnchor(this.world, { lat: poi.lat, lon: poi.lon, featureRef: poi.ref, snapshot: chunk.snapshot });
         const { result, newTags } = this.profile.recordDiscovery(poi, grade, this.trust(), anchor, snap, tags);
         chunk.markPoi(poi.ref, this.profile.data.discoveries[poi.ref].grade);
         this.journal?.onDiscovery(poi, grade, snap, result);
         if (result === 'new') {
           this.profile.log(`Discovered ${poi.name} [${grade}]`);
-          this.emit('discover', `${grade === 'echo' ? 'Echo of' : 'Discovered'} ${poi.name}`, { grade, poi });
+          this.emit('discover', `${grade === 'echo' ? 'Echo of' : 'Discovered'} ${poi.name}`, { grade, poi, result });
         } else if (result === 'upgraded') {
           this.profile.log(`${poi.name} upgraded to ${grade}`);
-          this.emit('discover', `${poi.name}: now ${grade.toUpperCase()}`, { grade, poi });
+          this.emit('discover', `${poi.name}: now ${grade.toUpperCase()}`, { grade, poi, result });
         } else if (newTags.length) {
           this.profile.log(`${poi.name} seen: ${newTags.join(', ')}`);
-          this.emit('discover', `${poi.name}, seen in new conditions: ${newTags.join(', ')}`, { grade, poi, tags: newTags });
+          this.emit('discover', `${poi.name}, seen in new conditions: ${newTags.join(', ')}`, { grade, poi, result, tags: newTags });
         }
-      } else if ((!known || GRADE_RANK[known.grade] < GRADE_RANK[grade]) && !(st && !st.open)) {
+      } else if (!known || GRADE_RANK[known.grade] < GRADE_RANK[grade]) {
         if (!nearest || d < nearest.dist) nearest = { poi, dist: d };
         if (wantPlace && !known && (!taskNear || d < taskNear.dist) && taskMatches(wantPlace, poi)) taskNear = { poi, dist: d };
       }
@@ -467,8 +470,7 @@ export class Game {
 
   persistLast() {
     if (!this.pos || !this.mode) return;
-    this.profile.data.last = { lat: +this.pos.lat.toFixed(6), lon: +this.pos.lon.toFixed(6), mode: this.mode };
-    this.profile.save();
+    this.profile.saveLast({ lat: +this.pos.lat.toFixed(6), lon: +this.pos.lon.toFixed(6), mode: this.mode });
   }
 }
 
