@@ -164,7 +164,10 @@ Tap **📓 Journal** to see what you've done:
 Each day brings one **field assignment** that sends you towards nature, history or
 something quirky: *Find a monument or historic spot*, *Visit a park or nature spot*, *Find
 something quirky (a sculpture, fountain, clock or sundial)*, *Spot a bird*, *Walk 1 km*.
-Cafés and shops never count. It's shown in the panel and only counts in Present or Home mode.
+Cafés and shops never count, and each asks for just one thing. It sits in the panel under
+Journal and This spot, with an arrow to the nearest place that fits; tap it to open that
+place. In the map-only view it becomes a faint ★ with a small arrow at the bottom of the
+screen. It only counts in Present or Home mode.
 
 The **minimap** (bottom-left on computers, top-right on phones) shows the ground you've
 explored lit up, the rest in fog, plus nearby places. Tap it to open the journal map.

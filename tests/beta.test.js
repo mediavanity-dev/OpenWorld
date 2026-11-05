@@ -79,3 +79,13 @@ test('assignments: nature, history and quirks; never businesses', () => {
   assert.equal(isQuirk({ kind: 'shop:bakery', name: 'Stone Bakery' }), false);
   assert.equal(isQuirk({ kind: 'historic:memorial', name: 'The Wishing Well' }), true);
 });
+
+import { taskMatches } from '../src/game/journal.js';
+test('assignments: one thing each (walk is a distance), and they point only at fitting places', () => {
+  for (const [k, t] of Object.entries(TASKS)) assert.equal(t.target, k === 'walk1k' ? 1000 : 1, k);
+  assert.equal(taskMatches('monument', { kind: 'historic:memorial', name: 'War memorial' }), true);
+  assert.equal(taskMatches('monument', { kind: 'amenity:cafe', name: 'Cafe' }), false);
+  assert.equal(taskMatches('green', { kind: 'leisure:park', name: 'Greenwich Park' }), true);
+  assert.equal(taskMatches('landmark', { kind: 'shop:bakery', name: 'Bakery' }), false);
+  assert.equal(taskMatches('landmark', { kind: 'geocache:traditional', cls: 'geocache', name: 'Box' }), false);
+});

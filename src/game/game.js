@@ -12,6 +12,7 @@ import { wildHabitat } from '../world/habitats.js';
 import { rockAt, ageText } from '../data/science.js';
 import { startHunt, stepHunt } from './hunt.js';
 import { treasuresFor, bandOf, PER_AREA } from './treasure.js';
+import { TASKS, taskMatches } from './journal.js';
 
 const DEV = new URLSearchParams(location.search).has('dev');
 
@@ -212,7 +213,9 @@ export class Game {
 
   checkDiscoveries() {
     const grade = MODES[this.mode].grade;
-    let nearest = null;
+    let nearest = null, taskNear = null;
+    const task = this.journal?.task();
+    const wantPlace = task && !task.done && TASKS[task.type]?.place ? task.type : null;
     const stillNear = new Set();
     for (const { poi, chunk } of this.world.pois(this.pos.lat, this.pos.lon, 1500)) {
       if (poi.cls === 'geocache') continue; // geocaches count only when you find the box ("I found it")
@@ -248,14 +251,17 @@ export class Game {
         }
       } else if ((!known || GRADE_RANK[known.grade] < GRADE_RANK[grade]) && !(st && !st.open)) {
         if (!nearest || d < nearest.dist) nearest = { poi, dist: d };
+        if (wantPlace && !known && (!taskNear || d < taskNear.dist) && taskMatches(wantPlace, poi)) taskNear = { poi, dist: d };
       }
     }
     this.nearby = stillNear;
-    if (nearest) {
-      const o = offsetMeters(this.pos.lat, this.pos.lon, nearest.poi.lat, nearest.poi.lon);
-      nearest.bearing = (Math.atan2(o.x, -o.z) * 180) / Math.PI; // 0 = north, clockwise
+    for (const n of [nearest, taskNear]) {
+      if (!n) continue;
+      const o = offsetMeters(this.pos.lat, this.pos.lon, n.poi.lat, n.poi.lon);
+      n.bearing = (Math.atan2(o.x, -o.z) * 180) / Math.PI; // 0 = north, clockwise
     }
     this.nearest = nearest;
+    this.taskTarget = taskNear; // nearest place that fits today's field assignment
   }
 
   // ---------------- geocaches ----------------

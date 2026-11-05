@@ -319,8 +319,12 @@ function renderTracker() {
     html += `<span class="hunt ${h.trend > 0 ? 'warmer' : h.trend < 0 ? 'colder' : ''}" title="Tracking">🐾<span class="dots">${dots}</span></span>`;
   }
   if (th?.band) html += `<span class="gold ${th.band}" title="Daily treasure: ${th.band}">✦</span>`;
+  // map-only view: a faint star + arrow towards today's field assignment (tap to open it)
+  const task = journal.task(), tgt = !task.done && document.body.classList.contains('clean') ? game.taskTarget : null;
+  if (tgt) html += `<span class="tk-task" title="Today's field assignment">★<i style="transform:rotate(${Math.round((tgt.bearing + (controls.yaw * 180) / Math.PI) / 5) * 5}deg)">↑</i></span>`;
   if (el.dataset.v !== html) { el.dataset.v = html; el.innerHTML = html; }
   el.classList.toggle('show', !!html && !ar.active);
+  el.classList.toggle('tappable', !!tgt);
 }
 
 // ---------------------------------------------------------------- input, picking, card
@@ -670,7 +674,8 @@ function updateRibbon(now) {
   });
   const items = [];
   for (const c of game.critters) items.push({ b: bearingTo(c.lat, c.lon), icon: '●', cls: 'critter', c });
-  if (game.nearest) items.push({ b: bearingTo(game.nearest.poi.lat, game.nearest.poi.lon), icon: '★', cls: 'target' });
+  const star = game.taskTarget || game.nearest;
+  if (star) items.push({ b: bearingTo(star.poi.lat, star.poi.lon), icon: '★', cls: 'target' });
   markEls.forEach((el, k) => {
     const it = items[k];
     if (!it) { el.style.display = 'none'; return; }
@@ -931,20 +936,18 @@ function renderHud() {
     if (el.dataset.v !== html) { el.innerHTML = html; el.dataset.v = html; }
   }
 
-  const n = game.nearest;
-  if (n) {
-    setText('n-name', n.poi.name);
-    const st = game.openState(n.poi);
-    setText('n-dist', `${fmtDist(n.dist)} · ${n.poi.kind.split(':')[1]?.replace(/_/g, ' ') || ''}${st?.open ? ' · open' : ''}`);
-    $('n-arrow').style.transform = `rotate(${n.bearing + (controls.yaw * 180) / Math.PI}deg)`;
-  } else {
-    setText('n-name', 'Nothing new nearby');
-    setText('n-dist', '');
-  }
-
+  // today's field assignment, with an arrow to the nearest place that fits it
   const t = journal.task(), T = TASKS[t.type];
-  setText('task', t.done ? `✓ Today: ${T.text}` : `Today: ${T.text} · ${T.unit === 'm' ? `${fmtDist(t.progress)}/${fmtDist(T.target)}` : `${t.progress}/${T.target}`}`);
-  $('task').classList.toggle('done', t.done);
+  const tgt = !t.done && T.place ? game.taskTarget : null;
+  setText('n-name', t.type === 'walk1k' ? (settings.units === 'imperial' ? 'Walk 0.6 miles' : 'Walk 1 km') : T.text);
+  setText('n-dist', t.done ? 'Done for today. A new one tomorrow.'
+    : tgt ? `Nearest: ${tgt.poi.name} · ${fmtDist(tgt.dist)}`
+    : T.unit === 'm' ? `${fmtDist(t.progress)} of ${fmtDist(T.target)} · Present or Home`
+    : T.place ? 'Nothing that fits close by yet. Keep exploring.'
+    : 'Watch for signs as you walk · Present or Home');
+  setText('n-arrow', tgt ? '↑' : t.done ? '✓' : '•');
+  $('n-arrow').style.transform = tgt ? `rotate(${tgt.bearing + (controls.yaw * 180) / Math.PI}deg)` : '';
+  $('nearest').classList.toggle('done', t.done);
   const logEl = $('log');
   const items = profile.data.log.slice(0, 12).map((l) => `<li>${new Date(l.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${escapeHtml(l.msg)}</li>`).join('');
   if (logEl.dataset.v !== items) { logEl.innerHTML = items; logEl.dataset.v = items; }
@@ -1076,7 +1079,7 @@ addEventListener('resize', placeToasts);
 if ('ResizeObserver' in window) new ResizeObserver(([e]) => document.documentElement.style.setProperty('--panel-h', `${Math.round(e.target.offsetHeight)}px`)).observe($('right'));
 setCollapsed(isTouch);
 $('more').onclick = () => setCollapsed(!left.classList.contains('collapsed'));
-$('nearest').onclick = () => { if (game.nearest) openPlace(game.nearest.poi); else $('right').classList.toggle('expanded'); };
+$('nearest').onclick = () => { if (game.taskTarget && !journal.task().done) openPlace(game.taskTarget.poi); else openJournal('overview'); };
 $('b-locate').onclick = async () => { if (await locateDevice()) { if (game.mode === 'present') begin('present'); else toast('Device fix updated: ' + fixText(game.fix)); } };
 $('b-ip').onclick = async () => { if (await locateIp()) { if (game.mode === 'present') begin('present'); else toast('Fix updated: ' + fixText(game.fix)); } };
 $('b-sethome').onclick = () => {
@@ -1210,11 +1213,12 @@ function startTutorial() {
   // deliberately tiny: show the eye, then one pointer, then never again
   const steps = [];
   if (document.body.classList.contains('clean')) steps.push({ target: () => $('ui-toggle'), text: '<b>Tap to show the menus.</b>', waitFor: 'click' });
-  steps.push({ target: () => $('nearest'), text: `Walk to places to discover them. Tap any icon for details. ${isTouch ? 'Pinch to zoom.' : 'Scroll to zoom.'} More in Settings → Help.` });
+  steps.push({ target: () => $('nearest'), text: `Today's field assignment: follow its arrow. Tap any icon for details. ${isTouch ? 'Pinch to zoom.' : 'Scroll to zoom.'} More in Settings → Help.` });
   runTutorial(steps);
 }
 $('ui-toggle').onclick = () => setClean(!document.body.classList.contains('clean'));
 $('recenter').onclick = () => controls.recenter();
+$('tracker').addEventListener('click', () => { if (game.taskTarget && !journal.task().done) openPlace(game.taskTarget.poi); });
 
 // deep link: ?at=lat,lon starts directly in Roam there
 const at = new URLSearchParams(location.search).get('at');

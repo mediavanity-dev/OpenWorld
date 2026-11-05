@@ -10,19 +10,30 @@ const MODE_RANK = { roam: 1, home: 2, present: 3 };
 
 // Daily assignments lean towards nature, history and the quirky, not businesses.
 export const TASKS = {
-  landmarks3: { text: 'Discover 3 landmarks or green spaces', target: 3, unit: '' },
-  monument: { text: 'Find a monument, memorial or historic spot', target: 1, unit: '' },
-  green: { text: 'Visit a park, garden or nature spot', target: 1, unit: '' },
-  quirk: { text: 'Find something quirky: a sculpture, fountain, clock or sundial', target: 1, unit: '' },
+  landmark: { text: 'Discover a landmark or green space', target: 1, unit: '', place: true },
+  monument: { text: 'Find a monument, memorial or historic spot', target: 1, unit: '', place: true },
+  green: { text: 'Visit a park, garden or nature spot', target: 1, unit: '', place: true },
+  quirk: { text: 'Find something quirky: a sculpture, fountain, clock or sundial', target: 1, unit: '', place: true },
   bird: { text: 'Spot a bird', target: 1, unit: '' },
   plant: { text: 'Spot a plant', target: 1, unit: '' },
-  night: { text: 'Discover a landmark after dark', target: 1, unit: '' },
+  night: { text: 'Discover a landmark after dark', target: 1, unit: '', place: true },
   walk1k: { text: 'Walk 1 km', target: 1000, unit: 'm' },
 };
 // businesses never count towards assignments
 const BUSINESS = new Set(['food', 'shop', 'lodging', 'other']);
 const QUIRK_VALUES = /^(artwork|sculpture|statue|fountain|clock|sundial|obelisk|folly|lighthouse|windmill|watermill|tower|well|milestone|boundary_stone|wayside_cross|wayside_shrine|tree|bust|stone|cannon)$/;
 const QUIRK_NAMES = /sundial|clock|statue|fountain|obelisk|folly|sculpture|\bwell\b|standing stone|stone circle|gnome|\bbench\b/i;
+// Does this place satisfy a place-type assignment? (used to point the way)
+export function taskMatches(type, poi) {
+  const grp = groupOf(poi.kind, poi.cls);
+  switch (type) {
+    case 'landmark': case 'night': return !BUSINESS.has(grp) && grp !== 'geocache';
+    case 'monument': return grp === 'history';
+    case 'green': return grp === 'park' || grp === 'nature';
+    case 'quirk': return isQuirk(poi);
+    default: return false;
+  }
+}
 export function isQuirk(poi) {
   const value = (poi.kind || '').split(':')[1] || '';
   return QUIRK_VALUES.test(value) || QUIRK_NAMES.test(poi.name || '');
@@ -110,7 +121,7 @@ export class Journal {
     this.today().finds++;
     const grp = groupOf(poi.kind, poi.cls);
     if (!BUSINESS.has(grp)) {
-      this.progress('landmarks3');
+      this.progress('landmark');
       if (snap && (snap.sun === 'night' || snap.sun === 'twilight')) this.progress('night');
     }
     if (grp === 'history') this.progress('monument');
