@@ -4,16 +4,29 @@
 
 import { geohash, hashStr } from '../geo.js';
 import { GRADE_RANK } from './profile.js';
+import { groupOf } from '../world/icons.js';
 
 const MODE_RANK = { roam: 1, home: 2, present: 3 };
 
+// Daily assignments lean towards nature, history and the quirky, not businesses.
 export const TASKS = {
-  finds3: { text: 'Discover 3 places', target: 3, unit: '' },
+  landmarks3: { text: 'Discover 3 landmarks or green spaces', target: 3, unit: '' },
+  monument: { text: 'Find a monument, memorial or historic spot', target: 1, unit: '' },
+  green: { text: 'Visit a park, garden or nature spot', target: 1, unit: '' },
+  quirk: { text: 'Find something quirky: a sculpture, fountain, clock or sundial', target: 1, unit: '' },
   bird: { text: 'Spot a bird', target: 1, unit: '' },
   plant: { text: 'Spot a plant', target: 1, unit: '' },
-  night: { text: 'Discover a place after dark', target: 1, unit: '' },
+  night: { text: 'Discover a landmark after dark', target: 1, unit: '' },
   walk1k: { text: 'Walk 1 km', target: 1000, unit: 'm' },
 };
+// businesses never count towards assignments
+const BUSINESS = new Set(['food', 'shop', 'lodging', 'other']);
+const QUIRK_VALUES = /^(artwork|sculpture|statue|fountain|clock|sundial|obelisk|folly|lighthouse|windmill|watermill|tower|well|milestone|boundary_stone|wayside_cross|wayside_shrine|tree|bust|stone|cannon)$/;
+const QUIRK_NAMES = /sundial|clock|statue|fountain|obelisk|folly|sculpture|\bwell\b|standing stone|stone circle|gnome|\bbench\b/i;
+export function isQuirk(poi) {
+  const value = (poi.kind || '').split(':')[1] || '';
+  return QUIRK_VALUES.test(value) || QUIRK_NAMES.test(poi.name || '');
+}
 
 export class Journal {
   constructor(profile, env, onEvent) {
@@ -50,7 +63,7 @@ export class Journal {
 
   task() {
     const date = this.dayKey();
-    if (!this.d.task || this.d.task.date !== date) {
+    if (!this.d.task || this.d.task.date !== date || !TASKS[this.d.task.type]) {
       const types = Object.keys(TASKS);
       const type = types[hashStr(this.d.id + date) % types.length];
       this.d.task = { date, type, progress: 0, done: false };
@@ -95,8 +108,14 @@ export class Journal {
     if (grade === 'echo' || (result !== 'new' && result !== 'upgraded')) return;
     const r = this.d.records;
     this.today().finds++;
-    this.progress('finds3');
-    if (snap && (snap.sun === 'night' || snap.sun === 'twilight')) this.progress('night');
+    const grp = groupOf(poi.kind, poi.cls);
+    if (!BUSINESS.has(grp)) {
+      this.progress('landmarks3');
+      if (snap && (snap.sun === 'night' || snap.sun === 'twilight')) this.progress('night');
+    }
+    if (grp === 'history') this.progress('monument');
+    if (grp === 'park' || grp === 'nature') this.progress('green');
+    if (isQuirk(poi)) this.progress('quirk');
     if (!r.firstClaim) r.firstClaim = { name: poi.name, date: this.dayKey() };
     const year = parseInt(poi.tags?.start_date, 10);
     if (year > 0 && year <= new Date().getFullYear() && (!r.oldestPlace || year < r.oldestPlace.year)) r.oldestPlace = { name: poi.name, year };
@@ -124,6 +143,8 @@ export class Journal {
     this.profile.save();
     return have ? 'upgraded' : 'new';
   }
+
+  onGeocache() { this.today().caches = (this.today().caches || 0) + 1; this.profile.save(); }
 
   onTreasure() { this.today().treasure = (this.today().treasure || 0) + 1; this.profile.save(); }
 

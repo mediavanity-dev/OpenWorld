@@ -56,3 +56,26 @@ test('treasure: same spots for everyone on the same day, new spots tomorrow', ()
 test('treasure: hot / warm / cool bands', () => {
   assert.equal(bandOf(20), 'hot'); assert.equal(bandOf(100), 'warm'); assert.equal(bandOf(300), 'cool'); assert.equal(bandOf(900), null);
 });
+
+import { normalizeCache, sizeLabel } from '../src/data/geocaching.js';
+import { isQuirk, TASKS } from '../src/game/journal.js';
+
+test('geocaching: normalises an OKAPI listing safely', () => {
+  const c = normalizeCache({ code: 'OC1234', name: 'Hidden Oak', location: '51.4779|-0.0015', type: 'Traditional', size2: 'small', difficulty: 1.5, terrain: 2, url: 'https://www.opencaching.de/OC1234', hint2: 'Under the root', attribution_note: '<a href="x">©</a> Owner, <b>Opencaching.de</b>' }, 'de');
+  assert.equal(c.ref, 'oc:OC1234');
+  assert.equal(c.cls, 'geocache');
+  assert.equal(c.gc.startOnly, false);
+  assert.equal(c.gc.attribution, '© Owner, Opencaching.de');      // tags stripped
+  assert.equal(normalizeCache({ code: 'OC1', location: '51|0', type: 'Multi' }, 'de').gc.startOnly, true);
+  assert.equal(normalizeCache({ code: 'OC2', location: 'nonsense' }, 'de'), null);
+  assert.equal(normalizeCache({ code: 'OC3', location: '51|0', url: 'javascript:alert(1)' }, 'de').gc.url, null); // unsafe links dropped
+  assert.equal(sizeLabel('xlarge'), 'extra large');
+});
+
+test('assignments: nature, history and quirks; never businesses', () => {
+  assert.ok(!Object.values(TASKS).some((t) => /places?\b(?! after)/i.test(t.text) && /Discover 3 places/.test(t.text)));
+  assert.equal(isQuirk({ kind: 'amenity:clock', name: 'Station clock' }), true);
+  assert.equal(isQuirk({ kind: 'amenity:cafe', name: 'Wellington Cafe' }), false);
+  assert.equal(isQuirk({ kind: 'shop:bakery', name: 'Stone Bakery' }), false);
+  assert.equal(isQuirk({ kind: 'historic:memorial', name: 'The Wishing Well' }), true);
+});

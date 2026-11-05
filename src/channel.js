@@ -3,6 +3,8 @@
 //   beta   -> /OpenWorld/beta/  (VITE_CHANNEL=beta: experimental features on)
 // Each channel keeps its own profile and settings so tests never touch the real journal.
 
+import { OKAPI_KEYS } from './config.js';
+
 export const CHANNEL = import.meta.env?.VITE_CHANNEL === 'beta' ? 'beta' : 'stable';
 export const BETA = CHANNEL === 'beta';
 const PREFIX = BETA ? 'openworld-beta' : 'openworld';
@@ -17,5 +19,6 @@ export const stableKey = (name) => `openworld.${name}`;
 export const FEATURES = {
   hunt: { label: 'The hunt: track animals by their signs', stable: true },
   treasure: { label: 'Daily treasure: golden finds hidden each day', stable: true },
+  geocaching: { label: 'Geocaches from Opencaching', stable: true, needsKeys: true },
 };
-export const featureAvailable = (k) => BETA || !!FEATURES[k]?.stable;
+export const featureAvailable = (k) => (BETA || !!FEATURES[k]?.stable) && (!FEATURES[k]?.needsKeys || Object.values(OKAPI_KEYS).some((v) => (v || '').trim()));

@@ -17,6 +17,15 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Opencaching consumer keys (public, read-only). Set in GitHub: Settings -> Secrets and
+      # variables -> Actions -> Variables. Empty = geocaching stays off.
+      VITE_OKAPI_KEY_DE: ${{ vars.OKAPI_KEY_DE }}
+      VITE_OKAPI_KEY_PL: ${{ vars.OKAPI_KEY_PL }}
+      VITE_OKAPI_KEY_NL: ${{ vars.OKAPI_KEY_NL }}
+      VITE_OKAPI_KEY_RO: ${{ vars.OKAPI_KEY_RO }}
+      VITE_OKAPI_KEY_UK: ${{ vars.OKAPI_KEY_UK }}
+      VITE_OKAPI_KEY_US: ${{ vars.OKAPI_KEY_US }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -64,7 +64,14 @@ export function skyNotes(lat, lon, utcOffsetSec) {
     const hit = SHOWERS.find(([mo, da]) => d.getUTCMonth() + 1 === mo && d.getUTCDate() === da);
     if (hit) shower = { name: hit[2], rate: hit[3], days: k, date: d.toISOString().slice(0, 10) };
   }
+  const t2 = getTimes(new Date(now.getTime() + DAY), lat, lon);
+  const dayLen2 = t2.sunrise && t2.sunset && !isNaN(t2.sunrise) && !isNaN(t2.sunset) ? (t2.sunset - t2.sunrise) / 3600000 : null;
+  // how far the clock is from the sun: solar noon vs 12:00 on the local clock
+  const noonLocal = t.solarNoon && !isNaN(t.solarNoon) ? new Date(t.solarNoon.getTime() + utcOffsetSec * 1000) : null;
+  const solarShift = noonLocal ? Math.round((noonLocal.getUTCHours() * 60 + noonLocal.getUTCMinutes()) - 720) : null;
   return {
+    dayTrend: dayLen != null && dayLen2 != null ? Math.round((dayLen2 - dayLen) * 60 * 10) / 10 : null, // minutes per day
+    solarShift,
     sunrise: local(t.sunrise), sunset: local(t.sunset), noon: local(t.solarNoon),
     golden: local(t.goldenHour), dawn: local(t.dawn), dusk: local(t.dusk),
     dayLength: dayLen, polar: dayLen === null ? (t.solarNoon ? 'polar day or night' : null) : null,
@@ -77,7 +84,7 @@ export function skyNotes(lat, lon, utcOffsetSec) {
 // One-time ~150 KB download per ~50 km area, reduced to 366 daily normals and cached for a year.
 async function normals(lat, lon) {
   const la = (Math.round(lat * 2) / 2).toFixed(1), lo = (Math.round(lon * 2) / 2).toFixed(1);
-  const key = `normals:${la},${lo}`;
+  const key = `normals2:${la},${lo}`;
   const hit = await cacheGet(key, 365 * DAY);
   if (hit) return hit;
   try {
@@ -85,12 +92,15 @@ async function normals(lat, lon) {
     if (!r.ok) return null;
     const j = await r.json();
     const sum = new Float64Array(366), n = new Uint16Array(366);
+    const recHi = Array.from({ length: 366 }, () => [-99, 0]), recLo = Array.from({ length: 366 }, () => [99, 0]);
     j.daily.time.forEach((d, i) => {
       const mx = j.daily.temperature_2m_max[i], mn = j.daily.temperature_2m_min[i];
       if (mx == null || mn == null) return;
       const dt = new Date(d + 'T00:00:00Z');
       const doy = Math.floor((dt - Date.UTC(dt.getUTCFullYear(), 0, 1)) / DAY);
       sum[doy] += (mx + mn) / 2; n[doy]++;
+      if (mx > recHi[doy][0]) recHi[doy] = [mx, dt.getUTCFullYear()];
+      if (mn < recLo[doy][0]) recLo[doy] = [mn, dt.getUTCFullYear()];
     });
     // ±7-day smoothing
     const out = [];
@@ -99,8 +109,9 @@ async function normals(lat, lon) {
       for (let k = -7; k <= 7; k++) { const i = (d + k + 366) % 366; s += sum[i]; c += n[i]; }
       out.push(c ? +(s / c).toFixed(2) : null);
     }
-    cachePut(key, out);
-    return out;
+    const res = { mean: out, hi: recHi.map(([v, y]) => [+v.toFixed(1), y]), lo: recLo.map(([v, y]) => [+v.toFixed(1), y]) };
+    cachePut(key, res);
+    return res;
   } catch { return null; }
 }
 export async function climateToday(lat, lon, utcOffsetSec) {
@@ -112,9 +123,9 @@ export async function climateToday(lat, lon, utcOffsetSec) {
   const today = (f.daily.temperature_2m_max[0] + f.daily.temperature_2m_min[0]) / 2;
   const local = new Date(Date.now() + utcOffsetSec * 1000);
   const doy = Math.floor((local - Date.UTC(local.getUTCFullYear(), 0, 1)) / DAY);
-  const normal = norm[Math.min(365, doy)];
+  const i = Math.min(365, doy), normal = norm.mean[i];
   if (normal == null || !isFinite(today)) return null;
-  return { today, normal, delta: today - normal, high: f.daily.temperature_2m_max[0], low: f.daily.temperature_2m_min[0] };
+  return { today, normal, delta: today - normal, high: f.daily.temperature_2m_max[0], low: f.daily.temperature_2m_min[0], recordHigh: norm.hi[i], recordLow: norm.lo[i] };
 }
 
 // ---------- earthquakes (USGS), last 7 days within 500 km ----------
@@ -154,4 +165,60 @@ export async function seasonality(id, lat, lon) {
   if (!m) return null;
   const arr = Array.from({ length: 12 }, (_, i) => m[i + 1] || 0);
   return arr.some((v) => v > 0) ? arr : null;
+}
+
+// ---------- recently seen here (iNaturalist, last 14 days, ~1 km) ----------
+export async function recentNearby(lat, lon) {
+  const since = new Date(Date.now() - 14 * DAY).toISOString().slice(0, 10);
+  const j = await cachedJson(`recent:${geohash(lat, lon, 6)}:${since}`,
+    `https://api.inaturalist.org/v1/observations?lat=${lat.toFixed(4)}&lng=${lon.toFixed(4)}&radius=1&d1=${since}&order_by=observed_on&per_page=40&quality_grade=research,needs_id&photos=true&locale=${(navigator.language || 'en').slice(0, 2)}`,
+    { ttl: 3 * 3600 * 1000 });
+  const seen = new Map();
+  for (const o of j?.results || []) {
+    const t = o.taxon;
+    if (!t || seen.has(t.id)) continue;
+    const ph = (o.photos || []).find((p) => p.license_code);
+    seen.set(t.id, { id: t.id, name: t.preferred_common_name || t.name, sci: t.name, group: t.iconic_taxon_name, date: o.observed_on, photo: ph ? ph.url : null });
+  }
+  return [...seen.values()].slice(0, 6);
+}
+
+// ---------- old photos of this place (Wikimedia Commons, free licences) ----------
+const stripTags = (x) => String(x || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+export async function photosNearby(lat, lon) {
+  const j = await cachedJson(`commons:${geohash(lat, lon, 7)}`,
+    `https://commons.wikimedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${lat.toFixed(5)}|${lon.toFixed(5)}&ggsradius=600&ggsnamespace=6&ggslimit=30&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=200&iiextmetadatafilter=DateTimeOriginal|LicenseShortName|Artist&format=json&origin=*`,
+    { ttl: 14 * DAY });
+  const out = [];
+  for (const pg of Object.values(j?.query?.pages || {})) {
+    const ii = pg.imageinfo?.[0];
+    if (!ii?.thumburl || !/\.(jpe?g|png|webp)$/i.test(pg.title)) continue;
+    const m = /(1[6-9]\d\d|20\d\d)/.exec(stripTags(ii.extmetadata?.DateTimeOriginal?.value));
+    out.push({ thumb: ii.thumburl, url: ii.descriptionurl, year: m ? +m[1] : null, title: pg.title.replace(/^File:|\.\w+$/g, ''),
+      licence: stripTags(ii.extmetadata?.LicenseShortName?.value), by: stripTags(ii.extmetadata?.Artist?.value).slice(0, 60) });
+  }
+  // oldest first: the "then" in then-and-now
+  return out.sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999)).slice(0, 4);
+}
+
+// ---------- pollen in the air (Open-Meteo, Europe; only shown when present) ----------
+const POLLEN = { alder_pollen: 'alder', birch_pollen: 'birch', grass_pollen: 'grass', mugwort_pollen: 'mugwort', olive_pollen: 'olive', ragweed_pollen: 'ragweed' };
+export async function pollenNow(lat, lon) {
+  const j = await cachedJson(`pollen:${geohash(lat, lon, 4)}:${new Date().toISOString().slice(0, 13)}`,
+    `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&current=${Object.keys(POLLEN).join(',')}`,
+    { ttl: 3 * 3600 * 1000 });
+  const c = j?.current;
+  if (!c) return [];
+  return Object.entries(POLLEN).map(([k, name]) => ({ name, v: c[k] })).filter((x) => x.v > 1)
+    .map((x) => ({ ...x, level: x.v < 10 ? 'low' : x.v < 50 ? 'moderate' : x.v < 200 ? 'high' : 'very high' }))
+    .sort((a, b) => b.v - a.v);
+}
+
+// ---------- the other side of the Earth ----------
+export async function antipode(lat, lon) {
+  const a = { lat: -lat, lon: lon > 0 ? lon - 180 : lon + 180 };
+  const j = await cachedJson(`anti:${a.lat.toFixed(1)},${a.lon.toFixed(1)}`,
+    `https://nominatim.openstreetmap.org/reverse?format=json&zoom=5&lat=${a.lat}&lon=${a.lon}`, { ttl: 60 * DAY });
+  const place = j?.address ? [j.address.state || j.address.region, j.address.country].filter(Boolean).join(', ') : null;
+  return { ...a, place: place || null };
 }

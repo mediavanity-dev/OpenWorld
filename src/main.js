@@ -26,6 +26,7 @@ import { fmtDist, fmtTemp } from './units.js';
 import { pruneCache } from './data/cache.js';
 import { BETA, FEATURES, featureAvailable, storeKey } from './channel.js';
 import { STABLE_PROFILE_KEY } from './game/profile.js';
+import { cachesIn, nodesFor } from './data/geocaching.js';
 import { wildHabitat } from './world/habitats.js';
 
 const $ = (id) => document.getElementById(id);
@@ -71,6 +72,11 @@ function applyFeatures() {
 }
 applyFeatures();
 if (BETA) document.body.classList.add('beta');
+world.addSource(async (chunk) => {
+  if (!game.features.geocaching) return [];
+  const lists = await Promise.all(nodesFor(environment.country).map((n) => cachesIn(chunk.bounds, n, chunk.key)));
+  return lists.flat();
+});
 const journal = new Journal(profile, environment, (ev) => onGameEvent(ev));
 game.journal = journal;
 const ambience = new Ambience();
@@ -185,7 +191,7 @@ function refreshLeash() {
 
 function markKnown(chunk) {
   for (const p of chunk.pois) {
-    const d = profile.data.discoveries[p.ref];
+    const d = p.gc ? profile.data.geocaches?.[p.gc.code] : profile.data.discoveries[p.ref];
     if (d) chunk.markPoi(p.ref, d.grade);
   }
 }
@@ -356,7 +362,7 @@ function photographCritter(c) {
   game.spot(c, 'photo');
 }
 function openPlace(poi) {
-  showPlace(poi, { game, profile, distance: haversine(game.pos.lat, game.pos.lon, poi.lat, poi.lon) });
+  showPlace(poi, { game, profile, distance: haversine(game.pos.lat, game.pos.lon, poi.lat, poi.lon), onLogged: () => { for (const ch of world.readyChunks()) markKnown(ch); } });
 }
 initCard();
 
@@ -879,6 +885,7 @@ function onGameEvent(ev) {
   else if (ev.type === 'hunt-reveal') { buzz([20, 40, 20]); ambience.chime(7); }
   else if (ev.type === 'hunt-flee' || ev.type === 'hunt-cold') { toast(ev.msg); }
   else if (ev.type === 'treasure-hot') { buzz([12, 30, 12]); ambience.chime(5); }
+  else if (ev.type === 'geocache') { toast(ev.msg, 'gold'); buzz([30, 40, 30]); ambience.chime(6); renderHud(); }
   else if (ev.type === 'treasure') { toast(ev.msg, 'gold'); buzz([30, 40, 60]); ambience.chime(9); renderHud(); }
   else if (ev.msg) toast(ev.msg);
 }
@@ -1144,6 +1151,7 @@ $('set-beta').addEventListener('change', (e) => {
   if (!k) return;
   settings.features = { ...(settings.features || {}), [k]: e.target.checked };
   saveSettings(); applyFeatures();
+  if (k === 'geocaching' && e.target.checked) world.refreshSources();
 });
 for (const el of document.querySelectorAll('.beta-only')) el.hidden = !BETA;
 if (BETA) {
@@ -1221,7 +1229,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 }
 
 // debug handle
-window.openworld = { iconMat, iconUniforms, world, game, profile, environment, settings, applyTier, camera, ar, journal, ambience, __refresh: () => refreshCandidates(), __labels: () => updateLabels(), get __cand() { return cand; }, get __view() { return { viewLocal, dist: controls.dist }; }, __setDist: (d) => { controls.dist = d; }, get tier() { return tierName; } };
+window.openworld = { iconMat, iconUniforms, world, game, profile, environment, settings, applyTier, camera, ar, journal, ambience, __refresh: () => refreshCandidates(), __open: (p) => openPlace(p), __labels: () => updateLabels(), get __cand() { return cand; }, get __view() { return { viewLocal, dist: controls.dist }; }, __setDist: (d) => { controls.dist = d; }, get tier() { return tierName; } };
 
 // help & about (static page; opened from settings or the start screen)
 function openAbout(e) { e?.preventDefault(); $('settings').hidden = true; $('about').hidden = false; }

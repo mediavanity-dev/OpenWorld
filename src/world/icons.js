@@ -19,6 +19,7 @@ export const GROUPS = [
   { id: 'nature', label: 'Nature', color: '#8b6b4b' },
   { id: 'transport', label: 'Transport', color: '#2a9fbf' },
   { id: 'other', label: 'Place', color: '#7d8590' },
+  { id: 'geocache', label: 'Geocache', color: '#7a9a3a' },
 ];
 const INDEX = Object.fromEntries(GROUPS.map((g, i) => [g.id, i]));
 
@@ -39,7 +40,7 @@ const BY_VALUE = {
 };
 const VALUE_TO = {};
 for (const [g, vals] of Object.entries(BY_VALUE)) for (const v of vals) VALUE_TO[v] = g;
-const KEY_TO = { shop: 'shop', historic: 'history', tourism: 'sight', leisure: 'park', natural: 'nature', transport: 'transport', amenity: 'civic' };
+const KEY_TO = { geocache: 'geocache', shop: 'shop', historic: 'history', tourism: 'sight', leisure: 'park', natural: 'nature', transport: 'transport', amenity: 'civic' };
 
 // kind = "key:value" (e.g. "amenity:cafe"); cls = OpenMapTiles class when known
 export function groupOf(kind, cls) {
@@ -125,6 +126,12 @@ function glyph(g, id) {
       g.beginPath(); g.arc(c - 4, c + 3, 1.8, 0, Math.PI * 2); g.arc(c + 4, c + 3, 1.8, 0, Math.PI * 2); g.fill();
       P([[c - 7, c + 13], [c - 4, c + 9]]); P([[c + 7, c + 13], [c + 4, c + 9]]);
       break;
+    case 'geocache': // a small box with its lid, a nod to the classic cache container
+      P([[c - 11, c - 2], [c + 11, c - 2], [c + 11, c + 11], [c - 11, c + 11]], true);
+      P([[c - 13, c - 8], [c + 13, c - 8], [c + 13, c - 2], [c - 13, c - 2]], true, true);
+      P([[c - 4, c - 12], [c + 4, c - 12]]);
+      P([[c - 3, c + 3], [c + 3, c + 3]]);
+      break;
     default:
       g.beginPath(); g.arc(c, c, 5, 0, Math.PI * 2); g.fill();
   }
@@ -158,7 +165,7 @@ export function atlasCss(index, size = 18) {
 export const ATLAS_N = N;
 
 // Zoom hierarchy: 0 landmarks (always), 1 civic & culture (mid zoom), 2 everyday places (close up)
-const PRIORITY = { sight: 0, history: 0, museum: 0, nature: 0, transport: 0, park: 0, culture: 1, education: 1, worship: 1, civic: 1, lodging: 1, food: 2, shop: 2, sport: 2, other: 2 };
+const PRIORITY = { geocache: 1, sight: 0, history: 0, museum: 0, nature: 0, transport: 0, park: 0, culture: 1, education: 1, worship: 1, civic: 1, lodging: 1, food: 2, shop: 2, sport: 2, other: 2 };
 export const priorityOf = (index) => PRIORITY[GROUPS[index]?.id] ?? 2;
 export const PRIORITY_MAX_DIST = [Infinity, 650, 280]; // camera distance (m) at which each tier has faded out
 // visibility 0..1 of an icon (same maths as the shader; used for tapping)

@@ -54,6 +54,8 @@ export function summary(profile) {
     tasksDone: d.tasksDone || 0,
     photos: d.photos || 0,
     peaks: Object.values(d.discoveries).filter((x) => x.kind?.startsWith('natural:peak') && x.grade !== 'echo').length,
+    caches: Object.keys(d.geocaches || {}).length,
+    treasure: d.treasure?.total || 0,
   };
 }
 
@@ -92,6 +94,7 @@ function overview(profile) {
     <div class="jgrid">
       ${stat(s.exploredKm2.toFixed(2), 'km² explored on foot')}${stat(fmtDist(s.walked), 'walked')}${stat(s.daysActive, 'days out')}
       ${stat(s.tasksDone, 'assignments done')}${stat(s.photos, 'AR photos')}${stat(s.peaks, 'peaks')}
+      ${s.caches ? stat(s.caches, 'geocaches', '#7a9a3a') : ''}${s.treasure ? stat(s.treasure, 'golden finds', '#ffd36b') : ''}
     </div>
     <h4>Last 7 days on foot</h4>
     <div class="bars">${bars}</div>
@@ -120,7 +123,9 @@ function collections(profile) {
   const tags = {};
   for (const x of Object.values(d.discoveries)) for (const t of x.seen || []) tags[t] = (tags[t] || 0) + 1;
   const cond = Object.keys(TAG_ICONS).map((t) => `<span class="chip ${tags[t] ? '' : 'off'}">${TAG_ICONS[t]} ${t} ${tags[t] ? `<b>${tags[t]}</b>` : ''}</span>`).join('');
-  return `<h4>Places</h4>${places}<h4>Life list</h4>${life}<h4>Rocks underfoot</h4>${rockList}<h4>Conditions you've seen places in</h4><div class="chips">${cond}</div>`;
+  const gcs = Object.entries(d.geocaches || {}).sort((a, b) => (b[1].date || '').localeCompare(a[1].date || ''));
+  const gcList = gcs.length ? `<ul class="jlist">${gcs.map(([code, g]) => `<li><i class="dot" style="background:${GRADE_DOT[g.grade]}"></i>${g.url ? `<a href="${esc(g.url)}" target="_blank" rel="noopener">${esc(g.name)}</a>` : esc(g.name)} <small>${esc(g.type)} · D${g.difficulty ?? '–'}/T${g.terrain ?? '–'} · ${esc(code)}</small></li>`).join('')}</ul>` : '';
+  return `<h4>Places</h4>${places}<h4>Life list</h4>${life}<h4>Rocks underfoot</h4>${rockList}${gcList ? `<h4>Geocaches found</h4>${gcList}` : ''}<h4>Conditions you've seen places in</h4><div class="chips">${cond}</div>`;
 }
 
 function records(profile) {
@@ -135,6 +140,7 @@ function records(profile) {
     ${row('Furthest north', r.north ? `${esc(r.north.name)} <small>${r.north.lat}°</small>` : null)}
     ${row('Furthest south', r.south ? `${esc(r.south.name)} <small>${r.south.lat}°</small>` : null)}
     ${row('Peaks reached', s.peaks || null)}
+    ${(() => { const h = Object.values(profile.data.geocaches || {}).sort((a, b) => ((b.difficulty || 0) + (b.terrain || 0)) - ((a.difficulty || 0) + (a.terrain || 0)))[0]; return h ? row('Hardest geocache', `${esc(h.name)} <small>(D${h.difficulty}/T${h.terrain})</small>`) : ''; })()}
     ${row('First claim', r.firstClaim ? `${esc(r.firstClaim.name)} <small>(${esc(r.firstClaim.date)})</small>` : null)}
     ${row('Walked (Present)', fmtDist(profile.data.stats.meters.present || 0))}
     ${row('Walked (Home)', fmtDist(profile.data.stats.meters.home || 0))}

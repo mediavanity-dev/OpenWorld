@@ -1,3 +1,5 @@
 node_modules/
 dist/
 Abstract.txt
+.env.local
+.env.*.local

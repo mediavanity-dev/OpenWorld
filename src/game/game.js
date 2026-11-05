@@ -215,6 +215,7 @@ export class Game {
     let nearest = null;
     const stillNear = new Set();
     for (const { poi, chunk } of this.world.pois(this.pos.lat, this.pos.lon, 1500)) {
+      if (poi.cls === 'geocache') continue; // geocaches count only when you find the box ("I found it")
       const d = haversine(this.pos.lat, this.pos.lon, poi.lat, poi.lon);
       const st = d < 1500 ? this.openState(poi) : null;
       if (d < 1500) chunk.setClosed(poi.ref, st && !st.open);
@@ -255,6 +256,30 @@ export class Game {
       nearest.bearing = (Math.atan2(o.x, -o.z) * 180) / Math.PI; // 0 = north, clockwise
     }
     this.nearest = nearest;
+  }
+
+  // ---------------- geocaches ----------------
+  // How close you need to be to say you found it (GPS-aware), and whether that's allowed now.
+  cacheReach() { return this.mode === 'present' ? Math.min(60, Math.max(30, (this.fix?.accuracy || 10) * 1.5)) : 30; }
+  canLogCache(poi) {
+    if (this.mode === 'roam') return { ok: false, why: 'Visit for real to log a find.' };
+    const d = haversine(this.pos.lat, this.pos.lon, poi.lat, poi.lon);
+    if (!poi.gc?.startOnly && d > this.cacheReach()) return { ok: false, why: `Get within ${Math.round(this.cacheReach())} m of the cache.` };
+    return { ok: true, d };
+  }
+  // Honour system, like geocaching itself: you say you found it, we remember where and when.
+  logCache(poi) {
+    const can = this.canLogCache(poi);
+    if (!can.ok) return this.emit('error', can.why);
+    const d = (this.profile.data.geocaches ||= {});
+    if (d[poi.gc.code]) return this.emit('info', 'Already in your journal.');
+    const grade = MODES[this.mode].grade;
+    const { snap } = this.conditions();
+    d[poi.gc.code] = { name: poi.name, type: poi.gc.type, size: poi.gc.size, difficulty: poi.gc.difficulty, terrain: poi.gc.terrain, site: poi.gc.site, url: poi.gc.url, grade, conditions: snap, anchor: makeAnchor(this.world, { lat: poi.lat, lon: poi.lon, featureRef: poi.ref }), date: new Date().toISOString() };
+    this.profile.log(`Found geocache ${poi.name} (${poi.gc.code})`);
+    this.profile.save();
+    this.journal?.onGeocache?.(d[poi.gc.code]);
+    this.emit('geocache', `Found it: ${poi.name}`, { poi });
   }
 
   // ---------------- geology under your feet ----------------

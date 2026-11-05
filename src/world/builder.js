@@ -159,6 +159,20 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
       poiState.set(ref, { ...st, closed }); recolor(ref);
     },
 
+    // Add extra places from another source (e.g. geocaches). Each needs ref, lat, lon, name, kind.
+    addPlaces(list) {
+      const known = new Set(pois.map((q) => q.ref));
+      let added = 0;
+      for (const q of list) {
+        if (known.has(q.ref) || !chunk.contains(q.lat, q.lon)) continue;
+        const o = offsetMeters(p.latc, p.lonc, q.lat, q.lon), ground = chunk.heightAt(q.lat, q.lon) ?? 0;
+        pois.push({ ...q, x: o.x, z: o.z, y: ground + 5, ground, chunk: p.key, tags: q.tags || null, hours: null });
+        added++;
+      }
+      if (added) rebuildPois();
+      return added;
+    },
+
     // Merge the Overpass detail layer: real trees, extra tags, extra landmarks.
     applyDetail(d, season) {
       chunk.detail = true;

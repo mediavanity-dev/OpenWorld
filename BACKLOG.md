@@ -202,6 +202,14 @@ anything is shown publicly, and a short note on what happens to submissions.
 
 ## 6. Geocaching via Opencaching (ready once keys exist)
 
+*Status: **built** (Nov 2026), dormant until consumer keys are added as GitHub variables
+(see README → Geocaching setup). Read-only: caches as a place class with their own icon,
+card with D/T, size, hint, attribution and listing link; honour-system "I found it" (near the
+cache, Present/Home only) recorded in the journal. Next: logging finds back to Opencaching
+needs OAuth 1.0a with the consumer secret, so a small backend (e.g. a serverless function);
+Opencaching.de listings are CC BY-NC-ND, so commercial use would need permission.*
+
+
 Opencaching's open API (OKAPI) works directly from the browser with a free key per site
 (e.g. opencaching.de, .pl, .us, opencache.uk). Needs: keys registered by the project owner.
 Then: caches as a collectible type (difficulty, terrain, hint, size), finds in the journal;

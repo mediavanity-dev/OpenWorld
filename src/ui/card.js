@@ -3,9 +3,10 @@
 import { wikiSummary } from '../data/wiki.js';
 import { GROUP_STYLE } from '../data/wildlife.js';
 import { TAG_ICONS } from '../game/environment.js';
-import { taxonDetails, seasonality, skyNotes, climateToday, wikiNearby, quakesNear, rockAt, ageText } from '../data/science.js';
+import { taxonDetails, seasonality, skyNotes, climateToday, wikiNearby, quakesNear, rockAt, ageText, recentNearby, photosNearby, pollenNow, antipode } from '../data/science.js';
 import { fmtDist, fmtElev, fmtTemp, fmtTempDelta } from '../units.js';
 import { groupInfo, iconIndex, atlasCss } from '../world/icons.js';
+import { sizeLabel } from '../data/geocaching.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -49,7 +50,30 @@ export function directionLinks(lat, lon, name) {
   };
 }
 
-export function showPlace(poi, { game, profile, distance }) {
+// Geocache card: shows the listing as published, with the site's attribution, and links to it.
+const stars = (v) => (v == null ? '–' : `${'★'.repeat(Math.round(v))}${'☆'.repeat(5 - Math.round(v))} ${(+v).toFixed(1)}`);
+function showGeocache(poi, { game, profile, distance, onLogged }) {
+  const g = poi.gc, mine = profile.data.geocaches?.[g.code];
+  const can = game.canLogCache(poi);
+  const size = sizeLabel(g.size);
+  $('card-body').innerHTML = `
+    <h3><i class="ico" style="${atlasCss(iconIndex(poi.kind, poi.cls), 26)}"></i>${esc(poi.name)}</h3>
+    <div class="kind">${esc(g.type)} cache${size ? ` · ${esc(size)}` : ''} · ${esc(g.code)} · ${fmtDist(distance)} away</div>
+    <div class="chips">${mine ? `<span class="chip grade-${mine.grade}">Found ${new Date(mine.date).toLocaleDateString()}</span>` : '<span class="chip">Not found yet</span>'}${g.startOnly ? '<span class="chip">Start point: puzzle or multi-stage</span>' : ''}</div>
+    <p class="small gcrate"><span>Difficulty <b>${stars(g.difficulty)}</b></span><span>Terrain <b>${stars(g.terrain)}</b></span></p>
+    ${g.tagline ? `<p class="small">${esc(g.tagline)}</p>` : ''}
+    ${g.hint ? `<details class="gchint"><summary>Show the hint</summary><p class="small">${esc(g.hint)}</p></details>` : ''}
+    <p class="credit">${g.founds != null ? `Found ${g.founds} times` : ''}${g.lastFound ? ` · last ${new Date(g.lastFound).toLocaleDateString()}` : ''}${g.owner ? ` · hidden by ${esc(g.owner)}` : ''}</p>
+    ${directionsRow(poi, game)}
+    <div class="dirs">${mine ? '' : `<button id="gc-found" class="dirbtn found" ${can.ok ? '' : 'disabled'}>✓ I found it</button>`}${g.url ? `<a class="diralt" href="${esc(g.url)}" target="_blank" rel="noopener">Open listing &amp; log on ${esc(g.site)}</a>` : ''}</div>
+    ${!mine && !can.ok ? `<p class="credit">${esc(can.why)}</p>` : ''}
+    <p class="credit">${esc(g.attribution || `Listing from ${g.site}`)}. Please follow the cache's rules, respect private land, and re-hide it as you found it.</p>`;
+  $('card').hidden = false;
+  $('gc-found')?.addEventListener('click', () => { game.logCache(poi); onLogged?.(poi); showGeocache(poi, { game, profile, distance, onLogged }); });
+}
+
+export function showPlace(poi, { game, profile, distance, onLogged }) {
+  if (poi.cls === 'geocache' && poi.gc) { current = poi.ref; clearTimeout(closeTimer); return showGeocache(poi, { game, profile, distance, onLogged }); }
   current = poi.ref;
   clearTimeout(closeTimer);
   const d = profile.data.discoveries[poi.ref];
@@ -142,30 +166,51 @@ export function showHere(pos, { game, areaName, elevation }) {
   clearTimeout(closeTimer);
   const sky = skyNotes(pos.lat, pos.lon, game.env.utcOffset());
   const hrs = sky.dayLength != null ? `${Math.floor(sky.dayLength)} h ${Math.round((sky.dayLength % 1) * 60)} min of daylight` : sky.polar || '';
+  const trend = sky.dayTrend != null && Math.abs(sky.dayTrend) >= 0.1 ? ` · getting ${Math.abs(sky.dayTrend).toFixed(1)} min ${sky.dayTrend > 0 ? 'longer' : 'shorter'} each day` : '';
+  const shift = sky.solarShift != null && Math.abs(sky.solarShift) >= 2 ? `<br>🕰 The sun is highest at ${esc(sky.noon)}: clocks here run ${Math.abs(sky.solarShift)} min ${sky.solarShift > 0 ? 'ahead of' : 'behind'} the sun.` : '';
   const shower = sky.shower ? (sky.shower.days === 0 ? `${sky.shower.name} meteor shower peaks tonight (up to ~${sky.shower.rate}/hour in dark skies)` : `Next meteor shower: ${sky.shower.name}, in ${sky.shower.days} day${sky.shower.days === 1 ? '' : 's'}`) : '';
   $('card-body').innerHTML = `
     <h3>This spot</h3>
     <div class="kind">${esc(areaName || '')}${areaName ? ' · ' : ''}${pos.lat.toFixed(4)}, ${pos.lon.toFixed(4)}${elevation != null ? ` · ${fmtElev(elevation)} above sea level` : ''}</div>
     <h4>Under your feet</h4><div id="here-rock"><p class="credit">Looking up the geology…</p></div>
+    <div id="here-recent"></div>
+    <div id="here-photos"></div>
     <h4>Sky today</h4>
-    <p class="small">☀️ ${esc(sky.sunrise || '–')} – ${esc(sky.sunset || '–')} · ${esc(hrs)}<br>🌙 ${Math.round(sky.moonIllum * 100)}% lit${sky.moonrise ? ` · rises ${esc(sky.moonrise)}` : ''}${sky.moonset ? ` · sets ${esc(sky.moonset)}` : ''}${shower ? `<br>☄️ ${esc(shower)}` : ''}</p>
+    <p class="small">☀️ ${esc(sky.sunrise || '–')} – ${esc(sky.sunset || '–')} · ${esc(hrs)}${esc(trend)}<br>🌙 ${Math.round(sky.moonIllum * 100)}% lit${sky.moonrise ? ` · rises ${esc(sky.moonrise)}` : ''}${sky.moonset ? ` · sets ${esc(sky.moonset)}` : ''}${shower ? `<br>☄️ ${esc(shower)}` : ''}${shift}</p>
     <h4>Climate</h4><div id="here-climate"><p class="credit">Comparing with 1991–2020…</p></div>
+    <div id="here-pollen"></div>
     <h4>Nearby on Wikipedia</h4><div id="here-wiki"><p class="credit">Searching…</p></div>
+    <h4>The other side of the Earth</h4><div id="here-anti"><p class="credit">Digging…</p></div>
     <h4>Earthquakes (past 7 days, 500 km)</h4><div id="here-quakes"><p class="credit">Checking…</p></div>
-    <p class="credit">Geology: Macrostrat · Climate: Open-Meteo/ERA5 · Quakes: USGS · Wikipedia (CC BY-SA)</p>`;
+    <p class="credit">Geology: Macrostrat · Wildlife: iNaturalist · Photos: Wikimedia Commons · Climate &amp; pollen: Open-Meteo/ERA5 · Quakes: USGS · Wikipedia (CC BY-SA) · Places: OpenStreetMap</p>`;
   $('card').hidden = false;
   const id = current;
   const set = (el, html) => { if (current === id) $(el).innerHTML = html; };
   rockAt(pos.lat, pos.lon).then((r) => set('here-rock', r
     ? `<p class="small"><b>${esc(r.name)}</b>${r.lith ? `: ${esc(r.lith)}` : ''}<br>${esc(r.period)}${r.period ? ' · ' : ''}${esc(ageText(r))}${r.descrip ? `<br><span class="credit">${esc(r.descrip)}</span>` : ''}</p>`
     : '<p class="credit">No geological map data here.</p>'));
+  recentNearby(pos.lat, pos.lon).then((list) => set('here-recent', list.length
+    ? `<h4>Recently seen here</h4><div class="seen">${list.map((x) => `<a class="seen1" href="https://www.inaturalist.org/taxa/${encodeURIComponent(x.id)}" target="_blank" rel="noopener">${safeUrl(x.photo) ? `<img src="${esc(x.photo)}" alt="" loading="lazy" />` : `<i style="background:${GROUP_STYLE[x.group]?.color || '#5fd08a'}"></i>`}<span>${esc(x.name)}<small>${esc(ago(x.date))}</small></span></a>`).join('')}</div>`
+    : ''));
+  photosNearby(pos.lat, pos.lon).then((list) => set('here-photos', list.length
+    ? `<h4>Pictures of this place</h4><div class="thens">${list.map((ph) => `<a href="${esc(ph.url)}" target="_blank" rel="noopener" title="${esc(ph.title)}${ph.by ? ` · ${esc(ph.by)}` : ''}${ph.licence ? ` · ${esc(ph.licence)}` : ''}"><img src="${esc(ph.thumb)}" alt="${esc(ph.title)}" loading="lazy" />${ph.year ? `<span>${ph.year}</span>` : ''}</a>`).join('')}</div>`
+    : ''));
   climateToday(pos.lat, pos.lon, game.env.utcOffset()).then((c) => set('here-climate', c
-    ? `<p class="small">Today: ${fmtTemp(c.low)} to ${fmtTemp(c.high)}, about <b>${fmtTempDelta(c.delta)}</b> ${c.delta >= 0 ? 'warmer' : 'colder'} than the 1991–2020 average for this date (${fmtTemp(c.normal, 1)}).</p>`
+    ? `<p class="small">Today: ${fmtTemp(c.low)} to ${fmtTemp(c.high)}, about <b>${fmtTempDelta(c.delta)}</b> ${c.delta >= 0 ? 'warmer' : 'colder'} than the 1991–2020 average for this date (${fmtTemp(c.normal, 1)}).${c.recordHigh && c.recordLow ? `<br><span class="credit">On this date since 1991: hottest ${fmtTemp(c.recordHigh[0], 1)} (${c.recordHigh[1]}), coldest ${fmtTemp(c.recordLow[0], 1)} (${c.recordLow[1]}).</span>` : ''}</p>`
     : '<p class="credit">Climate comparison unavailable.</p>'));
+  pollenNow(pos.lat, pos.lon).then((list) => set('here-pollen', list.length
+    ? `<h4>Pollen in the air</h4><p class="small">${list.map((x) => `${esc(x.name)} <span class="credit">${esc(x.level)}</span>`).join(' · ')}</p>`
+    : ''));
   wikiNearby(pos.lat, pos.lon).then((list) => set('here-wiki', list.length
     ? `<ul class="jlist">${list.slice(0, 7).map((w) => `<li><a href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.title)}</a> <small>${fmtDist(w.dist)}</small></li>`).join('')}</ul>`
     : '<p class="credit">No articles within 1 km.</p>'));
+  antipode(pos.lat, pos.lon).then((a) => set('here-anti', `<p class="small">Dig straight down through the Earth and you'd come out at ${Math.abs(a.lat).toFixed(2)}°${a.lat >= 0 ? 'N' : 'S'}, ${Math.abs(a.lon).toFixed(2)}°${a.lon >= 0 ? 'E' : 'W'}: ${a.place ? `<b>${esc(a.place)}</b>` : '<b>open ocean</b>'}.</p>`));
   quakesNear(pos.lat, pos.lon).then((q) => set('here-quakes', q.length
     ? `<ul class="jlist">${q.map((e) => `<li>M${e.mag.toFixed(1)} · ${esc(e.place || '')} <small>${fmtDist(e.km * 1000)} away · ${new Date(e.time).toLocaleDateString()}</small></li>`).join('')}</ul>`
     : '<p class="credit">None of magnitude 2.5 or more.</p>'));
+}
+
+function ago(dateStr) {
+  const d = Math.round((Date.now() - Date.parse(dateStr)) / 864e5);
+  return !isFinite(d) ? '' : d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
 }

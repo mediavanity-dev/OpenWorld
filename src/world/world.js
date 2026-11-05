@@ -106,6 +106,7 @@ export class World {
       this.scene.add(chunk.group);
       this.emit({ type: 'chunk', chunk });
       if (this.quality.detail) this.loadDetail(key, entry, season);
+      this.runSources(key, entry);
     } catch (err) {
       console.warn('chunk failed', key, err);
       entry.state = 'error';
@@ -116,6 +117,18 @@ export class World {
       this.pump();
     }
   }
+
+  // Extra place sources (e.g. geocaches): async (chunk) => [places]. Loaded after the area appears.
+  addSource(fn) { (this.sources ||= []).push(fn); }
+  runSources(key, entry) {
+    for (const fn of this.sources || []) {
+      Promise.resolve(fn(entry.chunk)).then((list) => {
+        if (!list?.length || this.chunks.get(key) !== entry || !entry.chunk) return;
+        if (entry.chunk.addPlaces(list)) this.emit({ type: 'detail', chunk: entry.chunk });
+      }).catch(() => {});
+    }
+  }
+  refreshSources() { for (const [key, entry] of this.chunks) if (entry.chunk) this.runSources(key, entry); }
 
   async loadDetail(key, entry, season) {
     try {

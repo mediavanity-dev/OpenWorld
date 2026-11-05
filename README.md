@@ -136,7 +136,15 @@ get warmer, a golden arc on the minimap's edge hints at the direction, and a fai
 glimmer appears when you're close. Walk to it to collect it. Only real visits (Present or
 Home) count, and they reset at midnight.
 
-Both can be switched off in **Settings → Game features**.
+**Geocaches.** Real geocaches from the open **Opencaching** network appear as small box
+icons. Tap one for its type, size, difficulty and terrain, the owner's hint (hidden until you
+tap), and walking directions. When you've found the container, tap **I found it** (you need
+to be close by, and it only counts in Present or Home); it goes into your journal. To log the
+find with the cache owner, use **Open listing** on the Opencaching site. For puzzle and
+multi-stage caches the marker is only the starting point. Please follow each cache's rules,
+respect private land and put caches back exactly as you found them.
+
+All three can be switched off in **Settings → Game features**.
 
 ### 7. Your field journal, records and daily assignment
 
@@ -153,8 +161,10 @@ Tap **📓 Journal** to see what you've done:
 - **Create a summary image** to save or share a picture of your journal (made on your
   device; nothing is uploaded).
 
-Each day brings one **field assignment**, such as *Spot a bird*, *Walk 1 km* or *Discover
-a place after dark*. It's shown in the panel and only counts in Present or Home mode.
+Each day brings one **field assignment** that sends you towards nature, history or
+something quirky: *Find a monument or historic spot*, *Visit a park or nature spot*, *Find
+something quirky (a sculpture, fountain, clock or sundial)*, *Spot a bird*, *Walk 1 km*.
+Cafés and shops never count. It's shown in the panel and only counts in Present or Home mode.
 
 The **minimap** (bottom-left on computers, top-right on phones) shows the ground you've
 explored lit up, the rest in fog, plus nearby places. Tap it to open the journal map.
@@ -162,14 +172,21 @@ Roam never counts as real exploration: virtual areas show in purple.
 
 ### 8. This spot: geology, sky and history
 
-Tap **📍 This spot** for a short field note about where you are:
+Tap **🔍 This spot** for a short field note about where you are:
 
 - **Under your feet**: the rock beneath you and its age (e.g. *Lambeth Group: clay, silt,
   sand and gravel, 56–66 million years old*). New rock types you walk onto are added to
   your collection automatically.
-- **Sky today**: sunrise, sunset, day length, moon phase and moonrise, next meteor shower.
-- **Climate**: how today compares with the 1991–2020 average for this date.
+- **Recently seen here**: animals and plants people have recorded within about 1 km in the
+  past two weeks.
+- **Pictures of this place**: freely licensed photos taken nearby, oldest first, with their year.
+- **Sky today**: sunrise, sunset, day length (and how fast it's changing), moon phase and
+  moonrise, the next meteor shower, and how far local clocks are from the sun.
+- **Climate**: how today compares with the 1991–2020 average for this date, plus the
+  hottest and coldest this date has been since 1991.
+- **Pollen in the air** (Europe), only when there is some.
 - **Nearby on Wikipedia**: articles about places within 1 km.
+- **The other side of the Earth**: where you'd come out if you dug straight down.
 - **Earthquakes**: any of magnitude 2.5+ within 500 km in the past week.
 
 Species cards now also show the creature's family tree, conservation status, how rare it is
@@ -378,3 +395,15 @@ snap to the current terrain.
 - Earthquakes: USGS. Holidays: Nager.Date.
 - Wildlife photos: only openly licensed (CC/public-domain) iNaturalist photos are shown.
 - Place search & country lookup: OSM Nominatim. IP location: geojs.io.
+- Geocaches: the Opencaching network (OKAPI); listings © their owners under each site's
+  licence (e.g. Opencaching.de CC BY-NC-ND), shown unmodified with attribution and a link.
+- Photos of places: Wikimedia Commons (free licences, credited on hover).
+
+### Geocaching setup (project owner)
+
+Geocaches need free *consumer keys* from the Opencaching sites (one per site; register with an
+email at e.g. `https://www.opencaching.de/okapi/signup.html`). Add them as GitHub repository
+**variables** (Settings → Secrets and variables → Actions → Variables): `OKAPI_KEY_DE`,
+`OKAPI_KEY_PL`, `OKAPI_KEY_NL`, `OKAPI_KEY_RO`, `OKAPI_KEY_UK`, `OKAPI_KEY_US`, then re-run the
+deploy. Only the consumer *key* is needed; never add the consumer *secret*. Without keys the
+feature stays off. Locally: put `VITE_OKAPI_KEY_DE=...` in an untracked `.env.local`.
