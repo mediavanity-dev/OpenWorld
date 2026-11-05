@@ -29,7 +29,7 @@ export class Minimap {
   }
 
   // bearing: degrees clockwise from north that should point "up"
-  draw({ pos, bearing = 0, cells = {}, pois = [], critters = [], home = null, discovered = {} }) {
+  draw({ pos, bearing = 0, cells = {}, pois = [], critters = [], home = null, discovered = {}, hunt = null, treasure = null, t = 0 }) {
     this.resize();
     const { g, c } = this;
     const W = c.width, R = W / 2, k = (R - 3) / this.radius;
@@ -74,6 +74,30 @@ export class Minimap {
       const [x, y] = P(cr.lat, cr.lon);
       g.strokeStyle = '#5fd08a'; g.lineWidth = Math.max(1.5, W / 90);
       g.beginPath(); g.arc(x, y, dot * 1.8, 0, Math.PI * 2); g.stroke();
+    }
+
+    // beta: the hunt's rustle, a soft breathing glow over the area it's in
+    if (hunt?.hint && !hunt.revealed) {
+      const [hx, hy] = P(hunt.hint.lat, hunt.hint.lon), hr = Math.max(dot * 3, hunt.hint.r * k);
+      const breathe = 0.75 + 0.25 * Math.sin(t / 600);
+      const gr = g.createRadialGradient(hx, hy, 0, hx, hy, hr);
+      gr.addColorStop(0, `rgba(95,208,138,${0.42 * breathe})`); gr.addColorStop(1, 'rgba(95,208,138,0)');
+      g.fillStyle = gr; g.beginPath(); g.arc(hx, hy, hr, 0, Math.PI * 2); g.fill();
+    }
+    // beta: daily treasure: a faint halo (cool), a golden arc towards it (warm), a spark (hot)
+    if (treasure?.band) {
+      const o = offsetMeters(pos.lat, pos.lon, treasure.t.lat, treasure.t.lon);
+      const brg = Math.atan2(o.x, -o.z) + ((treasure.t.rim || 0) * Math.PI) / 180 * (treasure.band === 'warm' ? 1 : 0);
+      const a = brg - th - Math.PI / 2;
+      g.lineCap = 'round';
+      if (treasure.band === 'cool') { g.strokeStyle = 'rgba(255,211,107,0.18)'; g.lineWidth = W / 30; g.beginPath(); g.arc(R, R, R - W / 40, 0, Math.PI * 2); g.stroke(); }
+      else if (treasure.band === 'warm') { g.strokeStyle = 'rgba(255,211,107,0.75)'; g.lineWidth = W / 26; g.beginPath(); g.arc(R, R, R - W / 40, a - 0.35, a + 0.35); g.stroke(); }
+      else {
+        const [x, y] = P(treasure.t.lat, treasure.t.lon), pulse = 1 + 0.25 * Math.sin(t / 300);
+        const gr = g.createRadialGradient(x, y, 0, x, y, dot * 4 * pulse);
+        gr.addColorStop(0, 'rgba(255,230,150,1)'); gr.addColorStop(1, 'rgba(255,211,107,0)');
+        g.fillStyle = gr; g.beginPath(); g.arc(x, y, dot * 4 * pulse, 0, Math.PI * 2); g.fill();
+      }
     }
 
     // you

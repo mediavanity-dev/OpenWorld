@@ -162,6 +162,11 @@ internal testing tracks (TestFlight / Play internal testing) before any public l
 
 ## 4. Test version (beta channel)
 
+*Status: **live** at https://mediavanity-dev.github.io/OpenWorld/beta/ (Nov 2026). Same code
+built twice (`npm run build` / `npm run build:beta`, `VITE_CHANNEL=beta`, see `src/channel.js`);
+separate profile and settings (`openworld-beta.*`), "copy my main profile" in beta Settings,
+per-scope offline caches, BETA marker, links between versions, feature switches.*
+
 **Goal:** a separate version for trying features safely before they reach everyone.
 
 - Deploy a second build to `/OpenWorld/beta/` (or a separate repo/site) from a `beta`
@@ -317,4 +322,8 @@ travelling fast or trespassing. Keep the honesty rules (Roam never counts as rea
 4. Restyle the world and journal to match; demote map-utility features in the interface.
 5. Playtest with a few people walking real routes; keep what makes them want to go outside.
 
-*Status: parked for later testing (owner's call, Nov 2026).*
+*Status: first prototype **in the beta** (Nov 2026): **the hunt** (animals leave signs: a
+minimap rustle that tightens, a 5-dot warmer/colder tracker, tracks on the ground, reveal up
+close, flee if rushed, trail goes cold) and **daily treasure** (3 finds per area per day along
+public streets, seeded by date + area so everyone shares them; cool/warm/hot hints, a faint
+golden mote when close; real visits only). Next: playtest, then rephotography.*

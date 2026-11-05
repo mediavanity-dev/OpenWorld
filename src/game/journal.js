@@ -125,6 +125,8 @@ export class Journal {
     return have ? 'upgraded' : 'new';
   }
 
+  onTreasure() { this.today().treasure = (this.today().treasure || 0) + 1; this.profile.save(); }
+
   onArea(chunk) {
     const a = this.d.areas[chunk.key];
     const total = chunk.pois.length;

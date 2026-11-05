@@ -261,6 +261,23 @@ screen and is never recorded or sent anywhere.
 
 ---
 
+## The beta version
+
+**https://mediavanity-dev.github.io/OpenWorld/beta/** is where new ideas are tried first. It
+has its own separate journal (copy your main one in from Settings if you like), a small
+BETA marker, and currently two experiments:
+
+- **The hunt**: animals no longer pop up beside you. You notice *signs* instead: a soft
+  rustle on the minimap that tightens as you close in, a little tracker (🐾 and five dots:
+  warmer or colder), faint tracks on the ground when you're near. Close enough and it
+  reveals itself; move in too fast and it slips away. Rarer animals leave fainter trails.
+- **Daily treasure** ✦: three golden finds are hidden each day in every area, along public
+  streets and paths, and they're the same for everyone nearby. The ✦ brightens as you get
+  warmer, the minimap hints at the direction, and a faint golden glimmer appears when you're
+  close. Only real visits (Present or Home) collect them; they reset at midnight.
+
+Both can be switched off in the beta's Settings.
+
 ## For developers
 
 Planned work and ideas: see [BACKLOG.md](BACKLOG.md).
@@ -268,7 +285,8 @@ Planned work and ideas: see [BACKLOG.md](BACKLOG.md).
 ```
 npm install
 npm run dev        # http://localhost:5173
-npm test           # unit tests (opening hours, geo, anchors, journal); also run before every deploy
+npm test           # unit tests (opening hours, geo, anchors, journal, hunt, treasure); run before every deploy
+npm run dev -- --mode beta   # beta channel locally (experiments on)
 ```
 Deep link: `http://localhost:5173/?at=51.4779,-0.0015` starts in Roam at those coordinates.
 Add `?dev` to bypass the 30-day home-base cooldown while testing.

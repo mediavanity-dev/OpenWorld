@@ -10,6 +10,8 @@ import { nearestBuilding } from '../data/osm.js';
 import { speciesNear, fitsHabitat, GROUP_STYLE } from '../data/wildlife.js';
 import { wildHabitat } from '../world/habitats.js';
 import { rockAt, ageText } from '../data/science.js';
+import { startHunt, stepHunt } from './hunt.js';
+import { treasuresFor, bandOf, PER_AREA } from './treasure.js';
 
 const DEV = new URLSearchParams(location.search).has('dev');
 
@@ -61,6 +63,12 @@ export class Game {
     this.wild = { cell: null, species: [], loading: false };
     this.dataSaver = false;
     this.journal = null;   // set by the app (src/game/journal.js)
+    this.features = {};    // beta-only experiments: { hunt, treasure }
+    this.hunt = null;      // active hunt (src/game/hunt.js)
+    this.treasureHint = null; // nearest uncollected daily treasure { t, d, band }
+    this._treasureMemo = new Map();
+    this._roamNoted = new Set();
+    this._spd = 0;         // smoothed ground speed (m/s) for Home/Roam
     this._moved = 0;
     this._walk = 0;
     this._rockCell = null;
@@ -149,6 +157,7 @@ export class Game {
       this.pos = next;
     }
     const moved = haversine(before.lat, before.lon, this.pos.lat, this.pos.lon);
+    if (dt > 0) this._spd += (moved / dt - this._spd) * Math.min(1, dt * 3);
     if (moved < 500) {
       this.profile.data.stats.meters[this.mode] += moved;
       // wildlife and walking records only at human speeds
@@ -162,6 +171,8 @@ export class Game {
     if (this._discT > 0.4) {
       this._discT = 0;
       this.checkDiscoveries(); this.checkCritters(); this.loadWildlife(); this.checkRock();
+      if (this.hunt) this.stepHunt();
+      if (this.features.treasure) this.checkTreasure();
       this.journal?.onMove(this.mode, this._walk, this.pos, this.world.groundAt(this.pos.lat, this.pos.lon));
       this._walk = 0;
     }
@@ -278,6 +289,7 @@ export class Game {
 
   rollEncounter() {
     if (!this.wild.species.length || this.critters.length >= 2) return;
+    if (this.features.hunt && this.hunt) return; // one trail at a time
     const hab = wildHabitat(this.world.habitatAt(this.pos.lat, this.pos.lon));
     const chance = hab === 'urban' ? 0.25 : 0.55;
     const rand = Math.random;
@@ -289,6 +301,12 @@ export class Game {
     const w = pool.map((s) => (total += Math.pow(s.count, 0.6)));
     const pick = rand() * total;
     const sp = pool[w.findIndex((v) => v >= pick)];
+    // only animals leave signs and flee; plants and fungi are simply found nearby
+    if (this.features.hunt && !['Plantae', 'Fungi'].includes(sp.group)) {
+      this.hunt = startHunt(this.pos, sp, this.heading);
+      const lbl = GROUP_STYLE[sp.group]?.label || 'creature';
+      return this.emit('hunt', `Fresh signs of ${/^[aeiou]/.test(lbl) ? 'an' : 'a'} ${lbl} nearby`, { hunt: this.hunt });
+    }
     // appear 15–35 m away, roughly ahead if we know the heading
     const base = this.heading != null ? (this.heading * Math.PI) / 180 : rand() * Math.PI * 2;
     const ang = base + (rand() - 0.5) * 1.6, dist = 15 + rand() * 20;
@@ -299,11 +317,73 @@ export class Game {
     this.emit('critter', `Something is moving nearby: ${/^[aeiou]/.test(label) ? 'an' : 'a'} ${label}. Go and see!`, { critter: c });
   }
 
+  stepHunt() {
+    const h = this.hunt;
+    const speed = this.mode === 'present' ? (this.fixSpeed ?? 0) : this._spd;
+    const ev = stepHunt(h, this.pos, speed);
+    if (!ev) return;
+    const drop = () => { this.critters = this.critters.filter((c) => c.id !== h.id); };
+    if (ev === 'cold') { drop(); this.hunt = null; this.emit('hunt-cold', 'The trail went cold'); }
+    else if (ev === 'flee') { drop(); this.emit('hunt-flee', 'It heard you coming. Approach gently.'); }
+    else if (ev === 'reveal') {
+      this.critters.push({ id: h.id, sp: h.sp, lat: h.lat, lon: h.lon, born: performance.now(), ttl: 150, hunted: true });
+      this.emit('hunt-reveal', null, { hunt: h });
+    } else this.emit(`hunt-${ev}`, null, { hunt: h });
+  }
+
+  // ---------------- daily treasure (beta) ----------------
+  todaysTreasure(chunk) {
+    const date = this.env.localNow().toISOString().slice(0, 10), key = `${date}|${chunk.key}`;
+    let t = this._treasureMemo.get(key);
+    if (!t) { t = treasuresFor(chunk, date); this._treasureMemo.set(key, t); if (this._treasureMemo.size > 60) this._treasureMemo.delete(this._treasureMemo.keys().next().value); }
+    return t;
+  }
+  treasureState() {
+    const date = this.env.localNow().toISOString().slice(0, 10);
+    const st = (this.profile.data.treasure ||= { date, found: [], total: 0 });
+    if (st.date !== date) { st.date = date; st.found = []; }
+    return st;
+  }
+  checkTreasure() {
+    const st = this.treasureState();
+    let best = null;
+    for (const ch of this.world.readyChunks()) {
+      const b = ch.bounds, pad = 0.006;
+      if (this.pos.lat < b.s - pad || this.pos.lat > b.n + pad || this.pos.lon < b.w - pad * 1.6 || this.pos.lon > b.e + pad * 1.6) continue;
+      for (const t of this.todaysTreasure(ch)) {
+        if (st.found.includes(t.id)) continue;
+        const d = haversine(this.pos.lat, this.pos.lon, t.lat, t.lon);
+        if (!best || d < best.d) best = { t, d };
+      }
+    }
+    const prev = this.treasureHint?.band;
+    this.treasureHint = best ? { ...best, band: bandOf(best.d) } : null;
+    if (this.treasureHint?.band === 'hot' && prev !== 'hot') this.emit('treasure-hot', null);
+    if (!best || best.d > 15) return;
+    if (this.mode === 'roam') {
+      if (!this._roamNoted.has(best.t.id)) { this._roamNoted.add(best.t.id); this.emit('info', 'A golden find is here. Visit for real to collect it.'); }
+      return;
+    }
+    st.found.push(best.t.id);
+    st.total = (st.total || 0) + 1;
+    this.profile.save();
+    const inArea = st.found.filter((id) => id.split(':')[1] === best.t.id.split(':')[1]).length;
+    this.profile.log(`Golden find${best.t.area ? ` in ${best.t.area}` : ''} (${inArea}/${PER_AREA} today)`);
+    this.journal?.onTreasure?.();
+    this.emit('treasure', `Golden find · ${inArea} of ${PER_AREA}${best.t.area ? ` in ${best.t.area}` : ''} today`, { treasure: best.t });
+    this.treasureHint = null;
+  }
+
   checkCritters() {
     const now = performance.now();
     const reach = this.mode === 'present' ? Math.min(20, Math.max(8, (this.fix?.accuracy || 10) * 0.6)) : 8;
     for (const c of [...this.critters]) {
-      if ((now - c.born) / 1000 > c.ttl) { this.critters = this.critters.filter((x) => x !== c); this.emit('critter-gone', null, { critter: c }); continue; }
+      if ((now - c.born) / 1000 > c.ttl) {
+        this.critters = this.critters.filter((x) => x !== c);
+        if (c.hunted && this.hunt?.id === c.id) this.hunt = null;
+        this.emit('critter-gone', null, { critter: c });
+        continue;
+      }
       if (haversine(this.pos.lat, this.pos.lon, c.lat, c.lon) > reach) continue;
       this.spot(c);
     }
@@ -316,7 +396,9 @@ export class Game {
     const grade = MODES[this.mode].grade;
     const { snap } = this.conditions();
     const anchor = makeAnchor(this.world, { lat: c.lat, lon: c.lon });
-    const res = this.profile.recordSpecies(c.sp, grade, anchor, how === 'photo' ? { ...snap, photo: true } : snap);
+    if (c.hunted && this.hunt?.id === c.id) this.hunt = null;
+    const cond = { ...snap, ...(how === 'photo' ? { photo: true } : {}), ...(c.hunted ? { tracked: true } : {}) };
+    const res = this.profile.recordSpecies(c.sp, grade, anchor, cond);
     this.journal?.onSpecies(c.sp, grade, res, how);
     const what = c.sp.name;
     if (res === 'new') this.profile.log(`${how === 'photo' ? 'Photographed' : 'Spotted'} ${what} [${grade}]`);

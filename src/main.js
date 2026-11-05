@@ -24,6 +24,8 @@ import { runTutorial, tutorialDone } from './ui/tips.js';
 import { Ambience } from './audio.js';
 import { fmtDist, fmtTemp } from './units.js';
 import { pruneCache } from './data/cache.js';
+import { BETA, FEATURES, storeKey } from './channel.js';
+import { STABLE_PROFILE_KEY } from './game/profile.js';
 import { wildHabitat } from './world/habitats.js';
 
 const $ = (id) => document.getElementById(id);
@@ -61,6 +63,14 @@ const profile = new Profile();
 const environment = new Environment(() => renderHud(true));
 const game = new Game(world, profile, environment, onGameEvent);
 game.dataSaver = settings.dataSaver;
+// beta channel: experimental features on unless switched off in settings
+function applyFeatures() {
+  game.features = {};
+  if (BETA) for (const k of Object.keys(FEATURES)) game.features[k] = settings.features?.[k] !== false;
+  if (!game.features.hunt) game.hunt = null;
+}
+applyFeatures();
+if (BETA) document.body.classList.add('beta');
 const journal = new Journal(profile, environment, (ev) => onGameEvent(ev));
 game.journal = journal;
 const ambience = new Ambience();
@@ -200,6 +210,12 @@ world.on((ev) => {
 
 // ---------------------------------------------------------------- wildlife critters
 const critterGeo = new THREE.IcosahedronGeometry(0.7, 1);
+const haloMat = new THREE.SpriteMaterial({ map: (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 4, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(160,255,200,0.55)'); gr.addColorStop(0.5, 'rgba(95,208,138,0.22)'); gr.addColorStop(1, 'rgba(95,208,138,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c);
+})(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
 const critterObjs = new Map();
 function syncCritters(t) {
   const alive = new Set(game.critters.map((c) => c.id));
@@ -209,6 +225,9 @@ function syncCritters(t) {
     if (!m) {
       m = new THREE.Mesh(critterGeo, new THREE.MeshLambertMaterial({ color: GROUP_STYLE[c.sp.group]?.color || '#5fd08a', emissive: '#113311' }));
       m.userData.critter = c;
+      const halo = new THREE.Sprite(haloMat);
+      halo.raycast = () => {}; // taps hit the creature, not its glow
+      m.add(halo);
       critterObjs.set(c.id, m);
       scene.add(m);
     }
@@ -216,7 +235,86 @@ function syncCritters(t) {
     if (g === null) { m.visible = false; continue; }
     m.visible = true;
     placeAt(m, c.lat, c.lon, g + 0.8 + (settings.reduceMotion ? 0.6 : Math.abs(Math.sin(t / 260 + c.born)) * 1.2));
+    const age = Math.min(1, (t - c.born) / 700);
+    m.scale.setScalar(settings.reduceMotion ? 1 : 0.2 + 0.8 * age * age * (3 - 2 * age));
+    const hs = ar.active ? 3 : Math.min(18, Math.max(3, controls.dist * 0.07)) / Math.max(0.2, m.scale.x);
+    m.children[0].scale.setScalar(hs * (settings.reduceMotion ? 1 : 0.92 + 0.08 * Math.sin(t / 500)));
   }
+}
+
+// ---------------------------------------------------------------- beta: hunt tracks + treasure mote
+// Subtle by design: faint prints on the ground; a soft golden mote with a light shaft that
+// fades in when you're close. A handful of objects, built once.
+const printGeo = new THREE.CircleGeometry(0.2, 10).scale(1, 1.5, 1).rotateX(-Math.PI / 2);
+const printMat = new THREE.MeshBasicMaterial({ color: '#2a2016', transparent: true, opacity: 0, depthWrite: false });
+const prints = new THREE.InstancedMesh(printGeo, printMat, 6);
+prints.frustumCulled = false; prints.visible = false; prints.renderOrder = 2;
+scene.add(prints);
+let printsFor = null;
+const _pm = new THREE.Matrix4(), _pq = new THREE.Quaternion(), _ps = new THREE.Vector3(1, 1, 1), _pp = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+function glowTexture(stops) {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  stops.forEach(([o, col]) => gr.addColorStop(o, col));
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+const mote = new THREE.Group();
+const moteGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture([[0, 'rgba(255,226,150,0.85)'], [0.2, 'rgba(255,200,90,0.45)'], [1, 'rgba(255,190,80,0)']]), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+moteGlow.scale.setScalar(3.2);
+const shaftTex = (() => { const c = document.createElement('canvas'); c.width = 4; c.height = 64; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 64); gr.addColorStop(0, 'rgba(255,190,80,0)'); gr.addColorStop(0.7, 'rgba(255,190,80,0.08)'); gr.addColorStop(1, 'rgba(255,200,100,0.3)'); g.fillStyle = gr; g.fillRect(0, 0, 4, 64); return new THREE.CanvasTexture(c); })();
+const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.45, 18, 16, 1, true).translate(0, 9, 0), new THREE.MeshBasicMaterial({ map: shaftTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, opacity: 0 }));
+mote.add(shaft, moteGlow);
+mote.visible = false;
+scene.add(mote);
+let moteFade = 0;
+function syncBeta(now, rdt) {
+  // tracks
+  const h = game.hunt;
+  if (h?.tracks && !h.revealed) {
+    if (printsFor !== h.tracks) {
+      printsFor = h.tracks;
+      h.tracks.forEach((tp, k) => {
+        const g = world.groundAt(tp.lat, tp.lon) ?? avatarY, o = world.toLocal(tp.lat, tp.lon);
+        _pq.setFromAxisAngle(_up, -tp.yaw);
+        prints.setMatrixAt(k, _pm.compose(_pp.set(o.x, g + 0.06, o.z), _pq, _ps));
+      });
+      prints.instanceMatrix.needsUpdate = true;
+    }
+    prints.visible = true;
+    printMat.opacity += (0.55 - printMat.opacity) * Math.min(1, rdt * 2);
+  } else if (prints.visible) {
+    printMat.opacity -= Math.min(printMat.opacity, rdt * 1.5);
+    if (printMat.opacity <= 0.01) { prints.visible = false; printsFor = null; }
+  }
+  // treasure mote: fades in when "hot", gently breathes
+  const th = game.treasureHint;
+  const want = th?.band === 'hot' ? 1 : 0;
+  moteFade += (want - moteFade) * Math.min(1, rdt * 2.5);
+  mote.visible = moteFade > 0.01;
+  if (mote.visible && th) {
+    const g = world.groundAt(th.t.lat, th.t.lon) ?? avatarY;
+    placeAt(mote, th.t.lat, th.t.lon, g);
+    const b = settings.reduceMotion ? 0 : Math.sin(now / 700);
+    const ms = Math.min(16, Math.max(3.2, controls.dist * 0.06));
+    moteGlow.scale.setScalar(ms);
+    moteGlow.position.y = 1.4 + ms * 0.2 + b * 0.25;
+    moteGlow.material.opacity = moteFade * (0.85 + 0.15 * b);
+    shaft.material.opacity = moteFade * 0.35; // a faint thread of light, not a beam
+  }
+}
+// small tracker pill: dots for the hunt's signal, a spark for treasure warmth; fades in and out
+function renderTracker() {
+  const el = $('tracker');
+  const h = game.hunt, th = game.treasureHint;
+  let html = '';
+  if (h) {
+    const dots = [1, 2, 3, 4, 5].map((k) => `<i class="${k <= h.signal ? 'on' : ''}"></i>`).join('');
+    html += `<span class="hunt ${h.trend > 0 ? 'warmer' : h.trend < 0 ? 'colder' : ''}" title="Tracking">🐾<span class="dots">${dots}</span></span>`;
+  }
+  if (th?.band) html += `<span class="gold ${th.band}" title="Daily treasure: ${th.band}">✦</span>`;
+  if (el.dataset.v !== html) { el.dataset.v = html; el.innerHTML = html; }
+  el.classList.toggle('show', !!html && !ar.active);
 }
 
 // ---------------------------------------------------------------- input, picking, card
@@ -722,12 +820,14 @@ function frame(now) {
     syncCritters(now);
     }
   }
+  if (BETA && game.pos) syncBeta(now, rdt);
   if (!settings.reduceMotion) beaconGroup.children.forEach((b) => (b.children[1].position.y = 2.5 + Math.sin(now / 500) * 0.4));
   miniT += rdt;
   if (miniT > 0.25 && game.pos && !$('hud').hidden) {
     miniT = 0;
     const bearing = ar.active ? (currentHeading() ?? 0) : (-controls.yaw * 180) / Math.PI;
-    minimap.draw({ pos: game.pos, bearing, cells: profile.data.cells, pois: [...world.pois(game.pos.lat, game.pos.lon, 600)].map((x) => x.poi), critters: game.critters, home: profile.data.home, discovered: profile.data.discoveries });
+    minimap.draw({ pos: game.pos, bearing, cells: profile.data.cells, pois: [...world.pois(game.pos.lat, game.pos.lon, 600)].map((x) => x.poi), critters: game.critters, home: profile.data.home, discovered: profile.data.discoveries, hunt: game.hunt, treasure: game.treasureHint, t: now });
+    renderTracker();
   }
   ambT += rdt;
   if (ambT > 1 && ambience.on && game.pos) {
@@ -773,6 +873,13 @@ function onGameEvent(ev) {
   } else if (ev.type === 'beacon') { toast(ev.msg); refreshBeacons(); }
   else if (ev.type === 'rock') { toast(ev.msg, 'rock'); buzz(30); }
   else if (ev.type === 'task') { toast(ev.msg, 'species'); buzz([40, 50, 40, 50, 80]); renderHud(); }
+  else if (ev.type === 'hunt') { toast(ev.msg, 'species'); buzz(15); ambience.chime(0); }
+  else if (ev.type === 'hunt-signal-up') { buzz(8 + ev.hunt.signal * 6); ambience.chime(ev.hunt.signal); }
+  else if (ev.type === 'hunt-tracks') { buzz(12); }
+  else if (ev.type === 'hunt-reveal') { buzz([20, 40, 20]); ambience.chime(7); }
+  else if (ev.type === 'hunt-flee' || ev.type === 'hunt-cold') { toast(ev.msg); }
+  else if (ev.type === 'treasure-hot') { buzz([12, 30, 12]); ambience.chime(5); }
+  else if (ev.type === 'treasure') { toast(ev.msg, 'gold'); buzz([30, 40, 60]); ambience.chime(9); renderHud(); }
   else if (ev.msg) toast(ev.msg);
 }
 
@@ -1007,6 +1114,7 @@ function openSettings() {
   $('set-text').value = settings.textSize;
   $('set-motion').checked = settings.reduceMotion;
   $('set-sound').checked = settings.sound;
+  if (BETA) $('set-beta').innerHTML = Object.entries(FEATURES).map(([k, f]) => `<label class="set check"><input type="checkbox" data-feature="${k}" ${settings.features?.[k] !== false ? 'checked' : ''}/> ${f.label}</label>`).join('');
   $('set-names').value = settings.placeNames;
   $('set-awake').disabled = !('wakeLock' in navigator);
   $('set-compass').disabled = !compassSupported;
@@ -1017,7 +1125,15 @@ $('p-settings').onclick = openSettings;
 $('set-close').onclick = () => { $('settings').hidden = true; };
 $('set-quality').onchange = (e) => { settings.quality = e.target.value; saveSettings(); applyTier(startTier()); $('set-info').textContent = `Now: ${tier.label}`; };
 $('set-weather').onchange = (e) => { settings.weatherFx = e.target.checked; saveSettings(); };
-$('set-datasaver').onchange = (e) => { settings.dataSaver = e.target.checked; game.dataSaver = settings.dataSaver; saveSettings(); applyTier(tierName); };
+$('set-datasaver').onchange = (e) => { settings.dataSaver = e.target.checked; game.dataSaver = settings.dataSaver;
+// beta channel: experimental features on unless switched off in settings
+function applyFeatures() {
+  game.features = {};
+  if (BETA) for (const k of Object.keys(FEATURES)) game.features[k] = settings.features?.[k] !== false;
+  if (!game.features.hunt) game.hunt = null;
+}
+applyFeatures();
+if (BETA) document.body.classList.add('beta'); saveSettings(); applyTier(tierName); };
 $('set-awake').onchange = (e) => { settings.keepAwake = e.target.checked; saveSettings(); keepAwake(game.mode === 'present' && settings.keepAwake); };
 $('set-compass').onchange = async (e) => {
   settings.compassFollow = e.target.checked; saveSettings();
@@ -1028,6 +1144,27 @@ $('set-units').onchange = (e) => { settings.units = e.target.value; saveSettings
 $('set-text').onchange = (e) => { settings.textSize = e.target.value; saveSettings(); applyLook(); };
 $('set-motion').onchange = (e) => { settings.reduceMotion = e.target.checked; saveSettings(); applyLook(); };
 $('set-sound').onchange = (e) => { settings.sound = e.target.checked; saveSettings(); settings.sound ? ambience.start() : ambience.stop(); };
+// beta: feature switches, copy the real profile in, and links between the two versions
+if (BETA) {
+  $('beta-box').hidden = false;
+  $('set-beta').addEventListener('change', (e) => {
+    const k = e.target.dataset.feature;
+    if (!k) return;
+    settings.features = { ...(settings.features || {}), [k]: e.target.checked };
+    saveSettings(); applyFeatures();
+  });
+  $('beta-import').onclick = () => {
+    let raw = null;
+    try { raw = localStorage.getItem(STABLE_PROFILE_KEY); } catch { /* ignore */ }
+    if (!raw) return toast('No main-version profile found on this device.', 'error');
+    if (!confirm('Replace your beta profile with a copy of your main profile? Your main profile is not changed.')) return;
+    try { profile.import(raw); journal.ensure(); toast('Copied your main profile into the beta'); setTimeout(() => location.reload(), 600); }
+    catch (err) { toast('Copy failed: ' + err.message, 'error'); }
+  };
+}
+$('channel-link').href = BETA ? '../' : 'beta/';
+$('channel-link').textContent = BETA ? 'Back to the main version' : 'Try the beta (new experiments)';
+
 function applyLook() {
   document.body.classList.toggle('text-lg', settings.textSize === 'large');
   document.body.classList.toggle('reduce-motion', settings.reduceMotion);
@@ -1057,7 +1194,7 @@ watchBattery((b) => {
 });
 
 // map-only view toggle (button, or H on a keyboard); remembered per device
-const UI_KEY = 'openworld.cleanView';
+const UI_KEY = storeKey('cleanView');
 function setClean(on) {
   document.body.classList.toggle('clean', on);
   $('ui-toggle').setAttribute('aria-label', on ? 'Show interface' : 'Hide interface');

@@ -100,6 +100,7 @@
     </div>
     <div id="stick" class="stick"><div></div></div>
     <canvas id="minimap" class="minimap" aria-label="Minimap (tap for your journal map)"></canvas>
+    <div id="tracker" class="tracker" aria-live="polite"></div>
     <button id="compass" class="fab compass" hidden aria-label="Follow compass">🧭</button>
     <button id="ar-btn" class="fab ar-btn" hidden aria-label="Camera AR view" title="Camera AR view">📷</button>
     <div id="ar-compass" class="ar-compass" aria-hidden="true"><div class="ticks"></div><b id="ar-heading">N 0°</b></div>
@@ -154,7 +155,7 @@
       <p>No account and no tracking. Your position stays on your device; only the surrounding <i>area</i> is used to fetch open data. Your journal, species and beacons are never uploaded.</p>
       <h4>Thanks to</h4>
       <p class="credit">Map data © OpenStreetMap contributors (ODbL) · OpenFreeMap · AWS Terrain Tiles (Mapzen) · Open-Meteo (weather, air, climate) · iNaturalist (wildlife; photos credited) · Wikipedia &amp; Wikidata · Macrostrat (geology) · USGS (earthquakes) · Nager.Date (holidays) · OSM Nominatim (search) · geojs.io (IP location).</p>
-      <p class="credit"><a href="https://github.com/mediavanity-dev/OpenWorld" target="_blank" rel="noopener">Source code &amp; full guide</a></p>
+      <p class="credit"><a href="https://github.com/mediavanity-dev/OpenWorld" target="_blank" rel="noopener">Source code &amp; full guide</a> · <a id="channel-link" href="beta/">Try the beta</a></p>
     </div>
   </div>
 
@@ -187,6 +188,12 @@
       <label class="set check"><input type="checkbox" id="set-datasaver" /> Data saver (skip trees, opening hours and wildlife downloads)</label>
       <label class="set check"><input type="checkbox" id="set-awake" /> Keep screen on while Present</label>
       <label class="set check"><input type="checkbox" id="set-compass" /> Camera follows my phone's compass (Present)</label>
+      <div id="beta-box" class="beta-box" hidden>
+        <h4>Beta experiments</h4>
+        <div id="set-beta"></div>
+        <button id="beta-import">Copy my main profile into the beta</button>
+        <p class="hint">The beta keeps its own profile, so nothing here changes your main journal.</p>
+      </div>
       <p class="hint" id="set-info"></p>
       <div class="row end">
         <button id="p-reset" class="danger">Reset profile…</button>

@@ -1,6 +1,8 @@
 // Per-device settings (not part of the portable profile) and quality tiers.
 
-const KEY = 'openworld.settings.v1';
+import { storeKey } from './channel.js';
+
+const KEY = storeKey('settings.v1');
 const coarse = matchMedia('(pointer: coarse)').matches;
 const conn = navigator.connection;
 const saveDataHint = !!(conn && (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || '')));
@@ -22,6 +24,7 @@ const defaults = {
   reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
   sound: false,             // ambient soundscape (off by default)
   placeNames: 'zoom',       // zoom (only when zoomed in) | always | never
+  features: {},             // beta experiments switched off by the player: { hunt: false, ... }
 };
 
 export const settings = (() => {

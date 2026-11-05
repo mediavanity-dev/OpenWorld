@@ -25,7 +25,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run build
+      - run: npm run build          # main site  -> dist/
+      - run: npm run build:beta     # beta site  -> dist/beta/ (experiments on, separate profile)
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

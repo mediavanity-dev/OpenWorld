@@ -2,7 +2,10 @@
 // device, exportable as JSON. Everything in it is keyed by real-world anchors,
 // never by render coordinates or dataset-internal indices.
 
-const KEY = 'openworld.profile.v1';
+import { storeKey, stableKey } from '../channel.js';
+
+const KEY = storeKey('profile.v1');
+export const STABLE_PROFILE_KEY = stableKey('profile.v1');
 
 export const GRADE_RANK = { echo: 1, home: 2, present: 3 };
 

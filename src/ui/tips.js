@@ -2,7 +2,9 @@
 // controls. Step 1 starts with everything hidden and waits for the player to tap the eye.
 // Shown once per device; skippable; never shown again.
 
-const KEY = 'openworld.tipsDone';
+import { storeKey } from '../channel.js';
+
+const KEY = storeKey('tipsDone');
 const $ = (id) => document.getElementById(id);
 
 export function tutorialDone() { try { return !!localStorage.getItem(KEY); } catch { return true; } }

@@ -75,6 +75,18 @@ export class Ambience {
     }
   }
 
+  // a soft two-note chime (hunt signal, treasure); level 0..5 raises the pitch slightly
+  chime(level = 1) {
+    if (!this.on) return;
+    const c = this.ctx, t0 = c.currentTime + 0.02;
+    [0, 0.11].forEach((dt, k) => {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.value = 660 * Math.pow(2, (level + k * 4) / 12);
+      g.gain.setValueAtTime(0, t0 + dt); g.gain.linearRampToValueAtTime(0.03, t0 + dt + 0.015); g.gain.exponentialRampToValueAtTime(0.0005, t0 + dt + 0.6);
+      o.connect(g).connect(this.master); o.start(t0 + dt); o.stop(t0 + dt + 0.65);
+    });
+  }
+
   cricket() {
     const c = this.ctx, t0 = c.currentTime + 0.05;
     for (let k = 0; k < 6; k++) {

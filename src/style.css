@@ -311,3 +311,32 @@ body.ar .ar-bar button { min-height: 40px; min-width: 44px; }
 .tip-ring { position: fixed; z-index: 44; pointer-events: none; box-shadow: 0 0 0 3px #ffd36b;
   animation: tipPulse 1.4s ease-in-out infinite; }
 @keyframes tipPulse { 50% { box-shadow: 0 0 0 7px rgba(255,211,107,0.45); } }
+
+/* ---------- beta channel ---------- */
+body.beta::after { content: 'BETA'; position: fixed; z-index: 60; top: calc(2px + var(--safe-t)); left: 50%; transform: translateX(-50%);
+  font: 600 9px/1 system-ui, sans-serif; letter-spacing: 0.18em; color: rgba(255,211,107,0.85); padding: 3px 7px; border-radius: 0 0 6px 6px;
+  background: rgba(16,20,26,0.55); pointer-events: none; }
+.beta-box { margin-top: 10px; padding-top: 6px; border-top: 1px solid var(--line); }
+.beta-box button { margin-top: 6px; }
+.toast.gold { border-left-color: #ffd36b; background: linear-gradient(90deg, rgba(255,211,107,0.14), var(--panel) 45%); }
+
+/* tracker: one small, quiet pill; fades in only while there's something to follow */
+.tracker { position: fixed; z-index: 7; left: 50%; bottom: calc(52px + var(--safe-b)); transform: translate(-50%, 6px); display: flex; gap: 12px; align-items: center;
+  padding: 6px 12px; border-radius: 999px; background: rgba(16,20,26,0.62); border: 1px solid rgba(255,255,255,0.10);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-size: 14px; opacity: 0; pointer-events: none;
+  transition: opacity 0.6s ease, transform 0.6s ease; }
+.tracker.show { opacity: 1; transform: translate(-50%, 0); }
+.tracker .hunt { display: inline-flex; align-items: center; gap: 7px; }
+.tracker .dots { display: inline-flex; gap: 4px; }
+.tracker .dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.18); transition: background 0.5s ease, box-shadow 0.5s ease; }
+.tracker .dots i.on { background: #5fd08a; box-shadow: 0 0 6px rgba(95,208,138,0.6); }
+.tracker .hunt.warmer .dots i.on { background: #8ee6ad; }
+.tracker .hunt.colder .dots i.on { background: #4aa36c; box-shadow: none; }
+.tracker .gold { color: rgba(255,211,107,0.45); transition: color 0.6s ease, text-shadow 0.6s ease; }
+.tracker .gold.warm { color: rgba(255,211,107,0.8); }
+.tracker .gold.hot { color: #ffe39b; text-shadow: 0 0 10px rgba(255,211,107,0.9); }
+@media (max-width: 720px) {
+  .tracker { left: auto; right: 76px; transform: translateY(6px); bottom: calc(var(--panel-h, 230px) + 78px + var(--safe-b)); }
+  .tracker.show { transform: none; }
+  body.clean .tracker { bottom: calc(46px + var(--safe-b)); }
+}
