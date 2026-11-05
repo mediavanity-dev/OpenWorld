@@ -137,7 +137,8 @@ body.clean .recenter { display: grid; }
 body.clean .ui-toggle { opacity: 0.55; }
 body.clean .ui-toggle .eye { display: none; }
 body.clean .ui-toggle .eye-off { display: block; }
-body.clean .panel, body.clean .bottom, body.clean #labels .label, body.clean #toasts, body.clean .compass { display: none !important; }
+body.clean .panel, body.clean .bottom, body.clean #labels .label, body.clean #toasts { display: none !important; }
+/* map controls (compass, return-to-me) stay available in the map-only view */
 /* street names stay in the map-only view */
 
 .stick { display: none; }
