@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { World } from './world/world.js';
 import { Sky } from './world/sky.js';
 import { Profile } from './game/profile.js';
-import { Game, MODES } from './game/game.js';
+import { Game, MODES, RULES } from './game/game.js';
 import { Environment } from './game/environment.js';
 import { Journal } from './game/journal.js';
 import { Metrics } from './game/metrics.js';
@@ -29,7 +29,8 @@ import { Controls } from './ui/controls.js';
 import { initCard, showPlace, showSpecies, showHere, closeCard } from './ui/card.js';
 import { Minimap } from './ui/minimap.js';
 import { initJournal, openJournal } from './ui/journalView.js';
-import { runTutorial, tutorialDone } from './ui/tips.js';
+import { runTutorial, tutorialDone, showHint } from './ui/tips.js';
+import { fmtDist } from './units.js';
 import { toast, fixText, initHud } from './ui/hud.js';
 import { initLabels } from './ui/labels.js';
 import { initArMode } from './ui/arMode.js';
@@ -420,7 +421,7 @@ $('s-ip').onclick = async () => {
     toast('IP location is approximate (city-level) and you can’t walk on it. Set it as your home base to move around.', 'home');
   }
 };
-$('s-home').onclick = () => begin('home');
+$('s-home').onclick = () => enterHome();
 $('s-resume').onclick = () => begin('roam', { to: profile.data.last });
 $('s-roam-form').onsubmit = async (e) => {
   e.preventDefault();
@@ -437,8 +438,29 @@ document.querySelectorAll('.tabs button[data-mode]').forEach((b) => (b.onclick =
   const mode = b.dataset.mode;
   if (mode === game.mode) return;
   if (mode === 'present' && !game.fix && !(await locateDevice())) return;
+  if (mode === 'home') return enterHome();
   begin(mode, mode === 'roam' ? { to: game.pos } : {});
 }));
+
+// Home mode, with a short pointer to how you get around in it (each time; "Don't show again" stops it).
+// Without a home base yet, the pointer explains how to set one instead of a bare error.
+function enterHome() {
+  const range = fmtDist(RULES.LEASH_M);
+  if (!profile.data.home) {
+    const shown = game.mode && showHint({ target: () => document.querySelector('.tabs button[data-mode="present"]'), timeout: 12000,
+      text: `<b>Set a home base first.</b> Go <b>Present</b> (where you really are) and tap <b>Set home base</b>. After that, Home lets you wander ${range} around it from anywhere.` });
+    if (!shown) toast(`No home base yet. Go Present and set one; then Home lets you wander ${range} around it from anywhere.`, 'error');
+    return;
+  }
+  if (!begin('home')) return;
+  // close the hint once they've been moving for a moment (they've got it)
+  const until = (close) => { let n = 0; const id = setInterval(() => { if (controls.move() && ++n >= 5) close(); }, 300); return () => clearInterval(id); };
+  const text = isTouch
+    ? `<b>Use the joystick to wander.</b> Go anywhere within ${range} of your home base (the blue ring). Push it all the way out to run.`
+    : `<b>Use W A S D or the arrow keys to wander.</b> Go anywhere within ${range} of your home base (the blue ring). Hold Shift to run.`;
+  // wait a moment for the mode switch (and the joystick) to appear
+  setTimeout(() => showHint({ key: 'home', text, until, target: () => (isTouch ? $('stick') : document.querySelector('.tabs button[data-mode="home"]')) }), 400);
+}
 const left = $('left');
 function setCollapsed(on) {
   left.classList.toggle('collapsed', on);

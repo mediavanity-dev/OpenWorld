@@ -6,6 +6,7 @@
 //   SMOKE_SHOT=shot.png npm run smoke         (also save a screenshot)
 //   SMOKE_PATH=/beta/ npm run smoke           (the beta build)
 //   SMOKE_SIZE=390,844 SMOKE_OPEN=journal:records   (window size; leave a panel open for the shot)
+//   SMOKE_TOUCH=1                             (emulate a phone: touch screen, joystick, phone layout)
 
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -69,6 +70,12 @@ try {
   };
   await send('Runtime.enable');
   await send('Page.enable');
+  // SMOKE_TOUCH=1: behave like a phone (touch screen, coarse pointer: joystick, phone layout)
+  if (process.env.SMOKE_TOUCH) {
+    const [w, h] = (process.env.SMOKE_SIZE || '390,844').split(',').map(Number);
+    await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 2, mobile: true });
+    await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  }
   await send('Page.navigate', { url: `http://localhost:${PORT}${process.env.SMOKE_PATH || '/'}?at=51.4779,-0.0015` });
 
   // wait for the game to start and at least one map area to be built
@@ -105,6 +112,17 @@ try {
     }
     click('journal-close'); click('p-settings'); await wait(200); click('set-close');
     click('b-here'); await wait(500); document.getElementById('card-close')?.click();
+    // Home: a hint says how to get around (or, with no home base yet, how to set one)
+    document.querySelector('#tips .skip')?.click(); await wait(100); // past the first-run tutorial
+    const o = window.openworld, tip = document.getElementById('tips');
+    const tab = (m) => document.querySelector('.tabs button[data-mode="' + m + '"]');
+    tab('home').click(); await wait(300);
+    if (tip.hidden || !/home base first/i.test(tip.textContent)) return 'no "set a home base first" hint';
+    tip.querySelector('.next').click();
+    o.profile.data.home = { lat: o.game.pos.lat, lon: o.game.pos.lon, trust: 'gps', accuracy: 5, source: 'device', setAt: new Date().toISOString() };
+    tab('home').click(); await wait(900);
+    if (o.game.mode !== 'home') return 'did not enter Home';
+    if (tip.hidden || !/wander/.test(tip.textContent)) return 'no Home hint';
     return 'ok'; })()` });
   if (r.result?.value !== 'ok') failures.push(`panel exercise failed: ${JSON.stringify(r)}`);
   await sleep(800);
