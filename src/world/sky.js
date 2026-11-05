@@ -7,6 +7,8 @@ import { env as uniforms, buildingMat, poiMat } from './materials.js';
 
 const C = (h) => new THREE.Color(h);
 const SKY = { day: C('#bcd8ec'), overcast: C('#c2c8ce'), golden: C('#f0c49a'), night: C('#16233a'), haze: C('#cbbfa8') };
+const WHITE = C('#ffffff'), SUN_LOW = C('#ffc58f'), SUN_HIGH = C('#fff3df');
+const _c = new THREE.Color(), _c2 = new THREE.Color(), _v = new THREE.Vector3();
 const NIGHT_SKY = C('#7d93c4'), DAY_SKY = C('#eef6ff'), NIGHT_GROUND = C('#3a4150'), DAY_GROUND = C('#8b9079');
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -74,7 +76,7 @@ export class Sky {
   }
 
   // e: Environment; pos: {lat, lon}; camPos: THREE.Vector3; quality.particles: count
-  update(e, pos, camPos, dt, { particles = 1200, viewDist = 70 } = {}) {
+  update(e, pos, camPos, dt, { particles = 1200, viewDist = 70, reduceMotion = false } = {}) {
     uniforms.uTime.value += dt;
     const sun = e.sun(pos.lat, pos.lon), moon = e.moon(pos.lat, pos.lon), w = e.weather;
     const cloud = w ? w.cloud : 0.3;
@@ -83,7 +85,8 @@ export class Sky {
     this.state.night = 1 - day;
 
     // sky colour
-    const c = SKY.night.clone().lerp(SKY.day.clone().lerp(SKY.overcast, cloud * 0.85), day);
+    // (reuses scratch colours: no per-frame allocations)
+    const c = _c.copy(SKY.night).lerp(_c2.copy(SKY.day).lerp(SKY.overcast, cloud * 0.85), day);
     c.lerp(SKY.golden, golden * 0.55 * (1 - cloud * 0.6));
     const aqi = w?.aqi ?? 0;
     if (aqi > 40) c.lerp(SKY.haze, Math.min(0.35, (aqi - 40) / 120));
@@ -102,22 +105,22 @@ export class Sky {
     // lightning
     if (kind === 'storm') {
       this.nextFlash -= dt;
-      if (this.nextFlash <= 0) { this.flash = 1; this.nextFlash = 4 + Math.random() * 10; }
+      if (this.nextFlash <= 0) { this.flash = reduceMotion ? 0.25 : 1; this.nextFlash = 4 + Math.random() * 10; }
     }
     this.flash = Math.max(0, this.flash - dt * 6);
 
-    this.bg.copy(c).lerp(C('#ffffff'), this.flash * 0.5);
+    this.bg.copy(c).lerp(WHITE, this.flash * 0.5);
     this.scene.fog.color.copy(this.bg);
     this.scene.fog.near = near; this.scene.fog.far = far;
 
     // lights
     const dir = (az, alt) => {
       const a = (az * Math.PI) / 180, h = (Math.max(alt, 2) * Math.PI) / 180;
-      return new THREE.Vector3(Math.sin(a) * Math.cos(h), Math.sin(h), -Math.cos(a) * Math.cos(h)).multiplyScalar(1000);
+      return _v.set(Math.sin(a) * Math.cos(h), Math.sin(h), -Math.cos(a) * Math.cos(h)).multiplyScalar(1000);
     };
     this.sun.position.copy(dir(sun.az, sun.alt));
     this.sun.intensity = 1.9 * day * (1 - 0.65 * cloud);
-    this.sun.color.copy(C('#ffc58f').lerp(C('#fff3df'), smooth(0, 25, sun.alt)));
+    this.sun.color.copy(SUN_LOW).lerp(SUN_HIGH, smooth(0, 25, sun.alt));
     this.moon.position.copy(dir(moon.az, moon.alt));
     this.moon.intensity = moon.alt > 0 ? 0.45 * moon.illum * (1 - 0.7 * cloud) * (1 - day) : 0;
     // night stays readable: a cool moonlit ambient rather than black
@@ -131,7 +134,7 @@ export class Sky {
 
     // ground & tree effects
     const wind = w ? w.wind : 8;
-    uniforms.uWind.value = Math.min(1.5, wind / 35);
+    uniforms.uWind.value = reduceMotion ? 0 : Math.min(1.5, wind / 35);
     const snowing = kind === 'snow';
     const target = Math.max(snowing ? 0.55 : 0, Math.min(1, (w?.snowDepth || 0) * 12));
     uniforms.uSnow.value += (target - uniforms.uSnow.value) * Math.min(1, dt * 0.5);

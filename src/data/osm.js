@@ -11,7 +11,7 @@ const ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
 ];
-const DETAIL_VERSION = 1;
+const DETAIL_VERSION = 2;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -79,6 +79,17 @@ export function normalizeDetail(raw) {
     if (lat === undefined) continue;
     if (el.type === 'node' && t.natural === 'tree') {
       trees.push({ ref, lat, lon, leaf: t.leaf_type || null, cycle: t.leaf_cycle || null, genus: t.genus || null });
+      // notable trees (named, protected or monumental) become discoverable places
+      const notable = t.name || /natural_monument|landmark/.test(t.denotation || '') || t.protected === 'yes' || t.heritage;
+      if (notable) {
+        const species = t['species:en'] || t.species || t['taxon:en'] || t.taxon || t.genus || null;
+        const tags = {};
+        for (const k of TAG_KEYS) if (t[k]) tags[k] = t[k];
+        if (species) tags.species = species;
+        if (t.circumference) tags.circumference = t.circumference;
+        if (t.height) tags.height = t.height;
+        places[ref] = { tags, lat, lon, name: t.name || (species ? `Notable tree (${species})` : 'Notable tree'), kind: 'natural:tree' };
+      }
       continue;
     }
     if (!t.name) continue;

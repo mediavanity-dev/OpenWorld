@@ -6,12 +6,15 @@ import { lonToTileX, latToTileY } from '../geo.js';
 const Z = 13; // ~19 m/px at the equator; plenty for "simplified terrain"
 const URL = (z, x, y) => `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
 
-const tiles = new Map(); // "x/y" -> Float32Array(256*256) | null (failed)
+const tiles = new Map(); // "x/y" -> Float32Array(256*256) | null (failed); insertion order = recency
+const MAX_TILES = 48;     // ~12 MB; older tiles are dropped (re-fetched from the HTTP cache if needed)
+function touch(key) { const v = tiles.get(key); tiles.delete(key); tiles.set(key, v); }
+function evict() { while (tiles.size > MAX_TILES) tiles.delete(tiles.keys().next().value); }
 const pending = new Map();
 
 async function loadTile(x, y) {
   const key = `${x}/${y}`;
-  if (tiles.has(key)) return;
+  if (tiles.has(key)) { touch(key); return; }
   if (pending.has(key)) return pending.get(key);
   const p = (async () => {
     try {
@@ -27,6 +30,7 @@ async function loadTile(x, y) {
         h[k] = px[k * 4] * 256 + px[k * 4 + 1] + px[k * 4 + 2] / 256 - 32768;
       }
       tiles.set(key, h);
+      evict();
     } catch (err) {
       console.warn('terrain tile failed', key, err);
       tiles.set(key, null); // flat fallback

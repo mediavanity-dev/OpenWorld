@@ -166,9 +166,15 @@ export class World {
   // Ask OSM where a feature (e.g. a building) is now; emits 'remote' when known.
   requestFeature(ref) {
     if (this.remote.has(ref)) return;
+    const retry = this.retryAt?.get(ref);
+    if (retry && Date.now() < retry) return; // back off after a failed lookup
     this.remote.set(ref, 'loading');
     lookupRef(ref).then((v) => {
-      if (v === undefined) { this.remote.delete(ref); return; } // network trouble: try again later
+      if (v === undefined) { // network trouble: try again in a few minutes, not on every refresh
+        this.remote.delete(ref);
+        (this.retryAt ||= new Map()).set(ref, Date.now() + 3 * 60 * 1000);
+        return;
+      }
       this.remote.set(ref, v ? { lat: v.lat, lon: v.lon, ground: null, kind: 'building', name: v.name } : null);
       this.emit({ type: 'remote', ref });
     });

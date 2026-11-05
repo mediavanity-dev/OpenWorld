@@ -224,7 +224,7 @@ async function build({ x, y, opts }) {
   }
 
   const payload = {
-    key: `${CHUNK_Z}/${x}/${y}`, x, y, bounds: b, latc, lonc, extent: E, gridN: GRID, grid,
+    key: `${CHUNK_Z}/${x}/${y}`, x, y, bounds: b, latc, lonc, extent: E, gridN: GRID, grid, areaName: fabric.areaName,
     terrain: { pos: tPos, uv: tUv }, texture, habitat, habitatN: HGRID,
     buildings, trees: packTrees(blobs), cones: packTrees(cones), pois,
   };

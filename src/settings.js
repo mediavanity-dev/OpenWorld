@@ -17,6 +17,10 @@ const defaults = {
   compassFollow: false,     // camera turns with the phone (Present mode)
   keepAwake: coarse,        // keep the screen on while Present
   weatherFx: true,
+  units: /^en-(US|LR)|^my\b/i.test(navigator.language || '') ? 'imperial' : 'metric',
+  textSize: 'normal',       // normal | large
+  reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+  sound: false,             // ambient soundscape (off by default)
 };
 
 export const settings = (() => {

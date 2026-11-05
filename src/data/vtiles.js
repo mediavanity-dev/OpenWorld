@@ -109,7 +109,7 @@ export async function loadBaseTile(z, x, y) {
   return normalizeTile(vt);
 }
 
-function emptyFabric() { return { extent: 4096, buildings: [], areas: [], lines: [], pois: [] }; }
+function emptyFabric() { return { extent: 4096, buildings: [], areas: [], lines: [], pois: [], areaName: null }; }
 
 export function normalizeTile(vt) {
   const out = emptyFabric();
@@ -180,6 +180,20 @@ export function normalizeTile(vt) {
       if (!ref) continue;
       out.pois.push({ ref, px: g.x, py: g.y, name: p.name, kind: `${kind}:${p.subclass || p.class}`, rank: p.rank || 99 });
     }
+  }
+  // the most local recognisable place name in this tile (for survey/journal labels)
+  const pl2 = vt.layers.place;
+  if (pl2) {
+    const ORDER = { neighbourhood: 0, quarter: 1, suburb: 2, hamlet: 3, village: 4, town: 5, city: 6 };
+    let best = null;
+    for (let i = 0; i < pl2.length; i++) {
+      const f = pl2.feature(i), p = f.properties;
+      const g = f.loadGeometry()[0]?.[0];
+      if (!p.name || ORDER[p.class] === undefined || !g || g.x < 0 || g.y < 0 || g.x >= E || g.y >= E) continue;
+      const score = ORDER[p.class] * 100 + (p.rank || 50);
+      if (!best || score < best.score) best = { score, name: p.name };
+    }
+    out.areaName = best?.name || null;
   }
   const mp = vt.layers.mountain_peak;
   if (mp) {

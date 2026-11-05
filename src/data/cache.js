@@ -43,6 +43,25 @@ export async function cachePut(key, data) {
   try { d.transaction(STORE, 'readwrite').objectStore(STORE).put({ t: Date.now(), data }, key); } catch { /* best effort */ }
 }
 
+// Delete entries older than maxAge (the cache otherwise only skips stale entries on read).
+export async function pruneCache(maxAge = 60 * 24 * 3600 * 1000) {
+  const d = await db();
+  if (!d) return 0;
+  return new Promise((resolve) => {
+    let n = 0;
+    try {
+      const req = d.transaction(STORE, 'readwrite').objectStore(STORE).openCursor();
+      req.onsuccess = () => {
+        const c = req.result;
+        if (!c) return resolve(n);
+        if (!c.value || Date.now() - c.value.t > maxAge) { c.delete(); n++; }
+        c.continue();
+      };
+      req.onerror = () => resolve(n);
+    } catch { resolve(n); }
+  });
+}
+
 // fetch JSON with a cache in front; returns null on failure
 export async function cachedJson(key, url, { ttl = DEFAULT_TTL, init } = {}) {
   const hit = await cacheGet(key, ttl);

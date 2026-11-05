@@ -107,7 +107,44 @@ actually recorded in that area** (from iNaturalist), shown with a photo. Birds a
 are common; at night you'll meet different animals. Your collection appears under
 **species**.
 
-### 7. Camera AR (phones, Present mode)
+### 7. Your field journal, records and daily assignment
+
+Tap **📓 Journal** to see what you've done:
+
+- **Overview**: places claimed, species, rock units, area explored on foot, distance walked,
+  days out, and a chart of your last 7 days.
+- **Collections**: places by type, your **life list** of species (tap one for details), the
+  **rocks** you've stood on, and the conditions you've seen places in.
+- **Records**: highest point stood on, longest day on foot, oldest place, rarest species,
+  furthest north and south, peaks reached.
+- **Areas**: how much of each ~1.5 km area you've surveyed.
+- **Map**: the ground you've explored, with your discoveries.
+- **Create a summary image** to save or share a picture of your journal (made on your
+  device; nothing is uploaded).
+
+Each day brings one **field assignment**, such as *Spot a bird*, *Walk 1 km* or *Discover
+a place after dark*. It's shown in the panel and only counts in Present or Home mode.
+
+The **minimap** (bottom-left on computers, top-right on phones) shows the ground you've
+explored lit up, the rest in fog, plus nearby places. Tap it to open the journal map.
+Roam never counts as real exploration: virtual areas show in purple.
+
+### 8. This spot: geology, sky and history
+
+Tap **📍 This spot** for a short field note about where you are:
+
+- **Under your feet**: the rock beneath you and its age (e.g. *Lambeth Group: clay, silt,
+  sand and gravel, 56–66 million years old*). New rock types you walk onto are added to
+  your collection automatically.
+- **Sky today**: sunrise, sunset, day length, moon phase and moonrise, next meteor shower.
+- **Climate**: how today compares with the 1991–2020 average for this date.
+- **Nearby on Wikipedia**: articles about places within 1 km.
+- **Earthquakes**: any of magnitude 2.5+ within 500 km in the past week.
+
+Species cards now also show the creature's family tree, conservation status, how rare it is
+locally, and which months it's usually seen around here.
+
+### 9. Camera AR (phones, Present mode)
 
 Tap **📷** to see the game through your phone's camera. Place names float over the real
 streets with their distance ("Café Nero · 120 m"), beacons rise up as glowing pillars, and
@@ -118,16 +155,18 @@ nearby creatures appear in front of you. **Tap a creature to photograph it** fro
 - Hold the phone upright and turn around slowly. Direction comes from the phone's compass,
   so it can be off by a few degrees, and positions are as accurate as your GPS (usually 5–15 m).
 - AR is only available in **Present** mode, because it shows what's around where you really are.
-- The camera picture is **only shown on your screen**: it is never recorded, saved or uploaded.
+- Tap **📸** in AR to save a photo of the view (with place labels and a caption). It's
+  created on your phone and only saved or shared if you choose.
+- The camera picture is otherwise **only shown on your screen**: it is never recorded or uploaded.
 
-### 8. Set your home base
+### 10. Set your home base
 
 While playing **Present**, tap **Set home base** to make your current real location your
 home. After that you can play **Home** mode from anywhere.
 
 Choose carefully: **a home base can only be moved once every 30 days.**
 
-### 9. Leave beacons
+### 11. Leave beacons
 
 Tap **Place beacon** (or press **B**) to drop a glowing marker where you're standing, with
 a label of your choice. Beacons stay put for good, even when the map data changes.
@@ -138,12 +177,12 @@ Their colour tells you what they're attached to:
 - **orange**: the building it was on has moved on the map, so the beacon moved with it
 - **red**: the building it was on no longer exists on the map; the beacon stays at its spot
 
-### 10. See just the map
+### 12. See just the map
 
 Tap the **eye button** (bottom right), or press **H** on a computer, to hide everything
 except the map. Tap it again to bring it all back.
 
-### 11. Phone extras and settings
+### 13. Phone extras and settings
 
 - **🧭 Compass** (Present mode, phones): tap it and the camera turns as you turn your phone.
   Your character faces the way you're facing.
@@ -154,8 +193,13 @@ except the map. Tap it again to bring it all back.
   graphics, and if your battery drops below 20% it switches to battery saver by itself.
   When nothing is moving, it slows down drawing to save power.
 - Discoveries and creatures give a short **vibration** (Android).
+- **Settings** also has **units** (metres/°C or feet/°F), **large text**, **reduce motion**
+  (no flashes, swaying or bobbing) and an optional quiet **ambient soundscape** (wind, rain,
+  birdsong), generated on your device.
+- **Install it like an app**: in your browser's menu choose *Add to Home Screen* / *Install*.
+  It then opens full-screen and starts instantly.
 
-### 12. Keep your progress safe
+### 14. Keep your progress safe
 
 Your progress is saved **only in this browser on this device**. It isn't stored online.
 To keep a backup or move to another device, use **Export** to save a file, then
@@ -181,7 +225,9 @@ ask public services for data: map tiles (OpenFreeMap), map details (OpenStreetMa
 Overpass), terrain (AWS), weather and air quality (Open-Meteo, to about 1 km), your
 country (OpenStreetMap Nominatim, to about 10 km) and its holidays (Nager.Date), and
 wildlife (iNaturalist, to about 5 km). Wikipedia is contacted only when you open a place
-card. "Locate via internet" asks geojs.io where your connection is. Your discoveries,
+card; Macrostrat (geology), Open-Meteo's climate archive, iNaturalist taxon pages and USGS
+(earthquakes) only when you open *This spot* or a species card, or move into a new area
+(geology). "Locate via internet" asks geojs.io where your connection is. Your discoveries,
 species, beacons and home base are never uploaded. In AR, the camera image stays on your
 screen and is never recorded or sent anywhere.
 
@@ -192,6 +238,7 @@ screen and is never recorded or sent anywhere.
 ```
 npm install
 npm run dev        # http://localhost:5173
+npm test           # unit tests (opening hours, geo, anchors, journal); also run before every deploy
 ```
 Deep link: `http://localhost:5173/?at=51.4779,-0.0015` starts in Roam at those coordinates.
 Add `?dev` to bypass the 30-day home-base cooldown while testing.
@@ -228,13 +275,17 @@ src/world/sky.js          sun/moon lighting, sky, fog, rain/snow particles, ligh
 src/world/materials.js    shared materials + GPU effects (wind sway, snow cover, wet ground)
 src/game/anchors.js       anchor model + resolution (feature / shifted / orphaned / ground / pending)
 src/game/environment.js   live conditions + snapshots stamped onto discoveries
+src/game/journal.js       explored cells, daily totals, records, rocks, survey areas, daily assignment
+src/data/science.js       geology (Macrostrat), Wikipedia nearby, sky notes, climate normals, quakes, taxa
 src/game/profile.js       the only durable state (localStorage, JSON export/import)
 src/game/game.js          rules: modes, leash, discovery, opening hours, wildlife, beacons, home base
 src/game/locator.js       device + IP location
 src/sensors.js            compass, wake lock, battery, vibration
 src/ar.js                 camera AR: rear-camera passthrough + device-orientation camera (no libraries)
 src/settings.js           per-device settings + quality tiers
-src/ui/                   controls (touch/pinch/keys), place & species card
+src/ui/                   controls, place/species/this-spot cards, field journal, minimap, tips
+src/audio.js              optional synthesised ambience (Web Audio)
+public/                   app manifest, icons, service worker (caches the app shell only)
 src/main.js               renderer, adaptive quality + frame cap, avatar, labels, HUD
 ```
 
@@ -269,5 +320,8 @@ snap to the current terrain.
 - Elevation: AWS Terrain Tiles (Mapzen/Tilezen, open data).
 - Weather & air quality: Open-Meteo (CC BY 4.0, non-commercial free tier).
 - Wildlife: iNaturalist research-grade observations; photos credited per image.
-- Wikipedia/Wikidata summaries (CC BY-SA). Holidays: Nager.Date.
+- Wikipedia/Wikidata summaries (CC BY-SA); only Wikimedia Commons (free) images are shown.
+- Geology: Macrostrat (CC BY 4.0). Climate normals: Open-Meteo historical archive (ERA5).
+- Earthquakes: USGS. Holidays: Nager.Date.
+- Wildlife photos: only openly licensed (CC/public-domain) iNaturalist photos are shown.
 - Place search & country lookup: OSM Nominatim. IP location: geojs.io.

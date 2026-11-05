@@ -9,6 +9,7 @@ import { isOpen, nextOpening } from '../data/hours.js';
 import { nearestBuilding } from '../data/osm.js';
 import { speciesNear, fitsHabitat, GROUP_STYLE } from '../data/wildlife.js';
 import { wildHabitat } from '../world/habitats.js';
+import { rockAt, ageText } from '../data/science.js';
 
 const DEV = new URLSearchParams(location.search).has('dev');
 
@@ -19,7 +20,8 @@ export const RULES = {
   BEACON_PLACE_M: 25,       // beacons latch onto a named place within this distance...
   BEACON_BUILDING_M: 35,    // ...or else the nearest building
   WALK: 6, RUN: 20, ROAM_FAST: 90,  // m/s (game-time, not real walking)
-  ENCOUNTER_EVERY_M: 110,   // roll for wildlife every this many metres moved
+  ENCOUNTER_EVERY_M: 110,   // roll for wildlife every this many metres moved (at walking/running speed only)
+  ENCOUNTER_MAX_SPEED: 12,  // m/s: faster travel (Roam fast-travel, vehicles) doesn't meet wildlife
   CRITTER_TTL_S: 120,
 };
 
@@ -58,7 +60,10 @@ export class Game {
     this.critters = [];    // [{ id, sp, lat, lon, born, ttl }]
     this.wild = { cell: null, species: [], loading: false };
     this.dataSaver = false;
+    this.journal = null;   // set by the app (src/game/journal.js)
     this._moved = 0;
+    this._walk = 0;
+    this._rockCell = null;
     this._discT = 0;
     this._saveT = 0;
   }
@@ -74,6 +79,11 @@ export class Game {
       if (recent && fix.accuracy > Math.max(60, prev.accuracy * 3)) return;
       const d = haversine(prev.lat, prev.lon, fix.lat, fix.lon);
       if (d < Math.max(3, Math.min(fix.accuracy, 25) * 0.5)) { this.fix = { ...prev, t: fix.t, accuracy: fix.accuracy, heading: fix.heading, speed: fix.speed }; return; }
+    }
+    // real ground speed from consecutive fixes (GPS's own speed when it reports one)
+    if (prev && fix.t > prev.t) {
+      const d = haversine(prev.lat, prev.lon, fix.lat, fix.lon);
+      this.fixSpeed = fix.speed != null && fix.speed >= 0 ? fix.speed : d / ((fix.t - prev.t) / 1000);
     }
     this.fix = fix;
     if (fix.heading != null && fix.speed > 0.8) this.gpsCourse = fix.heading;
@@ -141,12 +151,20 @@ export class Game {
     const moved = haversine(before.lat, before.lon, this.pos.lat, this.pos.lon);
     if (moved < 500) {
       this.profile.data.stats.meters[this.mode] += moved;
-      this._moved += moved;
+      // wildlife and walking records only at human speeds
+      // (Present: judged by the GPS's real speed, not the smoothed on-screen glide)
+      const speed = this.mode === 'present' ? (this.fixSpeed ?? 0) : dt > 0 ? moved / dt : 0;
+      if (speed < RULES.ENCOUNTER_MAX_SPEED) { this._moved += moved; this._walk += moved; }
     }
     if (this._moved > RULES.ENCOUNTER_EVERY_M) { this._moved = 0; this.rollEncounter(); }
 
     this._discT += dt;
-    if (this._discT > 0.4) { this._discT = 0; this.checkDiscoveries(); this.checkCritters(); this.loadWildlife(); }
+    if (this._discT > 0.4) {
+      this._discT = 0;
+      this.checkDiscoveries(); this.checkCritters(); this.loadWildlife(); this.checkRock();
+      this.journal?.onMove(this.mode, this._walk, this.pos, this.world.groundAt(this.pos.lat, this.pos.lon));
+      this._walk = 0;
+    }
     this._saveT += dt;
     if (this._saveT > 5) { this._saveT = 0; this.persistLast(); }
     return moved > 0.01;
@@ -205,6 +223,7 @@ export class Game {
         const anchor = makeAnchor(this.world, { lat: poi.lat, lon: poi.lon, featureRef: poi.ref, snapshot: chunk.snapshot });
         const { result, newTags } = this.profile.recordDiscovery(poi, grade, this.trust(), anchor, snap, tags);
         chunk.markPoi(poi.ref, this.profile.data.discoveries[poi.ref].grade);
+        this.journal?.onDiscovery(poi, grade, snap, result);
         if (result === 'new') {
           this.profile.log(`Discovered ${poi.name} [${grade}]`);
           this.emit('discover', `${grade === 'echo' ? 'Echo of' : 'Discovered'} ${poi.name}`, { grade, poi });
@@ -225,6 +244,25 @@ export class Game {
       nearest.bearing = (Math.atan2(o.x, -o.z) * 180) / Math.PI; // 0 = north, clockwise
     }
     this.nearest = nearest;
+  }
+
+  // ---------------- geology under your feet ----------------
+  checkRock() {
+    if (this.dataSaver || this._rockBusy) return;
+    const cell = geohash(this.pos.lat, this.pos.lon, 6);
+    if (cell === this._rockCell) return;
+    this._rockCell = cell;
+    this._rockBusy = true;
+    const grade = MODES[this.mode].grade;
+    rockAt(this.pos.lat, this.pos.lon).then((rock) => {
+      this.current = { ...(this.current || {}), rock };
+      if (!rock || !this.journal) return;
+      const res = this.journal.onRock(rock, grade);
+      if (res === 'new') {
+        this.profile.log(`New rock underfoot: ${rock.name}`);
+        this.emit('rock', `Under your feet: ${rock.name}${rock.lith ? ` (${rock.lith.split(',')[0]})` : ''}, ${ageText(rock)}`, { rock });
+      }
+    }).finally(() => { this._rockBusy = false; });
   }
 
   // ---------------- wildlife ----------------
@@ -279,6 +317,7 @@ export class Game {
     const { snap } = this.conditions();
     const anchor = makeAnchor(this.world, { lat: c.lat, lon: c.lon });
     const res = this.profile.recordSpecies(c.sp, grade, anchor, how === 'photo' ? { ...snap, photo: true } : snap);
+    this.journal?.onSpecies(c.sp, grade, res, how);
     const what = c.sp.name;
     if (res === 'new') this.profile.log(`${how === 'photo' ? 'Photographed' : 'Spotted'} ${what} [${grade}]`);
     this.emit('spotted', res === 'new' ? `New species: ${what}` : res === 'upgraded' ? `${what}: now ${grade.toUpperCase()}` : `Spotted ${what} again`, { critter: c, result: res, grade });

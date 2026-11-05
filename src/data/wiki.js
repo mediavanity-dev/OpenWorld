@@ -36,7 +36,8 @@ export async function wikiSummary(tags) {
       return {
         title: s.title,
         extract: s.extract,
-        thumb: s.thumbnail?.source || null,
+        // only freely licensed images (Wikimedia Commons); skips local "fair use" files
+        thumb: s.thumbnail?.source && s.thumbnail.source.includes('/wikipedia/commons/') ? s.thumbnail.source : null,
         url: s.content_urls?.desktop?.page || `https://${target.lang}.wikipedia.org/wiki/${encodeURIComponent(target.title)}`,
       };
     } catch { return null; }

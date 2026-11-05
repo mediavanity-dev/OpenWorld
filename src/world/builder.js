@@ -25,6 +25,7 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
   const group = new THREE.Group();
   group.name = 'chunk:' + p.key;
   const disposables = [];
+  const riseMeshes = []; // buildings + trees rise out of the ground when the chunk appears
 
   // terrain
   const tex = new THREE.Texture(p.texture);
@@ -52,6 +53,7 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
     bg.computeBoundingSphere();
     const bm = new THREE.Mesh(bg, buildingMat);
     bm.name = 'buildings';
+    riseMeshes.push(bm);
     group.add(bm);
     disposables.push(bg);
   }
@@ -63,6 +65,7 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
     const crown = instanced(cone ? coneGeo : treeGeoLo, treeMat, packed);
     const trunks = instanced(trunkGeo, trunkMat, packed, 'trunk', false);
     if (!cone) blobMeshes.push(crown);
+    riseMeshes.push(crown, trunks);
     group.add(crown, trunks);
     disposables.push(crown, trunks);
   };
@@ -112,7 +115,7 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
 
   const W = p.gridN + 1;
   const chunk = {
-    key: p.key, x: p.x, y: p.y, bounds: p.bounds, latc: p.latc, lonc: p.lonc, group, features,
+    key: p.key, x: p.x, y: p.y, bounds: p.bounds, latc: p.latc, lonc: p.lonc, group, features, areaName: p.areaName || null,
     get pois() { return pois; },
     snapshot: null, detail: false,
     contains(lat, lon) { return lat <= p.bounds.n && lat > p.bounds.s && lon >= p.bounds.w && lon < p.bounds.e; },
@@ -128,6 +131,14 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
       const c = Math.floor((lonToTileX(lon, CHUNK_Z) - p.x) * n), r = Math.floor((latToTileY(lat, CHUNK_Z) - p.y) * n);
       if (c < 0 || r < 0 || c >= n || r >= n) return null;
       return HABITATS[p.habitat[r * n + c]];
+    },
+    // t: 0 (just loaded) .. 1 (settled)
+    reveal(t) {
+      const k = 1 - t * t * (3 - 2 * t); // smoothstep, inverted
+      for (const m of riseMeshes) m.position.y = -k * (m.name === 'buildings' ? 28 : 14);
+      const fading = t < 1;
+      if (tm.transparent !== fading) { tm.transparent = fading; tm.needsUpdate = true; }
+      tm.opacity = fading ? Math.max(0.05, t) : 1;
     },
     setLOD(near) { for (const m of blobMeshes) m.geometry = near ? treeGeoHi : treeGeoLo; },
     markPoi(ref, grade) { poiState.set(ref, { ...(poiState.get(ref) || {}), grade }); recolor(ref); },
@@ -161,7 +172,7 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
       }
       for (const [ref, info] of Object.entries(d.places)) {
         if (known.has(ref) || !info.kind || !chunk.contains(info.lat, info.lon)) continue;
-        if (!(info.tags.heritage || info.tags.wikidata || info.tags.wikipedia || /^(tourism|historic)/.test(info.kind))) continue;
+        if (!(info.tags.heritage || info.tags.wikidata || info.tags.wikipedia || /^(tourism|historic|natural:tree)/.test(info.kind))) continue;
         const o = L(info.lat, info.lon);
         const ground = chunk.heightAt(info.lat, info.lon) ?? 0;
         pois.push({ ref, lat: info.lat, lon: info.lon, x: o.x, z: o.z, y: ground + 5, ground, name: info.name, kind: info.kind, rank: 50, chunk: p.key, tags: info.tags, hours: parseHours(info.tags.opening_hours) });

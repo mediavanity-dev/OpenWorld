@@ -7,14 +7,12 @@ import { geohash } from '../geo.js';
 export async function speciesNear(lat, lon) {
   const cell = geohash(lat, lon, 5);
   const j = await cachedJson(
-    `inat:${cell}`,
+    `inat2:${cell}`,
     `https://api.inaturalist.org/v1/observations/species_counts?lat=${lat.toFixed(3)}&lng=${lon.toFixed(3)}&radius=3&quality_grade=research&per_page=80&locale=${(navigator.language || 'en').slice(0, 2)}`,
     { ttl: 30 * 864e5 },
   );
   if (!j?.results) return { cell, species: [] };
-  return {
-    cell,
-    species: j.results
+  const species = j.results
       .filter((r) => r.taxon && r.taxon.iconic_taxon_name)
       .map((r) => ({
         id: r.taxon.id,
@@ -22,10 +20,17 @@ export async function speciesNear(lat, lon) {
         sci: r.taxon.name,
         group: r.taxon.iconic_taxon_name, // Aves, Plantae, Insecta, Mammalia, Fungi, ...
         count: r.count,
-        photo: r.taxon.default_photo?.square_url || null,
-        credit: r.taxon.default_photo?.attribution || null,
-      })),
-  };
+        // only openly licensed photos (CC / public domain); "all rights reserved" photos are not shown
+        photo: r.taxon.default_photo?.license_code ? r.taxon.default_photo.square_url : null,
+        credit: r.taxon.default_photo?.license_code ? r.taxon.default_photo.attribution : null,
+      }));
+  // rarity from real local observation counts (rank within this area's list)
+  const sorted = species.map((s) => s.count).sort((a, b) => a - b);
+  for (const s of species) {
+    const p = sorted.findIndex((c) => c >= s.count) / Math.max(1, sorted.length - 1);
+    s.rarity = p < 0.2 ? 'rare' : p < 0.6 ? 'uncommon' : 'common';
+  }
+  return { cell, species };
 }
 
 export const GROUP_STYLE = {

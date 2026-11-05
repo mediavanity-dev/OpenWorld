@@ -84,6 +84,21 @@ export function geohash(lat, lon, precision = 8) {
   return hash;
 }
 
+// Bounds of a geohash cell: { s, w, n, e, lat, lon } (lat/lon = centre)
+export function geohashBounds(hash) {
+  let latR = [-90, 90], lonR = [-180, 180], even = true;
+  for (const c of hash) {
+    const v = B32.indexOf(c);
+    for (let b = 4; b >= 0; b--) {
+      const r = even ? lonR : latR;
+      const mid = (r[0] + r[1]) / 2;
+      if ((v >> b) & 1) r[0] = mid; else r[1] = mid;
+      even = !even;
+    }
+  }
+  return { s: latR[0], n: latR[1], w: lonR[0], e: lonR[1], lat: (latR[0] + latR[1]) / 2, lon: (lonR[0] + lonR[1]) / 2 };
+}
+
 // Deterministic PRNG so procedural scatter (trees in woods) is identical on every visit.
 export function rng(seed) {
   let s = (typeof seed === 'string' ? hashStr(seed) : seed) >>> 0 || 1;
