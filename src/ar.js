@@ -17,9 +17,13 @@ export class ARView {
     this.video = videoEl;
     this.active = false;
     this.stream = null;
-    this.o = null;          // last orientation { alpha, beta, gamma } in degrees
-    this.northOffset = 0;   // degrees added to alpha so that 0 = north
+    this.o = null;          // orientation used for the view { alpha, beta, gamma } in degrees
+    this.relSeen = false;   // a smooth (gyro-based, relative) stream exists
+    this.northOffset = 0;   // degrees added to alpha so that 0 = north (slowly corrected by the compass)
     this.absolute = false;  // do we know where north is?
+    this.userOffset = 0;    // manual correction (drag sideways in AR)
+    this.compassAcc = null; // iOS compass accuracy in degrees, when reported
+    this._target = new THREE.Quaternion();
     this._euler = new THREE.Euler();
     this._q0 = new THREE.Quaternion();
     this._onOrient = (e) => this.onOrient(e);
@@ -39,9 +43,10 @@ export class ARView {
     });
     this.video.srcObject = this.stream;
     await this.video.play();
-    this.o = null;
+    this.o = null; this.relSeen = false; this.absolute = false;
+    // both streams where available: the relative one is gyro-smooth, the absolute one knows north
+    window.addEventListener('deviceorientation', this._onOrient);
     if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', this._onOrient);
-    else window.addEventListener('deviceorientation', this._onOrient);
     document.addEventListener('visibilitychange', this._onVis);
     // wait briefly for the first sensor reading
     for (let k = 0; k < 20 && !this.o; k++) await new Promise((r) => setTimeout(r, 75));
@@ -64,26 +69,54 @@ export class ARView {
 
   onOrient(e) {
     if (e.alpha == null || e.beta == null || e.gamma == null) return;
-    this.o = { alpha: e.alpha, beta: e.beta, gamma: e.gamma };
+    const isAbs = e.type === 'deviceorientationabsolute' || e.absolute === true;
+    // north reference: iOS compass heading, or an absolute event's alpha
+    let northAlpha = null;
     if (typeof e.webkitCompassHeading === 'number' && e.webkitCompassHeading >= 0) {
-      // iOS: alpha is relative; steer it towards north using the (tilt-compensated) compass, slowly
-      const target = (360 - e.webkitCompassHeading) - e.alpha;
-      if (!this.absolute) { this.northOffset = target; this.absolute = true; }
-      else {
-        const d = ((target - this.northOffset + 540) % 360) - 180;
-        this.northOffset += d * 0.05;
-      }
-    } else if (e.absolute || e.type === 'deviceorientationabsolute') {
-      this.northOffset = 0;
-      this.absolute = true;
+      northAlpha = 360 - e.webkitCompassHeading;
+      this.compassAcc = typeof e.webkitCompassAccuracy === 'number' ? e.webkitCompassAccuracy : null;
+    } else if (isAbs) northAlpha = e.alpha;
+
+    if (!isAbs) {
+      // smooth stream drives the view
+      this.relSeen = true;
+      this.o = { alpha: e.alpha, beta: e.beta, gamma: e.gamma };
+      if (northAlpha !== null) this.correctNorth(northAlpha - e.alpha); // iOS: same event carries the compass
+    } else {
+      if (!this.relSeen) { this.o = { alpha: e.alpha, beta: e.beta, gamma: e.gamma }; this.northOffset = 0; this.absolute = true; }
+      else if (this.o) this.correctNorth(northAlpha - this.o.alpha);
     }
+  }
+
+  // move the north offset slowly towards the compass, so compass noise never shakes the view
+  correctNorth(target) {
+    if (!this.absolute) { this.northOffset = target; this.absolute = true; return; }
+    const d = ((target - this.northOffset + 540) % 360) - 180;
+    this.northOffset += d * (Math.abs(d) > 25 ? 0.2 : 0.03);
+  }
+
+  needsCalibration() { return this.compassAcc != null && (this.compassAcc < 0 || this.compassAcc > 25); }
+
+  // Ease a camera quaternion towards the sensor orientation: steady when held still, quick when turning.
+  step(q, dt) {
+    if (!this.o) return q;
+    this.quaternion(this._target);
+    const ang = q.angleTo(this._target);
+    const k = Math.min(60, 7 + (ang / 0.05) ** 2 * 20);
+    return q.slerp(this._target, 1 - Math.exp(-dt * k));
+  }
+
+  // bearing (degrees clockwise from north) the camera is looking at
+  static bearingOf(q) {
+    const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+    return ((Math.atan2(f.x, -f.z) * 180) / Math.PI + 360) % 360;
   }
 
   // Orientation as a camera quaternion in the game's frame (x east, y up, -z north).
   quaternion(out) {
     if (!this.o) return out;
     const orient = ((screen.orientation && screen.orientation.angle) || window.orientation || 0) * D2R;
-    this._euler.set(this.o.beta * D2R, (this.o.alpha + this.northOffset) * D2R, -this.o.gamma * D2R, 'YXZ');
+    this._euler.set(this.o.beta * D2R, (this.o.alpha + this.northOffset + this.userOffset) * D2R, -this.o.gamma * D2R, 'YXZ');
     out.setFromEuler(this._euler);
     out.multiply(Q_BACK);
     out.multiply(this._q0.setFromAxisAngle(ZEE, -orient));

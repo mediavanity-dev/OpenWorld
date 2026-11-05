@@ -109,7 +109,7 @@ export async function loadBaseTile(z, x, y) {
   return normalizeTile(vt);
 }
 
-function emptyFabric() { return { extent: 4096, buildings: [], areas: [], lines: [], pois: [], areaName: null }; }
+function emptyFabric() { return { extent: 4096, buildings: [], areas: [], lines: [], pois: [], streets: [], areaName: null }; }
 
 export function normalizeTile(vt) {
   const out = emptyFabric();
@@ -154,6 +154,15 @@ export function normalizeTile(vt) {
       if (!width) continue;
       const cls = isRail ? 'rail' : p.class === 'path' || p.class === 'track' ? 'path' : 'road';
       for (const line of f.loadGeometry()) out.lines.push({ cls, width, pts: pts(line) });
+    }
+  }
+  // street names (for zoomed-in labels): name + line geometry
+  const tn = vt.layers.transportation_name;
+  if (tn) {
+    for (let i = 0; i < tn.length; i++) {
+      const f = tn.feature(i), p = f.properties;
+      if (f.type !== 2 || !p.name || p.class === 'rail' || p.class === 'transit') continue;
+      for (const line of f.loadGeometry()) if (line.length > 1) out.streets.push({ name: p.name, cls: p.class, pts: pts(line) });
     }
   }
   const wl = vt.layers.waterway;

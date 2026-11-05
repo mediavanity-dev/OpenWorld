@@ -8,7 +8,8 @@ import { resolveAnchor } from './game/anchors.js';
 import { deviceFix, ipFix, watchDevice, trustOf } from './game/locator.js';
 import { aqiLabel } from './data/weather.js';
 import { GROUP_STYLE } from './data/wildlife.js';
-import { haversine } from './geo.js';
+import { POI_COLORS } from './world/builder.js';
+import { haversine, offsetMeters } from './geo.js';
 import { settings, saveSettings, TIERS, startTier, isTouch } from './settings.js';
 import { startCompass, stopCompass, onHeading, currentHeading, compassSupported, keepAwake, watchBattery, buzz } from './sensors.js';
 import { Controls } from './ui/controls.js';
@@ -229,12 +230,7 @@ function pick(cx, cy) {
   if (!hit) return closeCard();
   if (hit.object.userData.critter) {
     const c = hit.object.userData.critter;
-    if (ar.active) {
-      const d = haversine(game.pos.lat, game.pos.lon, c.lat, c.lon);
-      if (d > AR_PHOTO_M) return toast(`Get a bit closer to photograph it (${fmtDist(d)} away, need ${fmtDist(AR_PHOTO_M)}).`, 'species');
-      flash();
-      return game.spot(c, 'photo');
-    }
+    if (ar.active) return photographCritter(c);
     const label = GROUP_STYLE[c.sp.group]?.label || 'creature';
     return toast(`${/^[aeiou]/.test(label) ? 'An' : 'A'} ${label}: walk up to it to see what it is.`, 'species');
   }
@@ -242,6 +238,12 @@ function pick(cx, cy) {
   const ch = world.readyChunks().find((c) => c.key === chunkKey);
   const poi = ch?.pois[hit.instanceId];
   if (poi) openPlace(poi);
+}
+function photographCritter(c) {
+  const d = haversine(game.pos.lat, game.pos.lon, c.lat, c.lon);
+  if (d > AR_PHOTO_M) return toast(`Get a bit closer to photograph it (${fmtDist(d)} away, need ${fmtDist(AR_PHOTO_M)}).`, 'species');
+  flash();
+  game.spot(c, 'photo');
 }
 function openPlace(poi) {
   showPlace(poi, { game, profile, distance: haversine(game.pos.lat, game.pos.lon, poi.lat, poi.lon) });
@@ -256,47 +258,158 @@ addEventListener('keydown', (e) => {
 });
 
 // ---------------------------------------------------------------- floating labels
+// Places, street names (zoomed in) and, in AR, tappable creature pins. Light by design:
+// candidates are gathered 5x/second; positioning reuses a small fixed pool of elements,
+// never reads layout, and avoids overlaps with estimated sizes.
 const labelsEl = $('labels');
-const labelPool = [];
-const v3 = new THREE.Vector3();
+const labelPool = [], streetPool = [], pinPool = [];
+const v3 = new THREE.Vector3(), v3b = new THREE.Vector3(), fwd = new THREE.Vector3();
+let cand = { pois: [], streets: [] };
+let candT = 0;
 labelsEl.addEventListener('click', (e) => {
   const el = e.target.closest('.label');
   if (!el || !game.pos) return;
+  if (el._critter) return photographCritter(el._critter);
   if (el._poi) openPlace(el._poi);
 });
-function updateLabels() {
-  const list = [];
-  if (game.pos) {
-    const c = ar.active ? game.pos : viewGeo || game.pos;
-    const r = ar.active ? 400 : Math.max(220, Math.min(900, controls.dist * 2.5));
-    for (const { poi, chunk } of world.pois(c.lat, c.lon, r)) {
-      const d = haversine(c.lat, c.lon, poi.lat, poi.lon);
-      if (d >= r) continue;
-      if (ar.active) {
-        // AR: only places in front of the camera compete for the label slots
-        v3.set(poi.x, poi.y + 3.5, poi.z).add(chunk.group.position).project(camera);
-        if (v3.z > 1 || Math.abs(v3.x) > 0.95 || Math.abs(v3.y) > 0.95) continue;
+function newEl(pool, cls) { const el = document.createElement('div'); el.className = cls; el.style.display = 'none'; labelsEl.appendChild(el); pool.push(el); return el; }
+function hideRest(pool, n) { for (let k = n; k < pool.length; k++) if (pool[k].style.display !== 'none') pool[k].style.display = 'none'; }
+const placed = [];
+function fits(l, t, r, b) {
+  for (const q of placed) if (l < q[2] && r > q[0] && t < q[3] && b > q[1]) return false;
+  placed.push([l, t, r, b]);
+  return true;
+}
+function screenOf(v) { return [((v.x + 1) / 2) * innerWidth, ((1 - v.y) / 2) * innerHeight]; }
+const textW = (str, px) => str.length * px * 0.56 + 18;
+
+// nearest point of each named street to a reference point (local metres)
+function streetCandidates(rx, rz, maxD, maxN) {
+  const best = new Map();
+  const g = world.toGeo(rx, rz), pad = maxD / 111320, padLon = pad / Math.max(0.2, Math.cos((g.lat * Math.PI) / 180));
+  for (const ch of world.readyChunks()) {
+    const b = ch.bounds;
+    if (g.lat < b.s - pad || g.lat > b.n + pad || g.lon < b.w - padLon || g.lon > b.e + padLon) continue;
+    const ox = ch.group.position.x, oz = ch.group.position.z, x0 = rx - ox, z0 = rz - oz;
+    for (const st of ch.streets) {
+      for (const L of st.lines) {
+        for (let i = 0; i + 3 < L.length; i += 2) {
+          const ax = L[i], az = L[i + 1], dx = L[i + 2] - ax, dz = L[i + 3] - az;
+          let t = ((x0 - ax) * dx + (z0 - az) * dz) / (dx * dx + dz * dz || 1);
+          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const px = ax + dx * t, pz = az + dz * t, d = Math.hypot(x0 - px, z0 - pz);
+          if (d > maxD) continue;
+          const cur = best.get(st.name);
+          if (!cur || d < cur.d) best.set(st.name, { name: st.name, d, x: px + ox, z: pz + oz, dx, dz });
+        }
       }
-      list.push({ poi, chunk, d });
     }
   }
-  list.sort((a, b) => a.d - b.d);
-  list.length = Math.min(list.length, ar.active ? Math.max(8, tier.labels) : tier.labels);
-  while (labelPool.length < list.length) { const el = document.createElement('div'); el.className = 'label'; labelsEl.appendChild(el); labelPool.push(el); }
-  labelPool.forEach((el, k) => {
-    const it = list[k];
-    if (!it) { if (el.style.display !== 'none') el.style.display = 'none'; return; }
-    v3.set(it.poi.x, it.poi.y + 3.5, it.poi.z).add(it.chunk.group.position).project(camera);
-    if (ar.active && (Math.abs(v3.x) > 0.95 || Math.abs(v3.y) > 0.95)) { el.style.display = 'none'; return; }
-    if (v3.z > 1 || Math.abs(v3.x) > 1.1 || Math.abs(v3.y) > 1.1) { el.style.display = 'none'; return; }
-    el.style.display = '';
-    el.style.transform = `translate3d(${((v3.x + 1) / 2) * innerWidth}px, ${((1 - v3.y) / 2) * innerHeight}px, 0) translate(-50%, -100%)`;
-    const text = ar.active ? `${it.poi.name} · ${fmtDist(it.d)}` : it.poi.name;
-    if (el._poi !== it.poi || el.textContent !== text) { el._poi = it.poi; el.textContent = text; }
-    const st = game.openState(it.poi);
-    const cls = 'label' + (profile.data.discoveries[it.poi.ref] ? ' done' : '') + (st && !st.open ? ' closed' : '');
-    if (el.className !== cls) el.className = cls;
-  });
+  const list = [...best.values()].sort((a, b) => a.d - b.d).slice(0, maxN);
+  for (const s2 of list) { const gg = world.toGeo(s2.x, s2.z); s2.y = (world.groundAt(gg.lat, gg.lon) ?? avatarY) + 0.6; }
+  return list;
+}
+
+function refreshCandidates() {
+  cand = { pois: [], streets: [] };
+  if (!game.pos) return;
+  const c = ar.active ? game.pos : viewGeo || game.pos;
+  const r = ar.active ? 450 : Math.max(220, Math.min(900, controls.dist * 2.5));
+  for (const { poi, chunk } of world.pois(c.lat, c.lon, r)) {
+    const d = haversine(c.lat, c.lon, poi.lat, poi.lon);
+    if (d < r) cand.pois.push({ poi, chunk, d });
+  }
+  cand.pois.sort((a, b) => a.d - b.d);
+  if (cand.pois.length > 60) cand.pois.length = 60;
+  if (ar.active) {
+    // streets ahead of you: around a point ~25 m in front, at ground level
+    fwd.set(0, 0, -1).applyQuaternion(camera.quaternion); fwd.y = 0; fwd.normalize();
+    cand.streets = streetCandidates(camera.position.x + fwd.x * 25, camera.position.z + fwd.z * 25, 45, 3);
+  } else if (controls.dist < 170) {
+    cand.streets = streetCandidates(viewLocal.x, viewLocal.z, 160, 6);
+  }
+}
+
+function updateLabels() {
+  placed.length = 0;
+  const big = settings.textSize === 'large' ? 1.18 : 1;
+  let nPin = 0, nPoi = 0, nSt = 0;
+  if (game.pos) {
+    // 1) AR: creature pins first (they're what you tap)
+    if (ar.active) {
+      for (const c of game.critters) {
+        const g = world.groundAt(c.lat, c.lon);
+        if (g === null) continue;
+        const o = world.toLocal(c.lat, c.lon);
+        v3.set(o.x, g + 2.6, o.z).project(camera);
+        if (v3.z > 1 || Math.abs(v3.x) > 0.95 || Math.abs(v3.y) > 0.95) continue;
+        const [x, y] = screenOf(v3), d = haversine(game.pos.lat, game.pos.lon, c.lat, c.lon);
+        const label = GROUP_STYLE[c.sp.group]?.label || 'creature';
+        const text = d <= AR_PHOTO_M ? `${label} · ${fmtDist(d)} · tap to photograph` : `${label} · ${fmtDist(d)} · get closer`;
+        const w = textW(text, 13 * big), h = 34 * big;
+        if (!fits(x - w / 2, y - h, x + w / 2, y)) continue;
+        const el = pinPool[nPin] || newEl(pinPool, 'label pin');
+        nPin++;
+        el._critter = c;
+        if (el.textContent !== text) el.textContent = text;
+        el.classList.toggle('near', d <= AR_PHOTO_M);
+        el.style.display = '';
+        el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -100%)`;
+      }
+    }
+    // 2) places
+    const maxPoi = ar.active ? Math.max(8, tier.labels) : tier.labels;
+    for (const it of cand.pois) {
+      if (nPoi >= maxPoi) break;
+      v3.set(it.poi.x, it.poi.y + (ar.active ? 0 : 3.5), it.poi.z).add(it.chunk.group.position).project(camera);
+      const lim = ar.active ? 0.95 : 1.1;
+      if (v3.z > 1 || Math.abs(v3.x) > lim || Math.abs(v3.y) > lim) continue;
+      let [x, y] = screenOf(v3);
+      const d = ar.active ? haversine(game.pos.lat, game.pos.lon, it.poi.lat, it.poi.lon) : it.d;
+      const text = ar.active ? `${it.poi.name} · ${fmtDist(d)}` : it.poi.name;
+      const sc = ar.active ? Math.max(0.82, Math.min(1.12, 1.15 - d / 700)) : 1;
+      const w = textW(text, 11 * big * sc) + (ar.active ? 12 : 0), h = 20 * big * sc;
+      if (ar.active) x = Math.max(w / 2 + 6, Math.min(innerWidth - w / 2 - 6, x)); // keep pins fully on screen
+      if (!fits(x - w / 2, y - h, x + w / 2, y)) continue;
+      const el = labelPool[nPoi] || newEl(labelPool, 'label');
+      nPoi++;
+      el._poi = it.poi;
+      if (el.textContent !== text) el.textContent = text;
+      const st = game.openState(it.poi);
+      const cls = 'label' + (ar.active ? ' arpin' : '') + (profile.data.discoveries[it.poi.ref] ? ' done' : '') + (st && !st.open ? ' closed' : '');
+      if (el.className !== cls) el.className = cls;
+      if (ar.active) { const col = POI_COLORS[it.poi.kind.split(':')[0]] || '#888'; if (el._col !== col) { el._col = col; el.style.setProperty('--c', col); } }
+      el.style.display = '';
+      el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -100%)${sc !== 1 ? ` scale(${sc.toFixed(2)})` : ''}`;
+    }
+    // 3) street names: quiet map text, only when zoomed in (or ahead of you in AR)
+    const fade = ar.active ? 1 : Math.max(0, Math.min(1, (170 - controls.dist) / 50));
+    if (fade > 0) {
+      for (const sn of cand.streets) {
+        v3.set(sn.x, sn.y, sn.z).project(camera);
+        if (v3.z > 1 || Math.abs(v3.x) > 0.95 || Math.abs(v3.y) > 0.95) continue;
+        const [x, y] = screenOf(v3);
+        let ang = 0;
+        if (!ar.active) {
+          v3b.set(sn.x + sn.dx, sn.y, sn.z + sn.dz).project(camera);
+          const [x2, y2] = screenOf(v3b);
+          ang = (Math.atan2(y2 - y, x2 - x) * 180) / Math.PI;
+          if (ang > 90) ang -= 180; else if (ang < -90) ang += 180; // keep text upright
+        }
+        const w = textW(sn.name, 12 * big), h = 16 * big, a = (ang * Math.PI) / 180;
+        const bw = Math.abs(w * Math.cos(a)) + Math.abs(h * Math.sin(a)), bh = Math.abs(w * Math.sin(a)) + Math.abs(h * Math.cos(a));
+        if (!fits(x - bw / 2, y - bh / 2, x + bw / 2, y + bh / 2)) continue;
+        const el = streetPool[nSt] || newEl(streetPool, 'street');
+        nSt++;
+        if (el.textContent !== sn.name) el.textContent = sn.name;
+        const op = fade.toFixed(1);
+        if (el.style.opacity !== op) el.style.opacity = op;
+        el.style.display = '';
+        el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) rotate(${ang.toFixed(1)}deg)`;
+      }
+    }
+  }
+  hideRest(pinPool, nPin); hideRest(labelPool, nPoi); hideRest(streetPool, nSt);
 }
 
 // ---------------------------------------------------------------- compass / heading
@@ -313,10 +426,9 @@ $('compass').onclick = async () => {
 // ---------------------------------------------------------------- camera AR (Present mode, phones)
 const AR_PHOTO_M = 40;
 const ar = new ARView($('ar-video'));
-const arQ = new THREE.Quaternion();
 let arSaved = null;
 function setWorldVisible(chunk, on) {
-  for (const o of chunk.group.children) if (o.name !== 'pois') o.visible = on;
+  for (const o of chunk.group.children) o.visible = on; // AR shows places as small screen pins instead
 }
 async function enterAR() {
   if (game.mode !== 'present') return toast('AR works in Present mode, where you really are.', 'error');
@@ -333,8 +445,11 @@ async function enterAR() {
   if (leashLine) leashLine.visible = false;
   if (sky.particles) sky.particles.visible = false;
   document.body.classList.add('ar');
+  ar.userOffset = 0; ribbonW = 0;
+  refreshCandidates();
   closeCard();
-  toast(ar.absolute ? 'AR on: point your phone around. Tap a creature to photograph it.' : "AR on, but this phone isn't reporting north, so directions may be off.", 'species');
+  announce('Camera view on');
+  if (!ar.absolute) toast("This phone isn't reporting north, so drag sideways to line labels up.", 'species');
 }
 function exitAR() {
   if (!ar.active) return;
@@ -345,6 +460,7 @@ function exitAR() {
     camera.fov = arSaved.fov; camera.near = arSaved.near; camera.far = arSaved.far; camera.updateProjectionMatrix();
   }
   for (const ch of world.readyChunks()) setWorldVisible(ch, true);
+  controls.pan.x = controls.pan.z = 0; // AR drags shouldn't leave the map panned
   avatar.visible = true;
   if (leashLine) leashLine.visible = true;
 }
@@ -386,6 +502,67 @@ async function arPhoto() {
   setTimeout(() => URL.revokeObjectURL(a.href), 1500);
 }
 $('ar-photo').onclick = arPhoto;
+
+// AR compass ribbon: heading + where things are, with edge arrows for anything off-screen.
+// ~12 small elements moved by transform 10x/second; width read once (no per-frame layout).
+const ribbon = $('ar-compass'), ribbonTicks = ribbon.querySelector('.ticks');
+const CARD = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const SPAN = 120; // degrees shown across the ribbon
+const tickEls = Array.from({ length: 9 }, () => ribbonTicks.appendChild(document.createElement('span')));
+const markEls = Array.from({ length: 4 }, () => { const m = document.createElement('i'); m.className = 'mark'; ribbonTicks.appendChild(m); return m; });
+let ribbonW = 0, ribT = 0;
+const bearingTo = (lat, lon) => { const o = offsetMeters(game.pos.lat, game.pos.lon, lat, lon); return ((Math.atan2(o.x, -o.z) * 180) / Math.PI + 360) % 360; };
+function announce(msg) { const el = $('sr'); el.textContent = ''; setTimeout(() => (el.textContent = msg), 30); }
+function updateRibbon(now) {
+  if (now - ribT < 90 || !game.pos) return;
+  ribT = now;
+  if (!ribbonW) ribbonW = ribbon.clientWidth || 300;
+  const h = ARView.bearingOf(camera.quaternion);
+  setText('ar-heading', `${CARD[Math.round(h / 45) % 8]} ${Math.round(h) % 360}°`);
+  const first = Math.ceil((h - SPAN / 2) / 15) * 15;
+  tickEls.forEach((el, k) => {
+    const deg = first + k * 15, rel = deg - h;
+    if (rel > SPAN / 2) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    const t = deg % 45 === 0 ? CARD[(((deg / 45) % 8) + 8) % 8] : '·';
+    if (el.textContent !== t) el.textContent = t;
+    el.className = t !== '·' ? 'cardinal' : '';
+    el.style.transform = `translateX(${((rel / SPAN + 0.5) * ribbonW).toFixed(0)}px)`;
+  });
+  const items = [];
+  for (const c of game.critters) items.push({ b: bearingTo(c.lat, c.lon), icon: '●', cls: 'critter', c });
+  if (game.nearest) items.push({ b: bearingTo(game.nearest.poi.lat, game.nearest.poi.lon), icon: '★', cls: 'target' });
+  markEls.forEach((el, k) => {
+    const it = items[k];
+    if (!it) { el.style.display = 'none'; return; }
+    const rel = ((it.b - h + 540) % 360) - 180, off = Math.abs(rel) > SPAN / 2 - 4;
+    const t = off ? (rel < 0 ? `‹${it.icon}` : `${it.icon}›`) : it.icon;
+    if (el.textContent !== t) el.textContent = t;
+    el.className = `mark ${it.cls}`;
+    el.style.display = '';
+    const x = (Math.max(-SPAN / 2 + 4, Math.min(SPAN / 2 - 4, rel)) / SPAN + 0.5) * ribbonW;
+    el.style.transform = `translateX(${x.toFixed(0)}px)`;
+    // a gentle buzz (and a screen-reader note) the first time a creature is straight ahead
+    if (it.c && Math.abs(rel) < 12 && !it.c.seenAhead) {
+      it.c.seenAhead = true;
+      buzz(20);
+      announce(`${GROUP_STYLE[it.c.sp.group]?.label || 'creature'} ahead, ${fmtDist(haversine(game.pos.lat, game.pos.lon, it.c.lat, it.c.lon))}`);
+    }
+  });
+  setText('ar-hint', ar.needsCalibration() ? 'Compass needs calibrating: wave your phone in a figure-8'
+    : ar.absolute ? 'Point your phone around · drag sideways if labels are off' : 'No compass here: drag sideways to line labels up');
+}
+addEventListener('resize', () => { ribbonW = 0; });
+
+// AR: drag sideways to nudge the compass if labels don't line up with the real world
+let arDragX = null;
+renderer.domElement.addEventListener('pointerdown', (e) => { if (ar.active) arDragX = e.clientX; });
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (!ar.active || arDragX === null || !e.buttons) return;
+  ar.userOffset += (e.clientX - arDragX) * 0.15;
+  arDragX = e.clientX;
+});
+addEventListener('pointerup', () => { arDragX = null; });
 $('ar-btn').onclick = () => (ar.active ? exitAR() : enterAR());
 $('ar-exit').onclick = exitAR;
 
@@ -400,6 +577,7 @@ let miniT = 0, ambT = 0;
 const minimap = new Minimap($('minimap'), { onTap: () => openJournal('map') });
 let skyState = { night: 0, precip: null };
 let viewGeo = null; // where the camera is looking (labels follow the view, not just the character)
+const viewLocal = { x: 0, z: 0 };
 
 function snapAvatar() {
   if (!game.pos) return;
@@ -478,7 +656,7 @@ function frame(now) {
     if (ar.active) {
       // AR: stand at the character's eyes and look where the phone points
       camera.position.set(avatar.position.x, avatarY + 1.6, avatar.position.z);
-      camera.quaternion.slerp(ar.quaternion(arQ), 0.35);
+      ar.step(camera.quaternion, rdt);
       const fov = ar.fov(camera.aspect);
       if (Math.abs(camera.fov - fov) > 0.5 || camera.near !== 0.3) { camera.fov = fov; camera.near = 0.3; camera.far = 3000; camera.updateProjectionMatrix(); }
       viewGeo = game.pos;
@@ -489,6 +667,7 @@ function frame(now) {
     const tg = world.toGeo(tx, tz);
     const ty = (controls.pan.x || controls.pan.z ? world.groundAt(tg.lat, tg.lon) ?? avatarY : avatarY) + 1.6;
     viewGeo = tg;
+    viewLocal.x = tx; viewLocal.z = tz;
     $('recenter').hidden = !controls.isAway();
     camera.position.set(
       tx + Math.sin(controls.yaw) * Math.cos(controls.pitch) * dist,
@@ -522,7 +701,9 @@ function frame(now) {
     ambience.update({ wind: w?.wind ?? 8, rain: w && /rain|storm/.test(w.kind) ? 1 : w?.kind === 'drizzle' ? 0.4 : 0, day: sun.alt > 0 ? 1 : 0, green: hab !== 'urban', warm: (w?.tempC ?? 10) > 14 });
   }
 
-  labelT += rdt; if (labelT > 0.05) { labelT = 0; updateLabels(); }
+  candT += rdt; if (candT > 0.2) { candT = 0; refreshCandidates(); }
+  labelT += rdt; if (ar.active || labelT > 0.05) { labelT = 0; updateLabels(); }
+  if (ar.active) updateRibbon(now);
   hudT += rdt; if (hudT > 0.3) { hudT = 0; renderHud(); }
   envT += rdt; if (envT > 10 && game.pos) { envT = 0; environment.refresh(game.pos.lat, game.pos.lon); }
   renderer.render(scene, camera);
@@ -848,4 +1029,11 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 }
 
 // debug handle
-window.openworld = { world, game, profile, environment, settings, applyTier, camera, ar, journal, ambience, get tier() { return tierName; } };
+window.openworld = { world, game, profile, environment, settings, applyTier, camera, ar, journal, ambience, __refresh: () => refreshCandidates(), __labels: () => updateLabels(), get __cand() { return cand; }, get __view() { return { viewLocal, dist: controls.dist }; }, get tier() { return tierName; } };
+
+// help & about (static page; opened from settings or the start screen)
+function openAbout(e) { e?.preventDefault(); $('settings').hidden = true; $('about').hidden = false; }
+$('p-about').onclick = openAbout;
+$('s-about').onclick = openAbout;
+$('about-close').onclick = () => { $('about').hidden = true; };
+$('about').addEventListener('click', (e) => { if (e.target.id === 'about') $('about').hidden = true; });

@@ -213,6 +213,25 @@ async function build({ x, y, opts }) {
     .sort((a, c) => a.k - c.k)
     .slice(0, opts.maxPois || 300)
     .map((x) => x.p);
+  // ---------- street names: compact polylines in local metres, merged per name ----------
+  const byName = new Map();
+  for (const st of fabric.streets || []) {
+    const out = [];
+    let lx = null, lz = null;
+    for (const [px, py] of st.pts) {
+      if (px < -64 || py < -64 || px > E + 64 || py > E + 64) continue;
+      const x = X(px), z = Z(py);
+      if (lx !== null && Math.hypot(x - lx, z - lz) < 8) continue; // ~8 m spacing is plenty for labels
+      out.push(x, z); lx = x; lz = z;
+    }
+    if (out.length < 4) continue;
+    const list = byName.get(st.name) || [];
+    list.push(new Float32Array(out));
+    byName.set(st.name, list);
+    if (byName.size > 500) break;
+  }
+  const streets = [...byName].map(([name, lines]) => ({ name, lines }));
+
   const pois = [];
   for (const p of chosen) {
     let base = H(p.px, p.py);
@@ -224,7 +243,7 @@ async function build({ x, y, opts }) {
   }
 
   const payload = {
-    key: `${CHUNK_Z}/${x}/${y}`, x, y, bounds: b, latc, lonc, extent: E, gridN: GRID, grid, areaName: fabric.areaName,
+    key: `${CHUNK_Z}/${x}/${y}`, x, y, bounds: b, latc, lonc, extent: E, gridN: GRID, grid, areaName: fabric.areaName, streets,
     terrain: { pos: tPos, uv: tUv }, texture, habitat, habitatN: HGRID,
     buildings, trees: packTrees(blobs), cones: packTrees(cones), pois,
   };

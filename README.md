@@ -46,6 +46,8 @@ In **Present** mode your character only moves when you really walk, so dragging 
 the map instead: zoom out and look around freely, then tap **◎** to jump back to where you
 are. Moving with the joystick also brings the view back.
 
+**Street names** appear along the streets when you zoom in close, and fade away as you zoom out.
+
 You're the small coloured figure with the arrow above its head. The arrow shows through
 buildings, so you can always find yourself.
 
@@ -146,10 +148,17 @@ locally, and which months it's usually seen around here.
 
 ### 9. Camera AR (phones, Present mode)
 
-Tap **📷** to see the game through your phone's camera. Place names float over the real
-streets with their distance ("Café Nero · 120 m"), beacons rise up as glowing pillars, and
-nearby creatures appear in front of you. **Tap a creature to photograph it** from up to
-40 m away, with no need to walk right up to it. Tap **✕ Exit AR** to go back to the map.
+Tap **📷** to see the game through your phone's camera. Places appear as small pins with
+their distance ("● Café Nero · 120 m"), the names of streets ahead of you show near the
+ground, beacons rise up as glowing pillars, and nearby creatures appear with a green
+"tap to photograph" tag. **Tap a creature to photograph it** from up to 40 m away.
+Tap **✕ Exit AR** to go back to the map.
+
+- A **compass strip** at the top shows which way you're facing, with ★ for your next
+  target and ● for creatures; arrows at its edges point to anything behind you.
+- Your phone gives a gentle buzz (and screen readers announce it) when a creature is straight ahead.
+- **Labels off?** Drag sideways on the screen to nudge them into line. If the strip says
+  the compass needs calibrating, wave your phone in a figure-8.
 
 - Your browser will ask to use the **camera** (and on iPhone, **Motion & Orientation**); allow both.
 - Hold the phone upright and turn around slowly. Direction comes from the phone's compass,
@@ -205,6 +214,11 @@ Your progress is saved **only in this browser on this device**. It isn't stored 
 To keep a backup or move to another device, use **Export** to save a file, then
 **Import** it on the other device. Clearing your browser data erases your progress unless
 you've exported it.
+
+### Help inside the game
+
+Tap **? Help & about** in Settings (or *How it works* on the start screen) for a one-page
+overview of everything above.
 
 ### Troubleshooting
 
