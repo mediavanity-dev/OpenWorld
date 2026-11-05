@@ -264,6 +264,44 @@ stays secondary (e.g. directions remain, but tucked away).
    - Listening mode: identify birdsong nearby; sound as a discovery channel.
    - Adaptive music and ambience that respond to place, weather and time.
 
+### Making it actually fun (moment to moment)
+
+The pillars above give it meaning; fun comes from **verbs with a bit of challenge, surprise,
+and a satisfying payoff** every few minutes. Today the main verb is "walk near a marker",
+which is passive. Candidate fun hooks, each grounded in real data:
+
+1. **The hunt (tracking creatures).** Instead of creatures popping up, you get *signs*: a
+   call, tracks, a rustle on the minimap that drifts. Follow warmer/colder cues (audio
+   gets louder, the phone buzzes stronger), then a short AR moment to frame and snap it
+   before it flees. Real local species, real rarity, so a rare find genuinely means something.
+2. **Rephotography (the time lens as a game).** At historic places, an old photo (Wikimedia
+   Commons) appears as a ghost overlay in the camera view; line it up with today's view to
+   "reveal" the past and unlock its story. Score how closely you matched it. Rare, physical,
+   instantly shareable, and unlike anything in map apps.
+3. **Daily treasure (everyone, same hunt).** Each day a handful of "golden" finds are hidden
+   at real spots in every area, chosen by a shared daily seed, so everyone nearby hunts the
+   same ones without needing a server. Hot/cold hints, a gentle race, gone at midnight.
+4. **Micro-challenges per discovery type.** Quick, optional, ~10 seconds each:
+   - Rocks: tap the layers from youngest to oldest.
+   - Plants: match the leaf shape.
+   - Birds: pick the right call from three.
+   - Buildings: guess the decade from its silhouette.
+
+   Getting it right upgrades the find (a "field mastery" star), so knowledge becomes skill.
+5. **Combos and sets.** Bonuses for real-world combinations: "a heron in the rain", "a
+   chapel at golden hour", "three rock ages in one walk"; set collections per area and
+   season. Encourages going out at different times, not just more often.
+6. **Surprise and spectacle.** Weather and sky moments that change play: a rainbow after rain
+   reveals a hidden find, fog makes creatures bolder, a meteor shower night spawns "star
+   fragments" in open spaces.
+7. **Ghost walks.** Race or retrace your own previous walks (or a friend's shared route)
+   as a translucent ghost; beat your time or find what you missed.
+
+**Recommendation:** prototype **the hunt** + **daily treasure** together first. They turn
+every walk into an active chase with almost no new data sources, and they make the AR
+camera matter. Then add **rephotography** as the signature "wow" feature for historic places.
+Test the rule of thumb: *is there something worth chasing within two minutes of opening it?*
+
 ### What to avoid
 
 Loot boxes, energy timers, streak guilt, XP pop-ups, mascots, and anything that rewards
