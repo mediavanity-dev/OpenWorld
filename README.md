@@ -114,14 +114,29 @@ When you discover a place, the game remembers the conditions: night, rain, snow,
 moon, golden hour, a holiday. Visiting again in **new conditions** adds a badge to that
 place (🌙 🌧️ ❄️ 🌕 🌅 🎉), so revisiting has a point.
 
-### 6. Spot wildlife
+### 6. Track wildlife and find daily treasure
 
-As you walk, especially through parks, woods and along water, a small glowing creature may
-appear nearby ("Something is moving nearby…"). **Walk up to it before it wanders off**
-(about 2 minutes) to see what it is. Every creature is a **real species that people have
-actually recorded in that area** (from iNaturalist), shown with a photo. Birds and plants
-are common; at night you'll meet different animals. Your collection appears under
+**The hunt.** As you walk, especially through parks, woods and along water, you'll notice
+*signs* of an animal nearby ("Fresh signs of a bird nearby"):
+
+- a soft green **rustle** on the minimap that tightens as you close in;
+- a small **tracker** at the bottom: 🐾 and five dots that light up as you get warmer;
+- faint **tracks** on the ground once you're close.
+
+Get close enough and it shows itself with a gentle glow; walk up to it or **photograph it**
+in camera view. Go gently: move in too fast and it slips away. Leave it too long and the
+trail goes cold. Every animal is a **real species that people have actually recorded in
+that area** (from iNaturalist), shown with a photo; rarer ones leave fainter trails. Plants
+and fungi don't leave tracks, so they're simply found nearby. Your collection appears under
 **species**.
+
+**Daily treasure ✦.** Every day, three golden finds are hidden in each area along public
+streets and paths, the same ones for everyone nearby. The ✦ in the tracker brightens as you
+get warmer, a golden arc on the minimap's edge hints at the direction, and a faint golden
+glimmer appears when you're close. Walk to it to collect it. Only real visits (Present or
+Home) count, and they reset at midnight.
+
+Both can be switched off in **Settings → Game features**.
 
 ### 7. Your field journal, records and daily assignment
 
@@ -264,19 +279,9 @@ screen and is never recorded or sent anywhere.
 ## The beta version
 
 **https://mediavanity-dev.github.io/OpenWorld/beta/** is where new ideas are tried first. It
-has its own separate journal (copy your main one in from Settings if you like), a small
-BETA marker, and currently two experiments:
-
-- **The hunt**: animals no longer pop up beside you. You notice *signs* instead: a soft
-  rustle on the minimap that tightens as you close in, a little tracker (🐾 and five dots:
-  warmer or colder), faint tracks on the ground when you're near. Close enough and it
-  reveals itself; move in too fast and it slips away. Rarer animals leave fainter trails.
-- **Daily treasure** ✦: three golden finds are hidden each day in every area, along public
-  streets and paths, and they're the same for everyone nearby. The ✦ brightens as you get
-  warmer, the minimap hints at the direction, and a faint golden glimmer appears when you're
-  close. Only real visits (Present or Home) collect them; they reset at midnight.
-
-Both can be switched off in the beta's Settings.
+has its own separate journal (copy your main one in from Settings if you like) and a small
+BETA marker. The hunt and daily treasure started there and have now graduated to the main
+version; the next experiments will appear in the beta first.
 
 ## For developers
 

@@ -12,8 +12,10 @@ export const storeKey = (name) => `${PREFIX}.${name}`;
 // the stable channel's key (beta can import the real profile from it)
 export const stableKey = (name) => `openworld.${name}`;
 
-// Experimental features (beta only). Can be switched off individually in beta settings.
+// Game features that started as beta experiments. `stable: true` = graduated to the main
+// version. All can be switched off individually in Settings.
 export const FEATURES = {
-  hunt: { label: 'The hunt: track creatures by their signs', default: true },
-  treasure: { label: 'Daily treasure: golden finds hidden each day', default: true },
+  hunt: { label: 'The hunt: track animals by their signs', stable: true },
+  treasure: { label: 'Daily treasure: golden finds hidden each day', stable: true },
 };
+export const featureAvailable = (k) => BETA || !!FEATURES[k]?.stable;

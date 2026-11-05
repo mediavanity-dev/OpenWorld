@@ -326,4 +326,5 @@ travelling fast or trespassing. Keep the honesty rules (Roam never counts as rea
 minimap rustle that tightens, a 5-dot warmer/colder tracker, tracks on the ground, reveal up
 close, flee if rushed, trail goes cold) and **daily treasure** (3 finds per area per day along
 public streets, seeded by date + area so everyone shares them; cool/warm/hot hints, a faint
-golden mote when close; real visits only). Next: playtest, then rephotography.*
+golden mote when close; real visits only). **Promoted to the main version** (Nov 2026, owner's decision) with on/off switches in
+Settings → Game features. Next: real-world playtest and tuning, then rephotography in the beta.*

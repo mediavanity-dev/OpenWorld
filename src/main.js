@@ -24,7 +24,7 @@ import { runTutorial, tutorialDone } from './ui/tips.js';
 import { Ambience } from './audio.js';
 import { fmtDist, fmtTemp } from './units.js';
 import { pruneCache } from './data/cache.js';
-import { BETA, FEATURES, storeKey } from './channel.js';
+import { BETA, FEATURES, featureAvailable, storeKey } from './channel.js';
 import { STABLE_PROFILE_KEY } from './game/profile.js';
 import { wildHabitat } from './world/habitats.js';
 
@@ -63,10 +63,10 @@ const profile = new Profile();
 const environment = new Environment(() => renderHud(true));
 const game = new Game(world, profile, environment, onGameEvent);
 game.dataSaver = settings.dataSaver;
-// beta channel: experimental features on unless switched off in settings
+// game features (graduated or beta-only): on unless switched off in settings
 function applyFeatures() {
   game.features = {};
-  if (BETA) for (const k of Object.keys(FEATURES)) game.features[k] = settings.features?.[k] !== false;
+  for (const k of Object.keys(FEATURES)) if (featureAvailable(k)) game.features[k] = settings.features?.[k] !== false;
   if (!game.features.hunt) game.hunt = null;
 }
 applyFeatures();
@@ -1114,7 +1114,7 @@ function openSettings() {
   $('set-text').value = settings.textSize;
   $('set-motion').checked = settings.reduceMotion;
   $('set-sound').checked = settings.sound;
-  if (BETA) $('set-beta').innerHTML = Object.entries(FEATURES).map(([k, f]) => `<label class="set check"><input type="checkbox" data-feature="${k}" ${settings.features?.[k] !== false ? 'checked' : ''}/> ${f.label}</label>`).join('');
+  $('set-beta').innerHTML = Object.entries(FEATURES).filter(([k]) => featureAvailable(k)).map(([k, f]) => `<label class="set check"><input type="checkbox" data-feature="${k}" ${settings.features?.[k] !== false ? 'checked' : ''}/> ${f.label}</label>`).join('');
   $('set-names').value = settings.placeNames;
   $('set-awake').disabled = !('wakeLock' in navigator);
   $('set-compass').disabled = !compassSupported;
@@ -1125,15 +1125,7 @@ $('p-settings').onclick = openSettings;
 $('set-close').onclick = () => { $('settings').hidden = true; };
 $('set-quality').onchange = (e) => { settings.quality = e.target.value; saveSettings(); applyTier(startTier()); $('set-info').textContent = `Now: ${tier.label}`; };
 $('set-weather').onchange = (e) => { settings.weatherFx = e.target.checked; saveSettings(); };
-$('set-datasaver').onchange = (e) => { settings.dataSaver = e.target.checked; game.dataSaver = settings.dataSaver;
-// beta channel: experimental features on unless switched off in settings
-function applyFeatures() {
-  game.features = {};
-  if (BETA) for (const k of Object.keys(FEATURES)) game.features[k] = settings.features?.[k] !== false;
-  if (!game.features.hunt) game.hunt = null;
-}
-applyFeatures();
-if (BETA) document.body.classList.add('beta'); saveSettings(); applyTier(tierName); };
+$('set-datasaver').onchange = (e) => { settings.dataSaver = e.target.checked; game.dataSaver = settings.dataSaver; saveSettings(); applyTier(tierName); };
 $('set-awake').onchange = (e) => { settings.keepAwake = e.target.checked; saveSettings(); keepAwake(game.mode === 'present' && settings.keepAwake); };
 $('set-compass').onchange = async (e) => {
   settings.compassFollow = e.target.checked; saveSettings();
@@ -1144,15 +1136,17 @@ $('set-units').onchange = (e) => { settings.units = e.target.value; saveSettings
 $('set-text').onchange = (e) => { settings.textSize = e.target.value; saveSettings(); applyLook(); };
 $('set-motion').onchange = (e) => { settings.reduceMotion = e.target.checked; saveSettings(); applyLook(); };
 $('set-sound').onchange = (e) => { settings.sound = e.target.checked; saveSettings(); settings.sound ? ambience.start() : ambience.stop(); };
-// beta: feature switches, copy the real profile in, and links between the two versions
+// game feature switches (both versions); beta extras: copy the real profile in
+$('beta-box').hidden = !Object.keys(FEATURES).some(featureAvailable);
+$('beta-title').textContent = BETA ? 'Beta experiments' : 'Game features';
+$('set-beta').addEventListener('change', (e) => {
+  const k = e.target.dataset.feature;
+  if (!k) return;
+  settings.features = { ...(settings.features || {}), [k]: e.target.checked };
+  saveSettings(); applyFeatures();
+});
+for (const el of document.querySelectorAll('.beta-only')) el.hidden = !BETA;
 if (BETA) {
-  $('beta-box').hidden = false;
-  $('set-beta').addEventListener('change', (e) => {
-    const k = e.target.dataset.feature;
-    if (!k) return;
-    settings.features = { ...(settings.features || {}), [k]: e.target.checked };
-    saveSettings(); applyFeatures();
-  });
   $('beta-import').onclick = () => {
     let raw = null;
     try { raw = localStorage.getItem(STABLE_PROFILE_KEY); } catch { /* ignore */ }
