@@ -1,0 +1,37 @@
+name: Checks
+
+# The same checks as the deploy workflow, without deploying: runs on every pull request
+# so problems show up before anything is merged into main (and goes live).
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run build:beta
+      - run: npm run smoke
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - run: npm run smoke
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+          SMOKE_PATH: /beta/
