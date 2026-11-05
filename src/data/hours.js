@@ -1,3 +1,4 @@
+// @ts-check
 // Minimal OSM opening_hours evaluator for the common cases:
 //   "24/7", "Mo-Fr 08:00-18:00; Sa 09:00-13:00", "Mo-Su 10:00-02:00", "Tu,Th 09:00-12:00,13:00-17:00",
 //   "Mo-Fr 08:00-18:00, Sa 10:00-14:00", "Su off", "10:00-22:00".
@@ -60,7 +61,7 @@ export function isOpen(week, local) {
   const min = local.getUTCHours() * 60 + local.getUTCMinutes();
   for (const [a, b] of week[day]) if (min >= a && min < b) return true;
   const prev = (day + 6) % 7; // yesterday's overnight ranges
-  for (const [a, b] of week[prev]) if (b > 1440 && min < b - 1440) return true;
+  for (const [, b] of week[prev]) if (b > 1440 && min < b - 1440) return true;
   return false;
 }
 

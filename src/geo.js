@@ -1,3 +1,4 @@
+// @ts-check
 // Geography helpers. WGS84 lat/lon is the source of truth; the renderer works in
 // a local metric frame (x = east, y = up, z = south) around a floating origin
 // that is re-based as the character moves, so float32 precision never degrades.
@@ -72,7 +73,8 @@ export function chunkBounds(i, j) {
 // ---- Tiny geohash (used to index the profile's task log by place) ----
 const B32 = '0123456789bcdefghjkmnpqrstuvwxyz';
 export function geohash(lat, lon, precision = 8) {
-  let latR = [-90, 90], lonR = [-180, 180], hash = '', bit = 0, ch = 0, even = true;
+  const latR = [-90, 90], lonR = [-180, 180];
+  let hash = '', bit = 0, ch = 0, even = true;
   while (hash.length < precision) {
     const r = even ? lonR : latR;
     const v = even ? lon : lat;
@@ -86,7 +88,8 @@ export function geohash(lat, lon, precision = 8) {
 
 // Bounds of a geohash cell: { s, w, n, e, lat, lon } (lat/lon = centre)
 export function geohashBounds(hash) {
-  let latR = [-90, 90], lonR = [-180, 180], even = true;
+  const latR = [-90, 90], lonR = [-180, 180];
+  let even = true;
   for (const c of hash) {
     const v = B32.indexOf(c);
     for (let b = 4; b >= 0; b--) {

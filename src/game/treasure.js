@@ -1,3 +1,4 @@
+// @ts-check
 // Daily treasure (beta): a few golden finds hidden each day in every map area, along
 // public streets and paths. Placement comes from a seed of (date, area), so everyone in
 // the same place hunts the same finds on the same day, with no server involved.

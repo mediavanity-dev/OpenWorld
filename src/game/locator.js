@@ -1,7 +1,10 @@
+// @ts-check
 // Where is the device, physically? Two sources:
 //   - Browser geolocation (GPS on phones; Wi-Fi/OS location on desktops)
 //   - Internet (IP) geolocation: coarse, city-level; the ISP-based fallback
 // Every fix carries its source and accuracy so the game can grade trust.
+
+import { getJson } from '../data/net.js';
 
 export function trustOf(fix) {
   if (!fix) return 'none';
@@ -23,9 +26,8 @@ export function deviceFix(timeout = 20000) {
 }
 
 export async function ipFix() {
-  const res = await fetch('https://get.geojs.io/v1/ip/geo.json');
-  if (!res.ok) throw new Error('IP lookup failed: ' + res.status);
-  const j = await res.json();
+  const j = await getJson('https://get.geojs.io/v1/ip/geo.json', { timeout: 10000, retries: 1 })
+    .catch((err) => { throw new Error('IP lookup failed: ' + err.message); });
   const lat = parseFloat(j.latitude), lon = parseFloat(j.longitude);
   if (!isFinite(lat) || !isFinite(lon)) throw new Error('IP lookup returned no position');
   return { lat, lon, accuracy: 5000, source: 'ip', place: [j.city, j.region, j.country].filter(Boolean).join(', '), t: Date.now() };

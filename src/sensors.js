@@ -18,7 +18,7 @@ function onOrient(e) {
   // circular low-pass to calm the needle
   if (heading === null) heading = h;
   else {
-    let d = ((h - heading + 540) % 360) - 180;
+    const d = ((h - heading + 540) % 360) - 180;
     heading = (heading + d * 0.2 + 360) % 360;
   }
   for (const fn of listeners) fn(heading);

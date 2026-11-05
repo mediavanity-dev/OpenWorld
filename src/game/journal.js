@@ -1,3 +1,4 @@
+// @ts-check
 // Field journal: explored ground, daily totals, personal records, rock collection,
 // survey areas and one gentle daily field assignment. Everything lives in the
 // profile (small, on-device). Roam never counts as real exploration.

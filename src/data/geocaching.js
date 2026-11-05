@@ -4,6 +4,7 @@
 
 import { OKAPI_KEYS } from '../config.js';
 import { cacheGet, cachePut } from './cache.js';
+import { tryJson } from './net.js';
 
 export const NODES = {
   de: { base: 'https://www.opencaching.de/okapi/', name: 'Opencaching.de', countries: ['DE', 'AT', 'CH', 'LI', 'IT', 'FR', 'ES', 'DK'] },
@@ -64,9 +65,8 @@ export async function cachesIn(bounds, node, areaKey) {
     consumer_key: ck,
   });
   try {
-    const r = await fetch(`${n.base}services/caches/shortcuts/search_and_retrieve?${params}`);
-    if (!r.ok) return [];
-    const j = await r.json();
+    const j = await tryJson(`${n.base}services/caches/shortcuts/search_and_retrieve?${params}`, { service: 'geocaches' });
+    if (!j) return [];
     const list = Object.values(j || {}).map((c) => normalizeCache(c, node)).filter(Boolean);
     cachePut(key, list);
     return list;

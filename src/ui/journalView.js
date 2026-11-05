@@ -7,9 +7,9 @@ import { GROUP_STYLE } from '../data/wildlife.js';
 import { TAG_ICONS } from '../game/environment.js';
 import { ageText } from '../data/science.js';
 import { fmtDist, fmtElev } from '../units.js';
+import { esc, safeUrl } from '../util/html.js';
 
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const KIND_LABEL = { tourism: 'Sights', historic: 'History', amenity: 'Cafés, culture & services', shop: 'Shops', leisure: 'Parks & sport', natural: 'Nature', transport: 'Stations' };
 const GROUP_PLURAL = { Aves: 'Birds', Plantae: 'Plants', Insecta: 'Insects', Arachnida: 'Spiders & kin', Mammalia: 'Mammals', Reptilia: 'Reptiles', Amphibia: 'Amphibians', Actinopterygii: 'Fish', Mollusca: 'Molluscs', Fungi: 'Fungi' };
 const GRADE_DOT = { present: '#ff7a3d', home: '#3db8ff', echo: '#b07aff' };
@@ -124,8 +124,10 @@ function collections(profile) {
   for (const x of Object.values(d.discoveries)) for (const t of x.seen || []) tags[t] = (tags[t] || 0) + 1;
   const cond = Object.keys(TAG_ICONS).map((t) => `<span class="chip ${tags[t] ? '' : 'off'}">${TAG_ICONS[t]} ${t} ${tags[t] ? `<b>${tags[t]}</b>` : ''}</span>`).join('');
   const gcs = Object.entries(d.geocaches || {}).sort((a, b) => (b[1].date || '').localeCompare(a[1].date || ''));
-  const gcList = gcs.length ? `<ul class="jlist">${gcs.map(([code, g]) => `<li><i class="dot" style="background:${GRADE_DOT[g.grade]}"></i>${g.url ? `<a href="${esc(g.url)}" target="_blank" rel="noopener">${esc(g.name)}</a>` : esc(g.name)} <small>${esc(g.type)} · D${g.difficulty ?? '–'}/T${g.terrain ?? '–'} · ${esc(code)}</small></li>`).join('')}</ul>` : '';
-  return `<h4>Places</h4>${places}<h4>Life list</h4>${life}<h4>Rocks underfoot</h4>${rockList}${gcList ? `<h4>Geocaches found</h4>${gcList}` : ''}<h4>Conditions you've seen places in</h4><div class="chips">${cond}</div>`;
+  const gcList = gcs.length ? `<ul class="jlist">${gcs.map(([code, g]) => `<li><i class="dot" style="background:${GRADE_DOT[g.grade]}"></i>${safeUrl(g.url) ? `<a href="${esc(g.url)}" target="_blank" rel="noopener">${esc(g.name)}</a>` : esc(g.name)} <small>${esc(g.type)} · D${g.difficulty ?? '–'}/T${g.terrain ?? '–'} · ${esc(code)}</small></li>`).join('')}</ul>` : '';
+  const rps = Object.values(d.rephotos || {}).sort((a, b) => (b.last || '').localeCompare(a.last || ''));
+  const rpList = rps.length ? `<ul class="jlist">${rps.map((r) => `<li><i class="dot" style="background:#ffd36b"></i>${safeUrl(r.photo?.url) ? `<a href="${esc(r.photo.url)}" target="_blank" rel="noopener">${esc(r.name)}</a>` : esc(r.name)} <small>${esc(r.year)} · ${esc(r.score)}% match</small></li>`).join('')}</ul>` : '';
+  return `<h4>Places</h4>${places}<h4>Life list</h4>${life}<h4>Rocks underfoot</h4>${rockList}${gcList ? `<h4>Geocaches found</h4>${gcList}` : ''}${rpList ? `<h4>Then &amp; now</h4>${rpList}` : ''}<h4>Conditions you've seen places in</h4><div class="chips">${cond}</div>`;
 }
 
 function records(profile) {

@@ -1,12 +1,13 @@
 // Wikipedia summaries for places tagged with wikipedia=* or wikidata=* in OSM.
 // Fetched only when the player opens a place card.
 
+import { tryJson } from './net.js';
+
 const memo = new Map();
 const LANG = (navigator.language || 'en').slice(0, 2).toLowerCase();
 
-async function json(url) {
-  const r = await fetch(url, { headers: { 'Api-User-Agent': 'OpenWorld-game (github.com/mediavanity-dev/OpenWorld)' } });
-  return r.ok ? r.json() : null;
+function json(url) {
+  return tryJson(url, { init: { headers: { 'Api-User-Agent': 'OpenWorld-game (github.com/mediavanity-dev/OpenWorld)' } } });
 }
 
 async function titleFromWikidata(q) {

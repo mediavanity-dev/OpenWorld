@@ -7,15 +7,14 @@
 
 import { VectorTile, classifyRings } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
+import { getJson, request } from './net.js';
 
 const TILEJSON = 'https://tiles.openfreemap.org/planet';
 let tileUrl = null;
 
 async function template() {
   if (tileUrl) return tileUrl;
-  const res = await fetch(TILEJSON);
-  if (!res.ok) throw new Error('tilejson ' + res.status);
-  tileUrl = (await res.json()).tiles[0];
+  tileUrl = (await getJson(TILEJSON, { retries: 2 })).tiles[0];
   return tileUrl;
 }
 
@@ -102,9 +101,9 @@ function stripClose(r) {
 
 export async function loadBaseTile(z, x, y) {
   const url = (await template()).replace('{z}', z).replace('{x}', x).replace('{y}', y);
-  const res = await fetch(url);
+  // 204/404 = nothing mapped here (open sea): an empty area, not an error
+  const res = await request(url, { retries: 2, okStatus: (s) => (s >= 200 && s < 300) || s === 404 });
   if (res.status === 204 || res.status === 404) return emptyFabric();
-  if (!res.ok) throw new Error('tile ' + res.status);
   const vt = new VectorTile(new PbfReader(new Uint8Array(await res.arrayBuffer())));
   return normalizeTile(vt);
 }

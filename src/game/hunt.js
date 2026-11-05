@@ -1,3 +1,4 @@
+// @ts-check
 // The hunt (beta): creatures don't pop up beside you; they leave signs you follow.
 // A hidden creature sits somewhere ahead; you get a drifting "rustle" on the minimap
 // that tightens as you close in, a warmer/colder signal, tracks on the ground when

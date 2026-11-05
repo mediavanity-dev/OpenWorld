@@ -4,6 +4,7 @@
 import { getTimes, getMoonTimes, getMoonIllumination } from 'suncalc';
 import { cachedJson, cacheGet, cachePut } from './cache.js';
 import { geohash, haversine } from '../geo.js';
+import { getJson, tryJson } from './net.js';
 
 const DAY = 864e5;
 
@@ -88,9 +89,7 @@ async function normals(lat, lon) {
   const hit = await cacheGet(key, 365 * DAY);
   if (hit) return hit;
   try {
-    const r = await fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${la}&longitude=${lo}&start_date=1991-01-01&end_date=2020-12-31&daily=temperature_2m_max,temperature_2m_min&timezone=GMT`);
-    if (!r.ok) return null;
-    const j = await r.json();
+    const j = await getJson(`https://archive-api.open-meteo.com/v1/archive?latitude=${la}&longitude=${lo}&start_date=1991-01-01&end_date=2020-12-31&daily=temperature_2m_max,temperature_2m_min&timezone=GMT`, { timeout: 30000 });
     const sum = new Float64Array(366), n = new Uint16Array(366);
     const recHi = Array.from({ length: 366 }, () => [-99, 0]), recLo = Array.from({ length: 366 }, () => [99, 0]);
     j.daily.time.forEach((d, i) => {
@@ -117,7 +116,7 @@ async function normals(lat, lon) {
 export async function climateToday(lat, lon, utcOffsetSec) {
   const [norm, f] = await Promise.all([
     normals(lat, lon),
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    tryJson(`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto`),
   ]);
   if (!norm || !f?.daily) return null;
   const today = (f.daily.temperature_2m_max[0] + f.daily.temperature_2m_min[0]) / 2;
@@ -221,4 +220,30 @@ export async function antipode(lat, lon) {
     `https://nominatim.openstreetmap.org/reverse?format=json&zoom=5&lat=${a.lat}&lon=${a.lon}`, { ttl: 60 * DAY });
   const place = j?.address ? [j.address.state || j.address.region, j.address.country].filter(Boolean).join(', ') : null;
   return { ...a, place: place || null };
+}
+
+// ---------- rephotography: old photos taken right at a place (Wikimedia Commons) ----------
+// Tighter than photosNearby (the photo should show *this* spot) and only genuinely old
+// images; a larger rendition is used for the camera overlay. Free licences only.
+export const REPHOTO_BEFORE = 1970;
+export async function oldPhotosAt(lat, lon, radius = 150) {
+  const j = await cachedJson(`commons-old:${geohash(lat, lon, 7)}:${radius}`,
+    `https://commons.wikimedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${lat.toFixed(5)}|${lon.toFixed(5)}&ggsradius=${radius}&ggsnamespace=6&ggslimit=40&prop=imageinfo|coordinates&iiprop=url|extmetadata&iiurlwidth=1024&iiextmetadatafilter=DateTimeOriginal|LicenseShortName|Artist|ImageDescription&format=json&origin=*`,
+    { ttl: 14 * DAY });
+  const out = [];
+  for (const pg of Object.values(j?.query?.pages || {})) {
+    const ii = pg.imageinfo?.[0];
+    if (!ii?.thumburl || !/\.(jpe?g|png|webp)$/i.test(pg.title)) continue;
+    const m = /(1[6-9]\d\d|20\d\d)/.exec(stripTags(ii.extmetadata?.DateTimeOriginal?.value));
+    const year = m ? +m[1] : null;
+    if (!year || year >= REPHOTO_BEFORE) continue;
+    const c = pg.coordinates?.[0];
+    out.push({
+      src: ii.thumburl, url: ii.descriptionurl, year, title: pg.title.replace(/^File:|\.\w+$/g, ''),
+      licence: stripTags(ii.extmetadata?.LicenseShortName?.value), by: stripTags(ii.extmetadata?.Artist?.value).slice(0, 80),
+      about: stripTags(ii.extmetadata?.ImageDescription?.value).slice(0, 300),
+      dist: c ? haversine(lat, lon, c.lat, c.lon) : null,
+    });
+  }
+  return out.sort((a, b) => (a.dist ?? 999) - (b.dist ?? 999) || a.year - b.year).slice(0, 5);
 }

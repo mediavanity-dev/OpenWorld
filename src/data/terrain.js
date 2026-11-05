@@ -2,6 +2,7 @@
 // height = R*256 + G + B/256 - 32768 (metres, roughly orthometric / above sea level).
 
 import { lonToTileX, latToTileY } from '../geo.js';
+import { request } from './net.js';
 
 const Z = 13; // ~19 m/px at the equator; plenty for "simplified terrain"
 const URL = (z, x, y) => `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
@@ -18,8 +19,7 @@ async function loadTile(x, y) {
   if (pending.has(key)) return pending.get(key);
   const p = (async () => {
     try {
-      const res = await fetch(URL(Z, x, y), { mode: 'cors' });
-      if (!res.ok) throw new Error(res.status);
+      const res = await request(URL(Z, x, y), { init: { mode: 'cors' }, retries: 1 });
       const bmp = await createImageBitmap(await res.blob());
       const c = new OffscreenCanvas(256, 256);
       const g = c.getContext('2d', { willReadFrequently: true });

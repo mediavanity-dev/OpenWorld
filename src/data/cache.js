@@ -3,6 +3,8 @@
 // game must work without it. Works on the main thread and in workers.
 // Only the player profile (src/game/profile.js) is durable.
 
+import { tryJson } from './net.js';
+
 const DB_NAME = 'openworld-refcache';
 const STORE = 'chunks';
 const DEFAULT_TTL = 7 * 24 * 3600 * 1000;
@@ -63,14 +65,10 @@ export async function pruneCache(maxAge = 60 * 24 * 3600 * 1000) {
 }
 
 // fetch JSON with a cache in front; returns null on failure
-export async function cachedJson(key, url, { ttl = DEFAULT_TTL, init } = {}) {
+export async function cachedJson(key, url, { ttl = DEFAULT_TTL, init = undefined, timeout = undefined } = {}) {
   const hit = await cacheGet(key, ttl);
   if (hit) return hit;
-  try {
-    const res = await fetch(url, init);
-    if (!res.ok) return null;
-    const j = await res.json();
-    cachePut(key, j);
-    return j;
-  } catch { return null; }
+  const j = await tryJson(url, { init, timeout });
+  if (j != null) cachePut(key, j);
+  return j;
 }

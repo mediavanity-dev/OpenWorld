@@ -1,3 +1,4 @@
+// @ts-check
 // The live environment around the character: sun, moon, season, weather, air,
 // local time, public holiday. Nothing here is stored as world state; a snapshot
 // is stamped onto discoveries as "the conditions when you were there".
@@ -95,5 +96,5 @@ export class Environment {
 
 export const TAG_ICONS = {
   night: '🌙', golden: '🌅', fog: '🌫️', drizzle: '🌦️', rain: '🌧️', snow: '❄️', storm: '⛈️',
-  fullmoon: '🌕', holiday: '🎉', spring: '🌸', summer: '☀️', autumn: '🍂', winter: '⛄',
+  fullmoon: '🌕', holiday: '🎉', open: '🔔', spring: '🌸', summer: '☀️', autumn: '🍂', winter: '⛄',
 };
