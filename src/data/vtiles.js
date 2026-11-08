@@ -38,6 +38,16 @@ const KIND = {
 };
 const SKIP_SUB = new Set(['platform', 'halt', 'subway_entrance', 'tram_stop', 'bus_stop', 'clinic', 'doctors', 'dentist', 'pharmacy']);
 
+// Ways people may walk on: everything but motorways and rail, unless closed to walkers
+// (foot=no/private, or access=no without a foot=yes/designated/permissive exception).
+const WALK_CLS = new Set(['path', 'track', 'minor', 'service', 'tertiary', 'secondary', 'primary', 'trunk', 'pedestrian', 'busway']);
+export function walkable(p) {
+  if (!WALK_CLS.has(p.class) || p.service === 'driveway') return false;
+  if (p.foot === 'no' || p.foot === 'private') return false;
+  if ((p.access === 'no' || p.access === 'private') && !['yes', 'designated', 'permissive'].includes(p.foot)) return false;
+  return true;
+}
+
 const ROAD_W = { motorway: 14, trunk: 12, primary: 11, secondary: 10, tertiary: 8, minor: 6, service: 4, track: 3, path: 1.8, raceway: 6, busway: 6 };
 
 function areaClass(layer, p) {
@@ -108,7 +118,7 @@ export async function loadBaseTile(z, x, y) {
   return normalizeTile(vt);
 }
 
-function emptyFabric() { return { extent: 4096, buildings: [], areas: [], lines: [], pois: [], streets: [], areaName: null }; }
+function emptyFabric() { return { extent: 4096, buildings: [], areas: [], lines: [], pois: [], streets: [], walk: [], areaName: null }; }
 
 export function normalizeTile(vt) {
   const out = emptyFabric();
@@ -148,6 +158,7 @@ export function normalizeTile(vt) {
       const f = tl.feature(i);
       const p = f.properties;
       if (f.type !== 2 || p.brunnel === 'tunnel') continue;
+      if (walkable(p)) for (const line of f.loadGeometry()) if (line.length > 1) out.walk.push(pts(line));
       const isRail = p.class === 'rail' || p.class === 'transit';
       const width = isRail ? 4 : ROAD_W[p.class];
       if (!width) continue;

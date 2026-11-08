@@ -234,6 +234,18 @@ async function build({ x, y, opts }) {
     if (byName.size > 500) break;
   }
   const streets = [...byName].map(([name, lines]) => ({ name, lines, rank: rankOf.get(name) }));
+  // ---------- walkable ways (public paths and streets): "can people get there?" ----------
+  const walk = [];
+  for (const pts of fabric.walk || []) {
+    let out = [], lx = null, lz = null;
+    for (const [px, py] of pts) {
+      if (px < -64 || py < -64 || px > E + 64 || py > E + 64) { if (out.length >= 4) walk.push(new Float32Array(out)); out = []; lx = null; continue; }
+      const x = X(px), z = Z(py);
+      if (lx !== null && Math.hypot(x - lx, z - lz) < 12) continue;
+      out.push(x, z); lx = x; lz = z;
+    }
+    if (out.length >= 4) walk.push(new Float32Array(out));
+  }
 
   const pois = [];
   for (const p of chosen) {
@@ -246,7 +258,7 @@ async function build({ x, y, opts }) {
   }
 
   const payload = {
-    key: `${CHUNK_Z}/${x}/${y}`, x, y, bounds: b, latc, lonc, extent: E, gridN: GRID, grid, areaName: fabric.areaName, streets,
+    key: `${CHUNK_Z}/${x}/${y}`, x, y, bounds: b, latc, lonc, extent: E, gridN: GRID, grid, areaName: fabric.areaName, streets, walk,
     terrain: { pos: tPos, uv: tUv }, texture, habitat, habitatN: HGRID,
     buildings, trees: packTrees(blobs), cones: packTrees(cones), pois,
   };

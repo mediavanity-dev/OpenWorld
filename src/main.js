@@ -25,7 +25,7 @@ import { haversine } from './geo.js';
 import { settings, saveSettings, TIERS, startTier, isTouch } from './settings.js';
 import { storage, onStorageError, isVolatile } from './storage.js';
 import { startCompass, stopCompass, onHeading, currentHeading, keepAwake, watchBattery, buzz } from './sensors.js';
-import { BETA, FEATURES, featureAvailable, storeKey } from './channel.js';
+import { BETA, FEATURES, featureAvailable, storeKey, SHOW_BEACONS } from './channel.js';
 import { Controls } from './ui/controls.js';
 import { initCard, showPlace, showSpecies, showHere, closeCard } from './ui/card.js';
 import { Minimap } from './ui/minimap.js';
@@ -68,6 +68,7 @@ const metrics = new Metrics();
 const game = new Game(world, profile, environment, onGameEvent);
 const journal = new Journal(profile, environment, (ev) => onGameEvent(ev));
 game.journal = journal;
+journal.chunkAt = (lat, lon) => world.chunkAt(lat, lon); // depth of exploration per area
 game.quests = new Quests(game, (ev) => onGameEvent(ev));
 game.dataSaver = settings.dataSaver;
 
@@ -116,6 +117,7 @@ function applyFeatures() {
 }
 applyFeatures();
 if (BETA) document.body.classList.add('beta');
+if (!SHOW_BEACONS) document.body.classList.add('no-beacons'); // hidden until shared content (BACKLOG 1)
 
 // saving problems are the one thing a player must hear about
 onStorageError(() => {
@@ -189,7 +191,7 @@ initCard();
 
 addEventListener('keydown', (e) => {
   if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || !game.mode) return;
-  if (e.code === 'KeyB') { game.placeBeacon(); markers.refreshBeacons(); hud.render(); }
+  if (e.code === 'KeyB' && SHOW_BEACONS) { game.placeBeacon(); markers.refreshBeacons(); hud.render(); }
   if (e.code === 'KeyH') setClean(!document.body.classList.contains('clean'));
   if (e.code === 'KeyC') controls.recenter();
 });
@@ -356,6 +358,7 @@ function onGameEvent(ev) {
   else if (ev.type === 'hunt-flee' || ev.type === 'hunt-cold') { toast(ev.msg); }
   else if (ev.type === 'treasure-hot') { buzz([12, 30, 12]); ambience.chime(5); }
   else if (ev.type === 'geocache') { toast(ev.msg, 'gold'); buzz([30, 40, 30]); ambience.chime(6); hud.render(); }
+  else if (ev.type === 'area-tier') { toast(ev.msg, 'gold'); buzz([30, 40, 30, 40, 60]); ambience.chime(8); }
   else if (ev.type === 'treasure') { toast(ev.msg, 'gold'); buzz([30, 40, 60]); ambience.chime(9); hud.render(); }
   else if (ev.type === 'rephoto') { toast(ev.msg, 'gold'); buzz([30, 40, 60]); ambience.chime(8); hud.render(); }
   else if (ev.type.startsWith('quest')) ctx.expeditions.onEvent(ev);
@@ -561,6 +564,17 @@ const at = new URLSearchParams(location.search).get('at');
 if (at) parsePlace(at).then((to) => begin('roam', { to })).catch((e) => (sMsg.textContent = e.message));
 // beta: returning players skip the start screen (first-timers still see it)
 else if (BETA && profile.data.last) autoStart();
+
+// a friend's explorer card link (#friend=CODE): add them to your league (beta), then tidy the URL
+function friendFromLink() {
+  const m = /^#friend=([A-Za-z0-9_-]+)$/.exec(location.hash);
+  if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  const go = () => ctx.expeditions.friendLink(m[1]);
+  if (game.mode) go(); else { const id = setInterval(() => { if (game.mode) { clearInterval(id); setTimeout(go, 800); } }, 400); }
+}
+friendFromLink();
+addEventListener('hashchange', friendFromLink);
 
 // Phones start where they really are; computers start at their home base, or are helped to
 // set one up. If that fails or they'd rather not, the start screen is the fallback.

@@ -66,7 +66,7 @@
           <button id="b-locate">Locate (device)</button>
           <button id="b-ip">Locate (IP)</button>
           <button id="b-sethome">Set home base</button>
-          <button id="b-beacon">Place beacon [B]</button>
+          <button id="b-beacon" class="beacon-ui">Place beacon [B]</button>
         </div>
         <form id="h-roam-form" class="row">
           <input id="h-roam" placeholder="Roam to place or lat, lon" autocomplete="off" aria-label="Roam to place" />
@@ -82,7 +82,7 @@
         <div><b id="c-home">0</b><span>home</span></div>
         <div><b id="c-echo">0</b><span>echoes</span></div>
         <div><b id="c-species">0</b><span>species</span></div>
-        <div><b id="c-beacons">0</b><span>beacons</span></div>
+        <div class="beacon-ui"><b id="c-beacons">0</b><span>beacons</span></div>
       </div>
       <div class="quick"><button id="b-journal">📓 Journal</button><button id="b-here">🔍 This spot</button></div>
       <button id="nearest" class="nearest" aria-label="Today's field assignment"><span id="n-arrow">↑</span><div><small class="n-label">Today</small><b id="n-name">–</b><small id="n-dist"></small></div></button>
@@ -96,7 +96,7 @@
 
     <div class="bottom">
       <span id="w-status"></span>
-      <span class="help">WASD / arrows move · Shift run · drag to look (Present: drag to pan) · right-drag pan · wheel zoom · C recentre · B beacon · H hide UI · click a place for info</span>
+      <span class="help">WASD / arrows move · Shift run · drag to look (Present: drag to pan) · right-drag pan · wheel zoom · C recentre · H hide UI · click a place for info</span>
     </div>
     <div id="stick" class="stick"><div></div></div>
     <canvas id="minimap" class="minimap" aria-label="Minimap (tap for your journal map)"></canvas>
@@ -177,9 +177,9 @@
       <h4>Camera view (phones, Present)</h4>
       <p>📷 shows labels over the real world through your camera. Hold the phone upright, turn slowly, and drag sideways if labels look off. 📸 saves a photo. The camera image is never recorded or uploaded.</p>
       <h4>Controls</h4>
-      <p>Drag to look (Present: drag to pan) · pinch or scroll to zoom · two-finger twist to rotate · ◎ or C to return to yourself · B beacon · H hide the interface · tap anything for details.</p>
+      <p>Drag to look (Present: drag to pan) · pinch or scroll to zoom · two-finger twist to rotate · ◎ or C to return to yourself · H hide the interface · tap anything for details.</p>
       <h4>Data &amp; privacy</h4>
-      <p>No account and no tracking. Your position stays on your device; only the surrounding <i>area</i> is used to fetch open data. Your journal, species and beacons are never uploaded.</p>
+      <p>No account and no tracking. Your position stays on your device; only the surrounding <i>area</i> is used to fetch open data. Your journal and species are never uploaded.</p>
       <h4>Thanks to</h4>
       <p class="credit">Map data © OpenStreetMap contributors (ODbL) · OpenFreeMap · AWS Terrain Tiles (Mapzen) · Open-Meteo (weather, air, climate) · iNaturalist (wildlife; photos credited) · Wikipedia &amp; Wikidata · Macrostrat (geology) · USGS (earthquakes) · Nager.Date (holidays) · OSM Nominatim (search) · geojs.io (IP location).</p>
       <p class="credit"><a href="https://github.com/mediavanity-dev/OpenWorld" target="_blank" rel="noopener">Source code &amp; full guide</a> · <a id="channel-link" href="beta/">Try the beta</a></p>

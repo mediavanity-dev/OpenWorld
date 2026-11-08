@@ -200,7 +200,13 @@ anything is shown publicly, and a short note on what happens to submissions.
 
 ---
 
-## 6. Geocaching via Opencaching (ready once keys exist)
+## 6. Geocaching via Opencaching (shelved until the phone app)
+
+*Shelved (Nov 2026, owner's decision): revisit when the game is deployed as a phone app (item 3).
+The code stays as it is (dormant with no keys). Then: register OKAPI consumer keys at each
+site's `/okapi/signup.html` (app name, homepage, email; only the consumer key is needed, never
+the secret) and add them as `OKAPI_KEY_*` build variables.*
+
 
 *Status: **built** (Nov 2026), dormant until consumer keys are added as GitHub variables
 (see README → Geocaching setup). Read-only: caches as a place class with their own icon,
@@ -337,4 +343,159 @@ public streets, seeded by date + area so everyone shares them; cool/warm/hot hin
 golden mote when close; real visits only). **Promoted to the main version** (Nov 2026, owner's decision) with on/off switches in
 Settings → Game features. **Rephotography** ("Then & now") is now **in the beta** (Nov 2026): at historic places with a pre-1970 Commons photo taken nearby, the photo appears as a ghost over the AR camera; an edge-map match meter scores the line-up; captures go to the journal and can be saved as a side-by-side image. Local-only **playtest stats** (Settings → Playtest stats) measure time to first chase, first find and hunt outcomes. Next: real-world playtests using those stats, then tune hunt distances, encounter rate and treasure radius from them.*
 
-*Status: **Expeditions** are in the beta (Nov 2026), answering "open the app and immediately see a fun-looking task": a board deals three quests with different verbs (Mystery: deduce an unnamed place from a riddle, buying clues for stars; Bounty: track a locally recorded animal via its habitat, which biases hunts; Race: the high ground against par or the real sunset). Each completion flips a collectible card with rarity from real facts, stars build a field rank, and Roam gives echo cards with no stars. Rules: `src/game/quests.js`; UI: `src/ui/expeditions.js`. Ideas to try next: chains (three linked mysteries telling one place's story), condition bonuses (a heron in the rain, a chapel at golden hour), weekly legendary bounties, playtest stats for quest pick and finish rates.*
+*Status: **Expeditions** are in the beta (Nov 2026), answering "open the app and immediately see a fun-looking task": a board deals three quests with different verbs (Mystery: deduce an unnamed place from a riddle, buying clues for stars; Bounty: track a locally recorded animal via its habitat, which biases hunts; Race: the high ground against par or the real sunset). Each completion flips a collectible card with rarity from real facts, stars build a field rank, and Roam gives echo cards with no stars. Rules: `src/game/quests.js`; UI: `src/ui/expeditions.js`. **Richer riddles** (Nov 2026): several hand-written opening lines per kind of place, plus, for places linked to Wikidata, a real fact as the riddle's second line ("Nicholas Hawksmoor designed me."), its build year (enabling the age guess and raising rarity) and better clues, including the first sentence of its encyclopedia entry; the place's name is always blanked out (`src/data/wikidata.js`, `applyFacts`). Ideas to try next: chains (three linked mysteries telling one place's story), condition bonuses (a heron in the rain, a chapel at golden hour), weekly legendary bounties, playtest stats for quest pick and finish rates.*
+
+---
+
+## 8. Reward exploring deeply, not travelling far ("explorer depth")
+
+**Problem:** distance and "places visited" reward whoever can afford to travel. Someone who flies
+Paris → Athens → Los Angeles → Kyoto and sees the streets around four airports is not more of an
+explorer than someone who has walked every street of St. Louis. The measure has to reward
+*knowing a place*, wherever you live.
+
+**Prerequisite fix (small):** explored ground (`journal.onMove`, geohash-7 cells of about 150 m)
+is recorded at **any** speed today, so driving or riding a train through a town "explores" it.
+Only walking distance is speed-filtered (`ENCOUNTER_MAX_SPEED`). Cells should count only when
+entered at walking or running speed, and ideally only after a short dwell (some seconds, or a
+few metres of path inside the cell).
+
+**The measure: coverage of neighbourhoods, not their number.**
+- Split the world into **neighbourhoods** (the existing map areas, or geohash-6 cells of about
+  1 × 0.6 km).
+- For each one, compute **coverage**: the share of its *walkable* ground you have covered on
+  foot (cells containing public streets and paths, from the map tiles already loaded), plus
+  the share of its places discovered, of the species recorded there that you have found, and
+  of its rock units.
+- **Depth tiers per neighbourhood:** Visited (any), Explored (25%), Surveyed (50%), Mapped
+  (75%), Known by heart (90%). Each tier wins a card or badge.
+- **Explorer score** = the sum over neighbourhoods of coverage squared (or the count of
+  neighbourhoods at Surveyed and above). Squaring makes depth count far more than breadth:
+  ten neighbourhoods at 80% score 6.4, while a hundred airport-adjacent neighbourhoods at 3%
+  score 0.09.
+- **Normalised by what exists:** coverage is relative to the walkable ground and places that
+  are actually there, so a rural village and a dense city are equally completable.
+- **Freshness without travel:** "new ground this week" (cells never walked before) and
+  variety of conditions (night, rain, seasons, golden hour) reward going out differently,
+  not further.
+
+**Rules:** Present counts in full; Home counts separately (it's virtual movement around a real
+base); Roam never counts. Fast travel never counts.
+
+**Ties into expeditions:** an *Uncharted* quest ("walk 6 streets you've never walked in this
+neighbourhood"), and neighbourhood tier cards with rarity by tier.
+
+**First step:** the speed and dwell filter for cells, then per-neighbourhood coverage in the
+journal's Areas tab, before any scores or leaderboards.
+
+*Status (Nov 2026): **built**. Cells count only on foot (Present, up to 10 mph; both versions).
+Each area's walkable ground comes from the public ways in the map tiles (`src/game/reach.js`);
+the journal's Areas tab shows coverage on foot and from home, depth tiers with an announcement
+at each new tier, and the explorer score (beta and main). Not yet: dwell time, Uncharted quests, tier cards.*
+
+---
+
+## 9. Leaderboards and comparing with other players (sustainably)
+
+**Goal:** let players compare ranks and accomplishments, without accounts, costs or privacy
+risks that grow with the player count, and without rewarding cheaters or travellers.
+
+**Constraints:** the site is static, with no server and no accounts. Positions must never be
+uploaded. Everything the client sends can be faked. Running costs must stay near zero.
+
+**What to post (aggregates only, never places):** field rank and stars, card counts by rarity,
+species count, the explorer score from item 8, and neighbourhoods at each depth tier. Region
+only at city or country level, opt-in. No coordinates, no timestamps finer than a week.
+
+**Options, cheapest first:**
+1. **Friend leagues with no server.** "Share my explorer card": a link or QR code encoding a
+   signed summary (stats only) plus a generated name. Friends paste each other's codes and
+   the app shows a small league table. Zero infrastructure, and among friends cheating
+   matters little.
+2. **Weekly local leagues on a tiny serverless backend** (e.g. Cloudflare Workers + D1, with a
+   free tier around 100k requests a day; *verify current limits*). Weekly submissions of the
+   summary under a **generated name** (e.g. "Swift Heron 42", no free text, so no
+   moderation of names), grouped by city, region or country and reset **every week or
+   season** so newcomers can compete. Old entries expire, which caps storage forever.
+3. **Platform leaderboards** (Apple Game Center, Google Play Games) once there's a store app
+   (item 3). Free, with identity and some anti-abuse handled by the platform.
+
+**Keeping it honest:**
+- Server-side plausibility checks: maximum stars, cells and species per day; walking-speed
+  limits; implausible jumps rejected.
+- Only Present play counts on public boards; Home and Roam stay personal.
+- Rank **depth** (item 8) and **diversity** (species, conditions, habitats), never raw
+  distance or the number of countries.
+- Weekly resets limit the value of cheating; "report" plus manual removal for the rest.
+- Be honest in the copy that public boards are for fun, and that friend leagues are the main
+  experience.
+
+**Privacy:** opt-in only; deletion of your entries from the app; no IP addresses stored with
+entries; a short note on what is sent and why (update the privacy text and store
+disclosures, item 3).
+
+**First step:** option 1 (friend leagues via share codes) in the beta, measuring whether
+people actually compare before building any server.
+
+*Status (Nov 2026): option 1 **built** in the beta (Expeditions → Friends; `src/game/league.js`):
+a generated name plus rank, stars, cards, rare+ cards, species, explorer score and areas
+surveyed; strict decoding of codes; friends kept on the device.*
+
+---
+
+## 10. Only offer goals people can actually reach (and reward the hard ones)
+
+**Problem:** quests and finds can point at places that can't, or shouldn't, be reached:
+private gardens and estates, military land, places in fenced reservoirs, a summit in the
+middle of a private golf course, a monument on an island in a big lake. Today a race's high
+ground is simply the highest sampled terrain point, and mystery places aren't checked for
+access at all.
+
+**Three tiers, not yes/no:**
+1. **Open and walkable:** normal rewards.
+2. **Public but hard to reach** (an island reached by ferry or boat, a summit at the end of a
+   long trail, a tidal island at low tide): offered as **special expeditions with higher
+   rarity and stars**, because getting there is genuinely an expedition.
+3. **Not open to the public** (private, military, a prison, closed to pedestrians): never
+   offered as a goal. It may still appear on the map.
+
+**Yes, this can be decided by rules from open data (OpenStreetMap), in layers:**
+- **Access tags on the place itself:** `access=private|no|customers`, `foot=no|private`. Tier 3.
+- **Access of the area around it** (point-in-polygon against enclosing areas):
+  `landuse=military`, `military=*`, `amenity=prison`, gardens or estates with
+  `access=private`, `leisure=golf_course` (paths only), `landuse=railway`. Tier 3. One
+  Overpass `is_in` query per candidate, or the areas from the detail layer already fetched.
+- **Is it next to a public path?** The distance from the target to the nearest way people may
+  walk (`highway=footway|path|pedestrian|residential|…` without `access=private` or `foot=no`).
+  If nothing is within about 30–50 m, it's not reachable on foot. The map tiles already loaded
+  carry the transportation layer (*verify* that OpenFreeMap's tiles include its `access` and
+  `foot` fields); otherwise one small Overpass query.
+- **Is it connected to where the player is?** Ask an open routing engine (OSRM, Valhalla or
+  GraphHopper on OSM data, with a foot profile) for a walking route. If the route's start or
+  end point snaps far from the target, or the route is many times longer than the straight
+  line, it is unreachable or hard. This is what catches **islands**: the island's paths aren't
+  connected to the mainland except by a bridge or by a `route=ferry`.
+- **Islands:** `place=island|islet` polygons, or a target inside water polygons. If a
+  `route=ferry` serves it, or it has public paths and a pier (`man_made=pier`,
+  `amenity=ferry_terminal`): tier 2, a special expedition with the ferry named. Without
+  any public access: tier 3.
+- **Water and terrain for races:** snap the high-ground target to the nearest point *on a
+  public path*, never a raw terrain sample.
+
+**Data is imperfect, so:**
+- Always offer **"Couldn't get there"** with no penalty: it swaps the quest, and remembers the
+  place locally so it isn't offered again (later: report it as an OSM Note, item 2).
+- Prefer being cautious: if access is unknown and no public path is near, don't offer it.
+- Nothing here needs new data sources: OSM tags, the tiles already loaded, and (optionally) a
+  public routing engine. Check each public routing service's usage policy (*verify*); keep
+  requests to one per dealt goal, cached.
+
+**First step:** race targets snapped to public paths, and mystery candidates filtered by the
+place's own access tags plus a "near a public path" test using the tiles already loaded.
+
+*Status (Nov 2026): first step **built**. The tiles' transportation layer carries `access` and
+`foot` (verified on OpenFreeMap), so walkable ways are kept per area with no extra requests.
+Mysteries skip places tagged private or more than 60 m from a public way; race finishes snap
+onto public ways; **Can't get there** swaps with no penalty and remembers the spot. Next:
+enclosing private areas, then islands and ferries as tier-2 special expeditions.*
+Then enclosing-area checks, then island and ferry detection as tier-2 special expeditions.

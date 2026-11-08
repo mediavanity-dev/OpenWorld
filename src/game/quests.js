@@ -19,6 +19,9 @@ import { wildHabitat } from '../world/habitats.js';
 import { fitsHabitat } from '../data/wildlife.js';
 import { isQuirk } from './journal.js';
 import { RULES } from './game.js';
+import { placeFacts } from '../data/wikidata.js';
+import { wikiSummary } from '../data/wiki.js';
+import { reachable as walkableTo, nearestPath, closedToPublic } from './reach.js';
 
 export const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 const bump = (r, n = 1) => RARITIES[Math.max(0, Math.min(RARITIES.length - 1, RARITIES.indexOf(r) + n))];
@@ -75,36 +78,121 @@ export function rarityOfRace(gain, sunset) {
 }
 
 // ---------------------------------------------------------------- riddles
+// Riddles are built by rules, never invented: a hand-written opening line for the kind of
+// place (several per kind, so two fountains rarely read the same), then, for places linked
+// to Wikidata, a real fact in the first person ("Nicholas Hawksmoor designed me.") and
+// extra clues from its facts and its encyclopedia entry. The place's own name is always
+// blanked out of anything taken from outside.
 const RIDDLE = {
-  worship: 'I have heard more whispered wishes than anywhere else around here.',
-  history: 'I remember something this street has long forgotten.',
-  museum: 'I keep other people’s treasures, and I’ll show you if you ask.',
-  sight: 'People come a long way just to stand in front of me.',
-  park: 'Green, open and full of birdsong. Dogs adore me.',
-  nature: 'I was here long before the houses, and I’ll outlast them.',
-  culture: 'Curtains, books or a stage: I’m where stories happen.',
-  education: 'Every year a fresh crowd learns something inside me.',
-  civic: 'Quietly, I keep this place running.',
-  sport: 'Sweat, shouting and the odd triumph: that’s me.',
+  worship: ['I have heard more whispered wishes than anywhere else around here.', 'Bells, candles or silence: people bring me what they can’t say anywhere else.', 'I’ve seen weddings, farewells and every quiet Sunday in between.'],
+  history: ['I remember something this street has long forgotten.', 'Most people walk straight past me. They shouldn’t.', 'I’m a piece of the past that refused to leave.'],
+  museum: ['I keep other people’s treasures, and I’ll show you if you ask.', 'Everything inside me has a label and a story.', 'I collect what the world would otherwise lose.'],
+  sight: ['People come a long way just to stand in front of me.', 'Cameras point at me more than at anything else around here.', 'I’m the reason some visitors came to this part of town.'],
+  park: ['Green, open and full of birdsong. Dogs adore me.', 'Picnics, puddles and the odd lost frisbee: that’s me.', 'In the middle of all this, I’m where the town takes a breath.'],
+  nature: ['I was here long before the houses, and I’ll outlast them.', 'Nobody built me. I just happened, slowly.', 'Rain, roots and rock made me.'],
+  culture: ['Curtains, books or a stage: I’m where stories happen.', 'Come in quiet, leave with something new in your head.', 'Applause, whispers or turning pages: you’ll hear one of them inside me.'],
+  education: ['Every year a fresh crowd learns something inside me.', 'Bells ring here, but not for prayer.', 'I’ve watched generations grow up a little.'],
+  civic: ['Quietly, I keep this place running.', 'When something goes wrong around here, people come to me.', 'I serve everyone, and I belong to all of them.'],
+  sport: ['Sweat, shouting and the odd triumph: that’s me.', 'Win or lose, people leave me out of breath.', 'I keep the score around here.'],
 };
 const RIDDLE_KIND = {
-  tree: 'I’m alive, I’m older than you, and I’ve never moved an inch.',
-  peak: 'Around here, nobody stands taller than me.',
-  fountain: 'I never stop talking, but I only ever say one thing.',
-  clock: 'I tell everyone the same thing all day long.',
-  sundial: 'I only work when the weather is kind.',
-  memorial: 'I was made so that someone would not be forgotten.',
-  statue: 'I’ve been standing still for a very long time.',
-  artwork: 'Someone made me to make you stop and look.',
-  viewpoint: 'Stand on me and the whole place opens up.',
-  ruins: 'I used to be whole. Now I’m more interesting.',
-  castle: 'Walls, gates and old quarrels: I’ve seen them all.',
-  windmill: 'I worked with the wind long before it was fashionable.',
-  spring: 'Water finds its own way out, right here.',
+  tree: ['I’m alive, I’m older than you, and I’ve never moved an inch.', 'I drink rain, eat sunlight and add a ring every year.', 'Birds live in me, and I don’t charge rent.'],
+  peak: ['Around here, nobody stands taller than me.', 'Everything around here is downhill from me.'],
+  fountain: ['I never stop talking, but I only ever say one thing.', 'Throw in a coin and I’ll keep your wish.', 'I’m always running, and I never leave.'],
+  clock: ['I tell everyone the same thing all day long.', 'I have hands but no fingers, and a face but no smile.'],
+  sundial: ['I only work when the weather is kind.', 'I tell the time with a shadow, and I take the night off.'],
+  memorial: ['I was made so that someone would not be forgotten.', 'I carry names so the town never loses them.', 'People stop beside me and go quiet.'],
+  statue: ['I’ve been standing still for a very long time.', 'I never blink, and the pigeons love my head.'],
+  artwork: ['Someone made me to make you stop and look.', 'I’m not useful. I’m here to make you wonder.'],
+  viewpoint: ['Stand on me and the whole place opens up.', 'Come for the view: I’m the best seat in town.'],
+  ruins: ['I used to be whole. Now I’m more interesting.', 'Time took my roof but left my story.'],
+  castle: ['Walls, gates and old quarrels: I’ve seen them all.', 'I was built to keep people out. Now I let everyone in.'],
+  windmill: ['I worked with the wind long before it was fashionable.', 'My arms turn, but I never wave.'],
+  spring: ['Water finds its own way out, right here.', 'I start small, and I never run dry.'],
 };
-export function riddleFor(poi) {
+const RIDDLE_ANY = ['I’m not on any postcard, but I’m worth finding.', 'I’ve been here all along. Have you noticed me?'];
+export function riddleFor(poi, rand = Math.random) {
   const value = (poi.kind || '').split(':')[1] || '';
-  return RIDDLE_KIND[value] || RIDDLE[groupOf(poi.kind, poi.cls)] || 'I’m not on any postcard, but I’m worth finding.';
+  const list = RIDDLE_KIND[value] || RIDDLE[groupOf(poi.kind, poi.cls)] || RIDDLE_ANY;
+  return list[Math.floor(rand() * list.length)];
+}
+
+// words of a name that would give it away (generic words like "church" or "park" stay)
+const GENERIC = new Set(('st saint the of and a an old new great little upper lower north south east west royal church chapel cathedral '
+  + 'abbey park garden gardens street road lane house hall museum memorial statue fountain gate bridge tower square green common '
+  + 'place court building centre center school college market hill river war').split(' '));
+const escRe = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Blank out the distinctive words of `name` (and words starting with them) in `text`. */
+export function redact(text, name) {
+  let out = text || '';
+  for (const w of (name || '').split(/[^\p{L}\p{N}]+/u)) {
+    if (w.length < 3 || GENERIC.has(w.toLowerCase())) continue;
+    out = out.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escRe(w)}[\\p{L}\\p{N}]*`, 'giu'), '…');
+  }
+  return out;
+}
+const art = (s) => (/^[aeiou]/i.test(s) ? 'an' : 'a');
+const hasWords = (s) => /\p{L}{3,}/u.test((s || '').replace(/…/g, ''));
+const useless = (s) => !s || /wikimedia|disambiguation|category|list of/i.test(s);
+
+/** First-person fact sentences from Wikidata facts (src/data/wikidata.js), name blanked. */
+export function factLines(f, name) {
+  const out = {};
+  const add = (key, label, text) => {
+    // a fact that would have to be blanked out (it repeats the name) is left out, not shown half-empty
+    if (!label || useless(label) || redact(label, name) !== label) return;
+    out[key] = redact(text, name);
+  };
+  if (f?.namedAfter?.desc) add('namedAfter', f.namedAfter.desc, `I’m named after ${art(f.namedAfter.desc)} ${f.namedAfter.desc}.`);
+  const maker = f?.architect ? ['designed', f.architect] : f?.creator ? ['made', f.creator] : null;
+  if (maker) add('maker', maker[1].label, `${maker[1].label} ${maker[0]} me.`);
+  if (f?.style) { const st = f.style.label.replace(/ architecture$/i, ''); add('style', st, `I was built in the ${st} style.`); }
+  if (f?.heritage) add('heritage', f.heritage.label, `I’m ${art(f.heritage.label)} ${f.heritage.label}.`);
+  if (f?.type) add('type', f.type.label, `I’m ${art(f.type.label)} ${f.type.label}.`);
+  if (f?.religion) add('religion', f.religion.label, `My faith: ${f.religion.label}.`);
+  if (f?.material) add('material', f.material.label, `I’m made of ${f.material.label}.`);
+  return out;
+}
+
+/** The first sentence of an encyclopedia summary, name blanked, as a clue (or null). */
+export function storyLine(extract, name) {
+  // first sentence (summaries sometimes lack the space after a full stop: "London.Of medieval…")
+  const first = (extract || '').split(/(?<=[\p{Ll})\]][.!?])\s*(?=\p{Lu})/u)[0].trim();
+  if (first.length < 25) return null;
+  const red = redact(first, name);
+  const cut = red.length > 220 ? `${red.slice(0, 217).replace(/\s+\S*$/, '')}…` : red;
+  return hasWords(cut) ? cut : null;
+}
+
+/**
+ * Enrich a mystery with real facts: a specific second sentence for the riddle, its build
+ * year (which enables the age guess and can raise the card's rarity), and better clues.
+ * Clues are only rebuilt while none has been bought, so nothing already paid for changes.
+ */
+export function applyFacts(o, f, extract = null) {
+  const lines = factLines(f || {}, o.place.name);
+  if (f?.year && !o.place.year) {
+    o.place.year = f.year;
+    if (!o.startedAt) {
+      const r = rarityOfPlace({ kind: o.place.kind, cls: o.place.cls, tags: { ...(o.place.tags || {}), start_date: String(f.year) } });
+      if (RARITIES.indexOf(r) > RARITIES.indexOf(o.rarity)) o.rarity = r;
+    }
+  }
+  const lead = ['namedAfter', 'maker', 'style', 'heritage'].find((k) => lines[k]);
+  if (lead && !o.fact) o.fact = lines[lead];
+  if (o.used.length) return o;
+  const rest = ['type', 'heritage', 'maker', 'style', 'religion', 'material', 'namedAfter'].filter((k) => lines[k] && lines[k] !== o.fact);
+  const keep = (k) => o.clues.find((c) => c.key === k);
+  const clues = [];
+  if (o.place.year) clues.push(keep('age') || { key: 'age', label: 'How old?', text: `I was built in ${eraText(o.place.year)}.` });
+  clues.push(rest[0] ? { key: 'fact', label: 'What am I?', text: lines[rest[0]] } : keep('fact')
+    || { key: 'fact', label: 'What am I?', text: `I’m ${art(human((o.place.kind || '').split(':')[1]) || 'place')} ${human((o.place.kind || '').split(':')[1]) || 'place'}.` });
+  const story = storyLine(extract, o.place.name);
+  if (story) clues.push({ key: 'story', label: 'Encyclopedia', text: `“${story}”` });
+  else if (rest[1]) clues.push({ key: 'detail', label: 'A detail', text: lines[rest[1]] });
+  clues.push(keep('name'), keep('zone'));
+  o.clues = clues.filter(Boolean);
+  return o;
 }
 const human = (s) => (s || '').replace(/_/g, ' ');
 function eraText(y) { return y < 1800 ? `the ${Math.floor(y / 100) * 100}s` : `the ${Math.floor(y / 10) * 10}s`; }
@@ -131,11 +219,11 @@ export const ERAS = [
 export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = new Set(), inside = (_p) => true) {
   const cands = [];
   for (const p of pois) {
-    if (!p.name || avoid.has(p.ref) || !inside(p)) continue;
+    if (!p.name || avoid.has(p.ref) || closedToPublic(p)) continue;
     const grp = groupOf(p.kind, p.cls);
     if (BUSINESS.has(grp)) continue;
     const d = haversine(pos.lat, pos.lon, p.lat, p.lon);
-    if (d < 120 || d > 800) continue;
+    if (d < 120 || d > 800 || !inside(p)) continue;
     cands.push({ p, d, grp, brg: bearingTo(pos, p) });
   }
   if (!cands.length) return null;
@@ -168,7 +256,7 @@ export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = n
   return {
     type: 'mystery', id: uid('m'),
     title: 'Who am I?',
-    riddle: riddleFor(poi),
+    riddle: riddleFor(poi, rand),
     sector: c.sector, dist: roundTo(c.d, 50), alike: c.alike,
     rarity: rarityOfPlace(poi),
     lat: poi.lat, lon: poi.lon, ref: poi.ref, group: c.grp,
@@ -236,33 +324,51 @@ export function parTime(d, mode) { return Math.round((d * 1.4) / (PACE[mode] || 
  * Race: the highest ground within reach (or a viewpoint / landmark), against par or sunset.
  * @param {(lat:number, lon:number) => number|null} groundAt
  */
-export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random, inside = (_p) => true) {
+/**
+ * @param {(lat: number, lon: number) => ({lat: number, lon: number} | null)} [snap] the nearest
+ *   point on a public way (null: nothing walkable near); finishes are never off the paths
+ */
+export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random, inside = (_p) => true, snap = (lat, lon) => ({ lat, lon })) {
   const here = groundAt(pos.lat, pos.lon);
-  let best = null;
+  let target = null, kind, gain = 0;
   if (here != null) {
+    // the highest ground that a public path actually reaches
+    const samples = [];
     for (let e = -650; e <= 650; e += 30) for (let n = -650; n <= 650; n += 30) {
       const r = Math.hypot(e, n);
       if (r < 150 || r > 650) continue;
       const p = offsetGeo(pos.lat, pos.lon, e, n);
       if (!inside(p)) continue;
       const h = groundAt(p.lat, p.lon);
-      if (h != null && (!best || h > best.h)) best = { ...p, h, d: r };
+      if (h != null && h - here >= 6) samples.push({ ...p, h });
     }
+    samples.sort((a, b) => b.h - a.h);
+    for (const p of samples.slice(0, 60)) {
+      const q = snap(p.lat, p.lon);
+      const h = q && groundAt(q.lat, q.lon);
+      const d = q && haversine(pos.lat, pos.lon, q.lat, q.lon);
+      if (h != null && h - here >= 6 && d >= 150 && inside(q)) { target = { lat: q.lat, lon: q.lon, h, d }; break; }
+    }
+    if (target) { kind = 'summit'; gain = Math.round(target.h - here); }
   }
-  let target, kind, gain = 0;
-  if (best && best.h - here >= 6) { target = best; kind = 'summit'; gain = Math.round(best.h - here); }
-  else {
-    const spots = pois.filter((p) => {
-      if (!p.name || !inside(p)) return false;
+  if (!target) {
+    const spots = [];
+    for (const p of pois) {
+      if (!p.name || closedToPublic(p)) continue;
       const d = haversine(pos.lat, pos.lon, p.lat, p.lon), grp = groupOf(p.kind, p.cls);
-      return d >= 200 && d <= 750 && !BUSINESS.has(grp);
-    });
+      if (d < 200 || d > 750 || BUSINESS.has(grp) || !inside(p)) continue;
+      spots.push(p);
+    }
     const view = spots.filter((p) => /viewpoint|peak|tower|lighthouse/.test(p.kind || ''));
-    const list = view.length ? view : spots;
-    if (!list.length) return null;
-    const p = list[Math.floor(rand() * list.length)];
-    target = { lat: p.lat, lon: p.lon, name: p.name, d: haversine(pos.lat, pos.lon, p.lat, p.lon) };
-    kind = view.length ? 'viewpoint' : 'dash';
+    for (const list of [view, spots]) {
+      for (let tries = 0; tries < 8 && list.length && !target; tries++) {
+        const p = list[Math.floor(rand() * list.length)];
+        const q = snap(p.lat, p.lon); // the finish line is on the path next to it
+        if (q) { target = { lat: q.lat, lon: q.lon, name: p.name, d: haversine(pos.lat, pos.lon, q.lat, q.lon) }; kind = list === view ? 'viewpoint' : 'dash'; }
+      }
+      if (target) break;
+    }
+    if (!target) return null;
   }
   const par = parTime(target.d, mode);
   // the real sunset as the clock, if it's close and reachable
@@ -291,7 +397,26 @@ export class Quests {
     this._fillT = 0;
     this._tries = 0;
     this._wrong = new Set();
+    // where real facts come from (swappable in tests)
+    this.lookup = { facts: placeFacts, summary: wikiSummary };
     this.tidy();
+  }
+
+  // Add real facts to a mystery once (Wikidata + its encyclopedia entry), in the background.
+  async enrich(o) {
+    const tags = o.place?.tags;
+    if (o.enriched || this.game.dataSaver || !tags || (!tags.wikidata && !tags.wikipedia)) return;
+    o.enriched = true;
+    try {
+      const [facts, sum] = await Promise.all([
+        tags.wikidata ? this.lookup.facts(tags.wikidata).catch(() => null) : null,
+        this.lookup.summary(tags).catch(() => null),
+      ]);
+      if (!facts && !sum?.extract) return;
+      applyFacts(o, facts, sum?.extract || null);
+      this.profile.save();
+      this.emit('quest-dealt', null);
+    } catch { /* the plain riddle stands */ }
   }
   get profile() { return this.game.profile; }
   get s() { return this.ensure(); }
@@ -313,6 +438,25 @@ export class Quests {
   stars() { return this.s.cards.reduce((a, c) => a + (c.grade === 'echo' ? 0 : c.stars), 0); }
   rank() { return rankOf(this.stars()); }
   active() { return this.s.offers.find((o) => o && o.id === this.s.active) || null; }
+
+  // Places and finish lines players told us they couldn't reach (never offered again)
+  isBlocked(p) {
+    return (this.s.blocked || []).some((b) => (b.ref && b.ref === p.ref) || haversine(b.lat, b.lon, p.lat, p.lon) < 60);
+  }
+  // Swap the active quest for another of the same kind, with no penalty, and remember the spot.
+  cantReach() {
+    const s = this.s, o = this.active();
+    if (!o || o.type === 'bounty') return null;
+    (s.blocked ||= []).push({ ref: o.ref || null, lat: +o.lat.toFixed(5), lon: +o.lon.toFixed(5) });
+    if (s.blocked.length > 300) s.blocked.splice(0, s.blocked.length - 300);
+    const i = s.offers.indexOf(o);
+    s.active = null;
+    s.offers[i] = this.make(o.type) || null; // null: refilled when something fits
+    this.profile.log(`Couldn't reach: ${o.title}${o.place?.name ? ` (${o.place.name})` : ''}`);
+    this.profile.save();
+    this.emit('quest-info', 'Thanks. We won’t send you there again. Here’s a fresh one instead, no stars lost.');
+    return s.offers[i];
+  }
 
   // Can the player get to a point in this mode? (Home: only inside the home range.)
   inside(p) {
@@ -363,12 +507,14 @@ export class Quests {
     const g = this.game, pos = g.pos, w = g.world;
     const pois = [...w.pois(pos.lat, pos.lon, 900)].map((x) => x.poi);
     for (const o of this.s.offers) if (o?.ref) avoid.add(o.ref);
-    const inside = (p) => this.inside(p);
-    if (type === 'mystery') return makeMystery(pos, pois, this.profile.data.discoveries, Math.random, avoid, inside);
+    const inside = (p) => this.inside(p) && !this.isBlocked(p);
+    // finish lines on public ways (where the map has path data; elsewhere the point stands)
+    const snap = (lat, lon) => { const n = nearestPath(w, lat, lon, 60); return !n.known ? { lat, lon } : n.d <= 60 ? { lat: n.lat, lon: n.lon } : null; };
+    if (type === 'mystery') { const m = makeMystery(pos, pois, this.profile.data.discoveries, Math.random, avoid, (p) => inside(p) && walkableTo(w, p)); if (m) this.enrich(m); return m; }
     if (type === 'bounty') return g.wild.species.length ? makeBounty(pos, g.wild.species, this.profile.data.species || {}, (a, b) => w.habitatAt(a, b), Math.random, avoid, inside) : null;
     if (type === 'race') {
       const ss = sunsetIn((t) => g.env.sun(pos.lat, pos.lon, new Date(t)).alt);
-      return makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside);
+      return makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside, snap);
     }
     return null;
   }
@@ -479,6 +625,7 @@ export class Quests {
 
   fill() {
     const s = this.s;
+    for (const o of s.offers) if (o?.type === 'mystery' && !o.done && !o.enriched) this.enrich(o); // offers dealt before facts existed
     if (!s.offers.some((o) => !o)) return;
     const now = Date.now();
     if (now - this._fillT < 2000) return;

@@ -27,7 +27,7 @@ roam 600 m around a home base you set once. **Roam** goes anywhere, but finds th
 **Your progress stays on your device.** Nothing about where you go is uploaded. Use **Export**
 to keep a backup.
 
-Everything else (all the controls, the camera AR view, beacons, geocaches, settings and
+Everything else (all the controls, the camera AR view, geocaches, settings and
 troubleshooting) is in the **[full guide](docs/GUIDE.md)**, and in the game under
 Settings → *Help & about*.
 
@@ -42,7 +42,10 @@ unnamed real place, a bounty on a locally recorded animal, a race to the high gr
 against the real sunset). Each one wins a collectible card whose rarity comes from real facts.
 The beta also skips the start screen for returning players (phones start where you are,
 computers at your home base) and lets a computer set its home base by Wi-Fi location or by a
-typed address near you.
+typed address near you. New in the beta: **explorer depth** (journal → Areas: how much of
+each area's streets you've walked, with tiers and a score that rewards depth over distance),
+quests only where there's a public way to get there, and **friend leagues** by share code.
+Everywhere: explored ground only counts on foot (up to 10 mph).
 
 ## For developers
 
@@ -87,7 +90,7 @@ Add `?dev` to bypass the 30-day home-base cooldown while testing.
 
 ## Modes
 
-| Mode | Where you are | Movement | Discoveries | Beacons |
+| Mode | Where you are | Movement | Discoveries | Beacons (hidden for now) |
 |---|---|---|---|---|
 | **Present** | your device's real location (GPS / Wi-Fi / IP) | only by moving in real life | **claimed** | yes |
 | **Home** | your permanent home base (set once, from a real fix) | free, within 600 m | **home** | yes |

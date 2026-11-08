@@ -52,7 +52,7 @@ You're the small coloured figure with the arrow above its head. The arrow shows 
 buildings, so you can always find yourself.
 
 On phones, the **▸** button next to the mode buttons opens more options (locate, home
-base, beacons, search).
+base, search).
 
 ### 3. The three ways to play
 
@@ -65,8 +65,7 @@ The buttons at the top switch between them. Each one has a different rule:
   600 m of it, from your sofa. Finds count as "home". A blue ring shows your limit.
 - **Roam** (purple, see-through): go anywhere in the world. It's great for exploring,
   but anything you find there is only an **echo**: a note that you've seen it
-  virtually. Visit it for real (Present) later to claim it properly. You can't place
-  beacons while roaming.
+  virtually. Visit it for real (Present) later to claim it properly.
 
 ### 4. Discover places
 
@@ -193,7 +192,7 @@ locally, and which months it's usually seen around here.
 
 Tap **📷** to see the game through your phone's camera. Places appear as small icon pins
 with their distance (tap one for its name and details), the names of streets ahead of you show near the
-ground, beacons rise up as glowing pillars, and nearby creatures appear with a green
+ground, and nearby creatures appear with a green
 "tap to photograph" tag. **Tap a creature to photograph it** from up to 40 m away.
 Tap **✕ Exit AR** to go back to the map.
 
@@ -224,6 +223,9 @@ opens by itself when you start. Pick a quest; tap the box (or the pill) to come 
   direction and rough distance. Buy clues if you're stuck (its age or type, its initial, a
   search circle on the minimap); each one costs a star. Visit the wrong place and it tells
   you which way to look. At historic places, guess its era before the reveal to win a star back.
+  Riddles are built from real data, never invented: an opening line for the kind of place and,
+  for well-known places, a real fact ("Nicholas Hawksmoor designed me."). Extra clues can come
+  from its encyclopedia entry, always with the name blanked out.
 - **🎯 Bounty: track.** A "wanted" poster for an animal really recorded near you, and the
   habitat it likes ("the nearest water is 240 m west"). Hunts there favour it; reach it or
   photograph it. Rushing in makes it flee and costs a star.
@@ -239,6 +241,15 @@ In **Home**, every quest is inside your home range. Directions for a mystery are
 you accept it, and a race's clock is set from where you start. Your cards (with where and when you
 won them) are under *Your cards*, on the journal's overview and as ◆ on the journal map.
 
+**Can't get there?** On an active mystery or race, **Can't get there** swaps it for a fresh one
+with no stars lost, and that spot is never offered again. The game already avoids places tagged
+private and anything without a public path or street close by, and race finishes always sit on a
+public path; the map data isn't perfect, though, so the button covers the rest.
+
+**Friends (beta).** In Expeditions → **Friends**, share your explorer card (a link or code) and add
+your friends' to compare. Only a few numbers and a generated name (like "Swift Heron 42") are
+shared, never where you've been, and nothing is uploaded: codes go from person to person.
+
 **Starting the beta.** First time: the start screen, as usual. After that it skips straight in. On
 a phone it starts where you are (Present); on a computer it starts at your home base. If a computer
 has no home base yet, a short window helps you set one: **use this device's location** (computers
@@ -253,16 +264,27 @@ home. After that you can play **Home** mode from anywhere.
 
 Choose carefully: **a home base can only be moved once every 30 days.**
 
-### 11. Leave beacons
+### 11. Beacons (switched off for now)
 
-Tap **Place beacon** (or press **B**) to drop a glowing marker where you're standing, with
-a label of your choice. Beacons stay put for good, even when the map data changes.
-Their colour tells you what they're attached to:
+Beacons are hidden until they can be shared with other players (see the backlog's shared
+content plan). Any you placed are kept in your profile and backups, and will come back.
+When they return: tap **Place beacon** (or press **B**) to drop a glowing marker where you're
+standing, with a label of your choice. Beacons stay put for good, even when the map data
+changes. Their colour tells you what they're attached to:
 
 - **gold**: attached to a nearby place or building
 - **teal**: attached to the ground
 - **orange**: the building it was on has moved on the map, so the beacon moved with it
 - **red**: the building it was on no longer exists on the map; the beacon stays at its spot
+
+### Explorer depth (journal → Areas)
+
+The game rewards knowing a place, not travelling far. For each area (about 1.5 km across) the
+journal shows how much of its public streets and paths you've walked, and a tier: **Explored**
+(25%), **Surveyed** (50%), **Mapped** (75%) and **Known by heart** (90%). Your **explorer score**
+adds up each area's share squared, so ten areas you know well beat a hundred you've passed
+through. Only real walking or running counts (Present, up to 10 mph): ground covered by car,
+bus or train doesn't, and Home progress shows separately.
 
 ### 12. See just the map
 
