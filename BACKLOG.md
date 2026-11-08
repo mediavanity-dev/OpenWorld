@@ -160,6 +160,28 @@ internal testing tracks (TestFlight / Play internal testing) before any public l
 
 ---
 
+### Daily expedition notifications (once it's a phone app)
+
+A gentle reason to open the app, in the spirit of the game (no streak guilt, no nagging):
+
+- **One morning nudge, opt-in, at a time the player picks:** "Today's expeditions are ready: a
+  riddle about a 300-year-old church, a wanted Grey Heron and a race to the high ground." The
+  board is dealt on the device, so the text can be built locally (local notifications; no server).
+  At most one a day; none if the app was already opened that day; quiet hours respected.
+- **Moments from the real world** (each its own switch): "Sunset in 45 minutes: a race to the
+  high ground is on", "Rain this afternoon: frogs and snails are about", "Clear skies tonight:
+  a full moon".
+- **Close to something you're after** (later, only if wanted): a bounty's habitat or a mystery
+  nearby. This needs background location, which raises the privacy bar and store review
+  (declared purpose, Android's background-location declaration, Apple's "Always" justification),
+  so it should be clearly optional and off by default.
+- **Never:** reminders to keep a streak, "you're falling behind" messages, or anything about
+  friends' activity without consent.
+- **Web version meanwhile:** possible with Web Push (needs a small server with VAPID keys, and on
+  iPhones only for installed home-screen web apps). Probably not worth it before the store app.
+- **Store requirements** *(verify)*: notification permission asked at a meaningful moment (not on
+  first launch), Android 13+ runtime permission, and a privacy note on what triggers each one.
+
 ## 4. Test version (beta channel)
 
 *Status: **live** at https://mediavanity-dev.github.io/OpenWorld/beta/ (Nov 2026). Same code

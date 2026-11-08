@@ -249,6 +249,13 @@ In **Home**, every quest is inside your home range. Directions for a mystery are
 you accept it, and a race's clock is set from where you start. Your cards (with where and when you
 won them) are under *Your cards*, on the journal's overview and as ◆ on the journal map.
 
+**Far from everything?** If nothing fits close by, quests reach further: a mystery or race up to
+about 2.5 km away becomes a **long expedition** (one rarity higher), a race can go to **the
+water's edge** (the nearest stream, pond or lake), a bounty can be a plant or fungus, and
+**🧭 New ground** asks you to walk 8 stretches you've never walked, in any direction. Where there
+really isn't enough open data, the board says so and suggests what to do (including adding your
+area to OpenStreetMap).
+
 **Help as you go.** A mystery tells you when you're **getting warm** (within about 150 m) and
 **very close** (about 60 m), never which way. A bounty adds **field notes** once you reach its
 habitat (where to look there, when it's usually recorded around here, what it is), and you can
