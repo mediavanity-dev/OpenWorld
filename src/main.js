@@ -13,7 +13,7 @@ import { Environment } from './game/environment.js';
 import { Journal } from './game/journal.js';
 import { Quests } from './game/quests.js';
 import { Metrics } from './game/metrics.js';
-import { deviceFix, ipFix, watchDevice } from './game/locator.js';
+import { deviceFix, watchDevice } from './game/locator.js';
 import { GROUP_STYLE } from './data/wildlife.js';
 import { getJson } from './data/net.js';
 import { pruneCache } from './data/cache.js';
@@ -33,7 +33,7 @@ import { Minimap } from './ui/minimap.js';
 import { initJournal, openJournal } from './ui/journalView.js';
 import { runTutorial, tutorialDone, showHint } from './ui/tips.js';
 import { fmtDist } from './units.js';
-import { toast, fixText, initHud } from './ui/hud.js';
+import { toast, initHud } from './ui/hud.js';
 import { initLabels } from './ui/labels.js';
 import { initArMode } from './ui/arMode.js';
 import { initSettingsPanel } from './ui/settingsPanel.js';
@@ -45,7 +45,7 @@ import { initMarkers } from './render/markers.js';
 import { initCritters } from './render/critters.js';
 import { initEffects } from './render/effects.js';
 import { Ambience } from './audio.js';
-import { WALK, renameStaticText } from './names.js';
+import { WALK } from './names.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -119,7 +119,6 @@ function applyFeatures() {
 }
 applyFeatures();
 if (BETA) document.body.classList.add('beta');
-renameStaticText(); // beta: plainer names (Walk / walked) in the page's fixed text
 if (!SHOW_BEACONS) document.body.classList.add('no-beacons'); // hidden until shared content (BACKLOG 1)
 
 // saving problems are the one thing a player must hear about
@@ -431,8 +430,8 @@ async function locate(getFix, failText, msgEl, busyText) {
     return null;
   }
 }
-const locateDevice = (msgEl) => locate(deviceFix, (e) => (BETA ? `Couldn’t get this device’s location (${e.message}).` : `Device location failed: ${e.message}. Try "via internet" instead.`), msgEl, 'Asking your device for its location…');
-// beta: Present always needs a fresh, real device location. If there isn't one: computers are
+const locateDevice = (msgEl) => locate(deviceFix, (e) => `Couldn’t get this device’s location (${e.message}).`, msgEl, 'Asking your device for its location…');
+// Walk always needs a fresh, real device location. If there isn't one: computers are
 // pointed to a home base (that's how to play from a computer); phones to the location setting.
 async function presentNow(msgEl) {
   if (await locateDevice(msgEl)) return begin('present');
@@ -440,21 +439,14 @@ async function presentNow(msgEl) {
   toast(`${WALK} needs your location. Allow location for this site in your browser settings, then try again.`, 'error');
   return false;
 }
-const locateIp = (msgEl) => locate(ipFix, (e) => e.message, msgEl, 'Looking up your internet connection’s location…');
 
 // start screen
 const sMsg = $('s-msg');
 if (profile.data.home) $('s-home').hidden = false;
 if (profile.data.last) $('s-resume').hidden = false;
-$('s-device').onclick = async () => { if (BETA) return presentNow(sMsg); if (await locateDevice(sMsg)) begin('present'); };
-$('s-ip').onclick = async () => {
-  if (await locateIp(sMsg)) {
-    begin('present');
-    toast('IP location is approximate (city-level) and you can’t walk on it. Set it as your home base to move around.', 'home');
-  }
-};
+$('s-device').onclick = () => presentNow(sMsg);
 $('s-home').onclick = () => enterHome();
-$('s-sethome').hidden = !BETA || !!profile.data.home || isTouch;
+$('s-sethome').hidden = !!profile.data.home || isTouch;
 $('s-sethome').onclick = () => ctx.homeSetup.open({ onSet: () => homeWasSet(true) });
 $('s-resume').onclick = () => begin('roam', { to: profile.data.last });
 $('s-roam-form').onsubmit = async (e) => {
@@ -471,8 +463,7 @@ document.querySelectorAll('.presets a').forEach((a) => (a.onclick = () => {
 document.querySelectorAll('.tabs button[data-mode]').forEach((b) => (b.onclick = async () => {
   const mode = b.dataset.mode;
   if (mode === game.mode) return;
-  if (mode === 'present' && BETA) return presentNow(); // always a fresh fix, never a stale or internet one
-  if (mode === 'present' && !game.fix && !(await locateDevice())) return;
+  if (mode === 'present') return presentNow(); // always a fresh fix, never a stale or internet one
   if (mode === 'home') return enterHome();
   begin(mode, mode === 'roam' ? { to: game.pos } : {});
 }));
@@ -482,11 +473,7 @@ document.querySelectorAll('.tabs button[data-mode]').forEach((b) => (b.onclick =
 function enterHome() {
   const range = fmtDist(RULES.LEASH_M);
   if (!profile.data.home) {
-    if (BETA) return ctx.homeSetup.open({ reason: `<b>Home needs a home base first.</b> Set one and you can wander ${range} around it from anywhere.`, onSet: () => homeWasSet(true) });
-    const shown = game.mode && showHint({ target: () => document.querySelector('.tabs button[data-mode="present"]'), timeout: 12000,
-      text: `<b>Set a home base first.</b> Go <b>${WALK}</b> (where you really are) and tap <b>Set home base</b>. After that, Home lets you wander ${range} around it from anywhere.` });
-    if (!shown) toast(`No home base yet. Go ${WALK} and set one; then Home lets you wander ${range} around it from anywhere.`, 'error');
-    return;
+    return ctx.homeSetup.open({ reason: `<b>Home needs a home base first.</b> Set one and you can wander ${range} around it from anywhere.`, onSet: () => homeWasSet(true) });
   }
   if (!begin('home')) return;
   // close the hint once they've been moving for a moment (they've got it)
@@ -515,13 +502,8 @@ if ('ResizeObserver' in window) new ResizeObserver(([e]) => document.documentEle
 setCollapsed(isTouch);
 $('more').onclick = () => setCollapsed(!left.classList.contains('collapsed'));
 $('nearest').onclick = () => { if (game.features.quests) return ctx.expeditions.open(); if (game.taskTarget && !journal.task().done) openPlace(game.taskTarget.poi); else openJournal('overview'); };
-$('b-locate').onclick = async () => { if (await locateDevice()) { if (game.mode === 'present') begin('present'); else toast('Device fix updated: ' + fixText(game.fix)); } };
-$('b-ip').onclick = async () => { if (await locateIp()) { if (game.mode === 'present') begin('present'); else toast('Fix updated: ' + fixText(game.fix)); } };
 $('b-sethome').onclick = () => {
-  if (BETA) return ctx.homeSetup.open({ onSet: () => homeWasSet(game.mode !== 'present') });
-  if (profile.data.home && !confirm('Move your home base here? It can then not be moved again for 30 days.')) return;
-  if (!profile.data.home && !confirm('Set your permanent home base at your current real location?')) return;
-  if (game.setHome()) { $('s-home').hidden = false; markers.refreshBeacons(); hud.render(); }
+  ctx.homeSetup.open({ onSet: () => homeWasSet(game.mode !== 'present') });
 };
 $('b-beacon').onclick = () => { const label = prompt('Beacon label?', `Beacon ${profile.data.beacons.length + 1}`); if (label !== null) { game.placeBeacon(label); markers.refreshBeacons(); hud.render(); } };
 $('h-roam-form').onsubmit = async (e) => {
@@ -581,8 +563,8 @@ function homeWasSet(go) {
 // deep link: ?at=lat,lon starts directly in Roam there
 const at = new URLSearchParams(location.search).get('at');
 if (at) parsePlace(at).then((to) => begin('roam', { to })).catch((e) => (sMsg.textContent = e.message));
-// beta: returning players skip the start screen (first-timers still see it)
-else if (BETA && profile.data.last) autoStart();
+// returning players skip the start screen (first-timers still see it)
+else if (profile.data.last) autoStart();
 
 // a friend's explorer card link (#friend=CODE): add them to your league (beta), then tidy the URL
 function friendFromLink() {

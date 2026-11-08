@@ -9,7 +9,6 @@ import { onHealth, unhealthy } from '../data/net.js';
 import { haversine } from '../geo.js';
 import { fmtDist, fmtTemp } from '../units.js';
 import { esc } from '../util/html.js';
-import { BETA } from '../channel.js';
 import { WALK } from '../names.js';
 
 const $ = (id) => document.getElementById(id);
@@ -48,7 +47,7 @@ export function initHud(ctx) {
     setText('h-fix', fixText(game.fix));
     const h = profile.data.home;
     setText('h-home', h ? `${h.trust} · ${game.pos ? fmtDist(haversine(h.lat, h.lon, game.pos.lat, game.pos.lon)) + ' away' : ''}` : 'not set');
-    $('b-sethome').disabled = !BETA && (game.mode !== 'present' || !game.fix); // beta: opens the home base setup
+    $('b-sethome').disabled = false; // opens the home base setup (device location or a typed address)
     $('b-beacon').disabled = !MODES[game.mode].beacons;
 
     const c = profile.counts();

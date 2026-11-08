@@ -10,17 +10,18 @@ only real visits count.
 
 ## Quick start
 
-1. **Pick where to start.** *Be here* uses your phone's location (best outdoors). *Roam anywhere*
+1. **Pick where to start.** *Walk where I am* uses your phone's location (best outdoors); on a
+   computer, set a home base. *Roam anywhere*
    lets you visit any place virtually.
 2. **Walk.** Get within about 30 m of a place icon to discover it. On a computer, use
-   **W A S D**; on a phone in **Present** mode, walk for real.
+   **W A S D**; on a phone in **Walk** mode, walk for real.
 3. **Follow what turns up.** Animals leave signs (🐾 and five dots that light up as you get
    warmer), three golden finds ✦ are hidden in each area every day, and today's field
    assignment points the way.
 4. **Open 📓 Journal** for your species, rocks, records and the ground you've covered, and
    **🔍 This spot** for the geology, sky and history under your feet.
 
-**Only real visits count.** In **Present** you are where your device is. In **Home** you can
+**Only real visits count.** In **Walk** you are where your device is. In **Home** you can
 roam 600 m around a home base you set once. **Roam** goes anywhere, but finds there are only
 *echoes* until you visit for real.
 
@@ -35,17 +36,10 @@ Settings → *Help & about*.
 
 **https://mediavanity-dev.github.io/OpenWorld/beta/** is where new ideas are tried first. It
 has its own separate journal (copy your main one in from Settings if you like) and a small
-BETA marker. The hunt and daily treasure started there and have now graduated to the main
-version. Now in the beta: **Then & now**, lining up old photos of historic places in the camera, and
-**Expeditions**: a board of three quests dealt from what's around you (a riddle about an
-unnamed real place, a bounty on a locally recorded animal, a race to the high ground or
-against the real sunset). Each one wins a collectible card whose rarity comes from real facts.
-The beta also skips the start screen for returning players (phones start where you are,
-computers at your home base) and lets a computer set its home base by Wi-Fi location or by a
-typed address near you. New in the beta: **explorer depth** (journal → Areas: how much of
-each area's streets you've walked, with tiers and a score that rewards depth over distance),
-quests only where there's a public way to get there, and **friend leagues** by share code.
-Everywhere: explored ground only counts on foot (up to 10 mph).
+BETA marker. Everything tried there so far has graduated to the main version (Nov 2026):
+the hunt, daily treasure, Then & now, **Expeditions** (daily mysteries, bounties, races and
+New ground, with collectible cards and friend leagues), explorer depth and deeper layers, the
+easier home base setup, and the plainer names (Walk / Home / Roam).
 
 ## For developers
 
@@ -92,13 +86,13 @@ Add `?dev` to bypass the 30-day home-base cooldown while testing.
 
 | Mode | Where you are | Movement | Discoveries | Beacons (hidden for now) |
 |---|---|---|---|---|
-| **Present** | your device's real location (GPS / Wi-Fi / IP) | only by moving in real life | **claimed** | yes |
+| **Walk** (`present`) | your device's real location (GPS / Wi-Fi) | only by moving in real life | **walked** | yes |
 | **Home** | your permanent home base (set once, from a real fix) | free, within 600 m | **home** | yes |
 | **Roam** | anywhere (search a place or type lat, lon) | free and fast | **echo**, until visited for real | no |
 
 Every fix carries a trust level (`gps` / `network` / `coarse` / `ip`), which is
-recorded with each claim. A desktop can play Present using OS or IP location, then set
-that as a home base to get room to move.
+recorded with each claim. A desktop sets a home base from its own (Wi-Fi) location, or from a typed address checked
+against its IP location (`Game.homeCheck`), and plays Home around it.
 
 ## Layout
 
@@ -137,7 +131,7 @@ src/render/               avatar, beacons & home marker, creatures, hunt tracks 
 src/ui/hud.js             toasts, stats panel, conditions, assignment, tracker, missing-data line
 src/ui/labels.js          floating place / street / creature labels
 src/ui/arMode.js          camera AR: enter/exit, photos, compass ribbon
-src/ui/rephoto.js         then & now overlay in AR (beta)
+src/ui/rephoto.js         then & now overlay in AR
 src/ui/settingsPanel.js   settings, backup, feature switches, playtest stats, help
 src/ui/                   also: place/species/this-spot cards, journal, minimap, controls, mini tutorial
 src/ar.js                 camera AR core: rear-camera passthrough + device-orientation camera

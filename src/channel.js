@@ -20,9 +20,9 @@ export const FEATURES = {
   hunt: { label: 'The hunt: track animals by their signs', stable: true },
   treasure: { label: 'Daily treasure: golden finds hidden each day', stable: true },
   geocaching: { label: 'Geocaches from Opencaching', stable: true, needsKeys: true },
-  rephoto: { label: 'Rephotography: line up old photos of a place in the camera', stable: false },
-  quests: { label: 'Expeditions: daily mysteries, bounties and races that win collectible cards', stable: false },
-  deep: { label: 'Deeper layers: small hidden finds open up in areas you know well', stable: false },
+  rephoto: { label: 'Then & now: line up old photos of a place in the camera', stable: true },
+  quests: { label: 'Expeditions: daily mysteries, bounties and races that win collectible cards', stable: true },
+  deep: { label: 'Deeper layers: small hidden finds open up in areas you know well', stable: true },
 };
 // Beacons are hidden (both versions) until there is a shared-content model to give them a
 // purpose (BACKLOG item 1). Beacons already placed stay in profiles and exports.
