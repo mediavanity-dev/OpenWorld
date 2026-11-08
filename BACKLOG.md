@@ -200,7 +200,13 @@ anything is shown publicly, and a short note on what happens to submissions.
 
 ---
 
-## 6. Geocaching via Opencaching (ready once keys exist)
+## 6. Geocaching via Opencaching (shelved until the phone app)
+
+*Shelved (Nov 2026, owner's decision): revisit when the game is deployed as a phone app (item 3).
+The code stays as it is (dormant with no keys). Then: register OKAPI consumer keys at each
+site's `/okapi/signup.html` (app name, homepage, email; only the consumer key is needed, never
+the secret) and add them as `OKAPI_KEY_*` build variables.*
+
 
 *Status: **built** (Nov 2026), dormant until consumer keys are added as GitHub variables
 (see README → Geocaching setup). Read-only: caches as a place class with their own icon,
