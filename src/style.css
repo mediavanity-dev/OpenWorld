@@ -587,3 +587,10 @@ table.lg tr.me td { background: rgba(255,211,107,0.08); } table.lg tr.me b { col
 
 /* beta: Present always asks the device; the home base window replaces internet (IP) location */
 body.beta .beta-hide { display: none !important; }
+
+/* the deep layer is open in this area */
+.tierchip.deep { border-color: #c07aff; color: #e3c8ff; box-shadow: 0 0 8px rgba(192,122,255,0.35); }
+
+/* a mystery's closeness: warm, then hot */
+.tracker .tk-quest.warm { color: #ffc27a; }
+.tracker .tk-quest.hot { color: #ff9a6b; text-shadow: 0 0 10px rgba(255,120,80,0.8); animation: qglow 1s ease-in-out infinite; }

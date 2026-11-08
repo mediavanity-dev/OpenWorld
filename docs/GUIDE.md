@@ -246,6 +246,12 @@ In **Home**, every quest is inside your home range. Directions for a mystery are
 you accept it, and a race's clock is set from where you start. Your cards (with where and when you
 won them) are under *Your cards*, on the journal's overview and as ◆ on the journal map.
 
+**Help as you go.** A mystery tells you when you're **getting warm** (within about 150 m) and
+**very close** (about 60 m), never which way. A bounty adds **field notes** once you reach its
+habitat (where to look there, when it's usually recorded around here, what it is), and you can
+buy its **last recorded sighting** nearby for a star. The longer you search in the right habitat,
+the likelier your next encounter is the one you're after.
+
 **Can't get there?** On an active mystery or race, **Can't get there** swaps it for a fresh one
 with no stars lost, and that spot is never offered again. The game already avoids places tagged
 private and anything without a public path or street close by, and race finishes always sit on a
@@ -281,6 +287,13 @@ changes. Their colour tells you what they're attached to:
 - **teal**: attached to the ground
 - **orange**: the building it was on has moved on the map, so the beacon moved with it
 - **red**: the building it was on no longer exists on the map; the beacon stays at its spot
+
+### Deeper layers (beta)
+
+Once you've walked half of an area's streets, a new layer opens there (you'll get a message):
+survey marks, plaques and memorial benches, boundary stones, milestones, old post boxes and other
+small real things most people walk past. They appear as history places to discover, and
+mysteries love them. You won't see this layer anywhere you haven't earned it.
 
 ### Explorer depth (journal → Areas)
 

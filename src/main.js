@@ -18,6 +18,7 @@ import { GROUP_STYLE } from './data/wildlife.js';
 import { getJson } from './data/net.js';
 import { pruneCache } from './data/cache.js';
 import { cachesIn, nodesFor } from './data/geocaching.js';
+import { deepPlaces } from './data/deep.js';
 import { getAtlas, iconVisibility } from './world/icons.js';
 import { iconUniforms, iconMat } from './world/materials.js';
 import { wildHabitat } from './world/habitats.js';
@@ -134,6 +135,12 @@ world.addSource(async (chunk) => {
   if (!game.features.geocaching) return [];
   const lists = await Promise.all(nodesFor(environment.country).map((n) => cachesIn(chunk.bounds, n, chunk.key)));
   return lists.flat();
+});
+
+// beta: the deep layer, in areas you know well (half walked); see src/data/deep.js
+world.addSource(async (chunk) => {
+  if (!game.features.deep || !profile.data.areas?.[chunk.key]?.deep || settings.dataSaver) return [];
+  return deepPlaces(chunk.bounds, chunk.key);
 });
 
 let firstChunk = true;
@@ -360,6 +367,7 @@ function onGameEvent(ev) {
   else if (ev.type === 'hunt-flee' || ev.type === 'hunt-cold') { toast(ev.msg); }
   else if (ev.type === 'treasure-hot') { buzz([12, 30, 12]); ambience.chime(5); }
   else if (ev.type === 'geocache') { toast(ev.msg, 'gold'); buzz([30, 40, 30]); ambience.chime(6); hud.render(); }
+  else if (ev.type === 'deep-unlock') { if (game.features.deep) { toast(ev.msg, 'gold'); buzz([40, 60, 40, 60, 120]); ambience.chime(10); world.refreshSources(); } }
   else if (ev.type === 'area-tier') { toast(ev.msg, 'gold'); buzz([30, 40, 30, 40, 60]); ambience.chime(8); }
   else if (ev.type === 'treasure') { toast(ev.msg, 'gold'); buzz([30, 40, 60]); ambience.chime(9); hud.render(); }
   else if (ev.type === 'rephoto') { toast(ev.msg, 'gold'); buzz([30, 40, 60]); ambience.chime(8); hud.render(); }

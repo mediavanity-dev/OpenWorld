@@ -157,6 +157,15 @@ try {
     if (want === 'homesetup') { o.profile.data.home = null; o.ctx.homeSetup.open({ reason: '<b>Welcome back!</b> To play from this computer you need a home base.' }); return 'ok:homesetup'; }
     o.ctx.expeditions.open('today'); await wait(300);
     if (!document.querySelector('#quests-body .qwelcome')) return 'no welcome blurb on first open';
+    // Give up works from an active quest's card (value-less button attributes once broke it)
+    { const q0 = offers.find((x) => !o.game.quests.blocked(x));
+      if (q0) {
+        const realConfirm = window.confirm; window.confirm = () => true;
+        o.game.quests.accept(q0.id); o.ctx.expeditions.render(); await wait(100);
+        document.querySelector('#quests-body [data-qabandon]')?.click(); await wait(100);
+        window.confirm = realConfirm;
+        if (o.game.quests.active()) return 'Give up did nothing';
+      } }
     if (!document.querySelector('#quests-body .qcard')) return 'board did not render';
     if (want === 'friends') { o.ctx.expeditions.close(); o.ctx.expeditions.open('friends'); await wait(300); if (!document.querySelector('#quests-body table.lg')) return 'no friends table'; }
     else if (want === 'reveal') { const q = offers.find((x) => x.type !== 'bounty') || offers[0]; o.game.quests.accept(q.id); if (q.type === 'mystery') q.guessRight = true; o.game.quests.complete(q); await wait(2200); }

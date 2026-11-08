@@ -188,7 +188,7 @@ function areas(profile) {
     <p class="credit tiers">${DEPTH_TIERS.slice().reverse().filter(([t]) => t > 0).map(([t, n]) => `<span>${n} ${Math.round(t * 100)}%</span>`).join(' · ')}</p></div>`;
   if (!list.length) return head + '<p class="credit">Your areas appear here as you walk and discover places. Each area is about 1.5 km across.</p>';
   return head + list.map((x) => `<div class="area depth">
-      <div><b>${esc(x.a.name || 'Unnamed area')}</b>${x.tier ? ` <span class="tierchip t-${x.tier.split(' ')[0].toLowerCase()}">${esc(x.tier)}</span>` : ''}
+      <div><b>${esc(x.a.name || 'Unnamed area')}</b>${x.tier ? ` <span class="tierchip t-${x.tier.split(' ')[0].toLowerCase()}">${esc(x.tier)}</span>` : ''}${x.a.deep && ctx.game.features.deep ? ' <span class="tierchip deep" title="Survey marks, plaques, boundary stones and more are on the map here">✦ deep layer open</span>' : ''}
         <small>${x.a.walk ? `Streets walked: <b>${Math.round(x.foot * 100)}%</b> on foot${x.home > x.foot ? ` · ${Math.round(x.home * 100)}% from home` : ''} · ` : ''}places ${x.f}/${x.a.total}${x.e ? ` · ${x.e} echoes` : ''}</small></div>
       <div class="pbar two"><i class="home" style="width:${Math.round(x.home * 100)}%"></i><i style="width:${Math.round(x.foot * 100)}%"></i></div>
       <span>${x.a.walk ? Math.round(x.foot * 100) : x.placePct}%</span></div>`).join('');
