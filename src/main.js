@@ -421,14 +421,22 @@ async function locate(getFix, failText, msgEl, busyText) {
     return null;
   }
 }
-const locateDevice = (msgEl) => locate(deviceFix, (e) => `Device location failed: ${e.message}. Try "via internet" instead.`, msgEl, 'Asking your device for its location…');
+const locateDevice = (msgEl) => locate(deviceFix, (e) => (BETA ? `Couldn’t get this device’s location (${e.message}).` : `Device location failed: ${e.message}. Try "via internet" instead.`), msgEl, 'Asking your device for its location…');
+// beta: Present always needs a fresh, real device location. If there isn't one: computers are
+// pointed to a home base (that's how to play from a computer); phones to the location setting.
+async function presentNow(msgEl) {
+  if (await locateDevice(msgEl)) return begin('present');
+  if (!isTouch) return ctx.homeSetup.open({ reason: '<b>Present needs this device’s real location</b>, and it couldn’t be found. To play from a computer, set a home base and play <b>Home</b>.', onSet: () => homeWasSet(true) });
+  toast('Present needs your location. Allow location for this site in your browser settings, then try again.', 'error');
+  return false;
+}
 const locateIp = (msgEl) => locate(ipFix, (e) => e.message, msgEl, 'Looking up your internet connection’s location…');
 
 // start screen
 const sMsg = $('s-msg');
 if (profile.data.home) $('s-home').hidden = false;
 if (profile.data.last) $('s-resume').hidden = false;
-$('s-device').onclick = async () => { if (await locateDevice(sMsg)) begin('present'); };
+$('s-device').onclick = async () => { if (BETA) return presentNow(sMsg); if (await locateDevice(sMsg)) begin('present'); };
 $('s-ip').onclick = async () => {
   if (await locateIp(sMsg)) {
     begin('present');
@@ -453,6 +461,7 @@ document.querySelectorAll('.presets a').forEach((a) => (a.onclick = () => {
 document.querySelectorAll('.tabs button[data-mode]').forEach((b) => (b.onclick = async () => {
   const mode = b.dataset.mode;
   if (mode === game.mode) return;
+  if (mode === 'present' && BETA) return presentNow(); // always a fresh fix, never a stale or internet one
   if (mode === 'present' && !game.fix && !(await locateDevice())) return;
   if (mode === 'home') return enterHome();
   begin(mode, mode === 'roam' ? { to: game.pos } : {});
