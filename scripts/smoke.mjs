@@ -36,6 +36,8 @@ const profileDir = mkdtempSync(join(tmpdir(), 'ow-smoke-'));
 const browser = spawn(browserPath, [
   '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profileDir}`,
   '--no-first-run', '--no-default-browser-check', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
+  // never pause the game loop (requestAnimationFrame) because the headless window seems hidden
+  '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
   `--window-size=${process.env.SMOKE_SIZE || '1280,800'}`, 'about:blank',
 ], { stdio: 'ignore' });
 
@@ -70,6 +72,9 @@ try {
   };
   await send('Runtime.enable');
   await send('Page.enable');
+  // keep the page in the foreground: a page that thinks it's hidden pauses its game loop
+  await send('Page.bringToFront').catch(() => {});
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
   // SMOKE_TOUCH=1: behave like a phone (touch screen, coarse pointer: joystick, phone layout)
   if (process.env.SMOKE_TOUCH) {
     const [w, h] = (process.env.SMOKE_SIZE || '390,844').split(',').map(Number);
@@ -143,7 +148,7 @@ try {
     if (!o.game.features.quests) return 'off';
     for (let k = 0; k < 30 && !o.game.quests.s.offers.some(Boolean); k++) await wait(500);
     const offers = o.game.quests.s.offers.filter(Boolean);
-    if (!offers.length) { const s = o.game.quests.s; return 'no expeditions dealt: ' + JSON.stringify({ mode: o.game.mode, smode: s.mode, date: s.date, active: s.active, offers: s.offers, tries: o.game.quests._tries, wild: o.game.wild.species.length, ready: o.world.isReadyAt(o.game.pos.lat, o.game.pos.lon), feat: o.game.features }); }
+    if (!offers.length) { const s = o.game.quests.s, f0 = o.ctx.renderer.info.render.frame; await wait(1000); return 'no expeditions dealt: ' + JSON.stringify({ framesPerSecond: o.ctx.renderer.info.render.frame - f0, hidden: document.visibilityState, mode: o.game.mode, smode: s.mode, date: s.date, active: s.active, offers: s.offers, tries: o.game.quests._tries, wild: o.game.wild.species.length, ready: o.world.isReadyAt(o.game.pos.lat, o.game.pos.lon), feat: o.game.features }); }
     const want = ${JSON.stringify(process.env.SMOKE_OPEN || '')};
     // a new player: the board has not popped up by itself, and its entry point glows
     if (o.game.quests.s.seen) return 'board was opened before the player chose to';

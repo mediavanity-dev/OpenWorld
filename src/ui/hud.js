@@ -10,6 +10,7 @@ import { haversine } from '../geo.js';
 import { fmtDist, fmtTemp } from '../units.js';
 import { esc } from '../util/html.js';
 import { BETA } from '../channel.js';
+import { WALK } from '../names.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -83,9 +84,9 @@ export function initHud(ctx) {
     setText('n-name', t.type === 'walk1k' ? (settings.units === 'imperial' ? 'Walk 0.6 miles' : 'Walk 1 km') : T.text);
     setText('n-dist', t.done ? 'Done for today. A new one tomorrow.'
       : tgt ? `Nearest: ${tgt.poi.name} · ${fmtDist(tgt.dist)}`
-      : T.unit === 'm' ? `${fmtDist(t.progress)} of ${fmtDist(T.target)} · Present or Home`
+      : T.unit === 'm' ? `${fmtDist(t.progress)} of ${fmtDist(T.target)} · ${WALK} or Home`
       : T.place ? 'Nothing that fits close by yet. Keep exploring.'
-      : 'Watch for signs as you walk · Present or Home');
+      : `Watch for signs as you walk · ${WALK} or Home`);
     setText('n-arrow', tgt ? '↑' : t.done ? '✓' : '•');
     $('n-arrow').style.transform = tgt ? `rotate(${tgt.bearing + (controls.yaw * 180) / Math.PI}deg)` : '';
     $('nearest').classList.toggle('done', t.done);

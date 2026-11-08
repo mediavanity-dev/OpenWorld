@@ -16,6 +16,8 @@ When the game opens, pick one of these:
   outdoors.
 - **Locate me via my internet connection.** Guesses your town from your internet
   connection. Good for computers, but it's only accurate to roughly the nearest city.
+  (Not in the beta: there, computers set a home base instead, by Wi-Fi location or a typed
+  address, and **Present** always uses a fresh location from the device.)
 - **Roam anywhere.** Type a place name ("Eiffel Tower") or tap one of the suggestions to
   visit it virtually.
 
@@ -55,6 +57,9 @@ On phones, the **▸** button next to the mode buttons opens more options (locat
 base, search).
 
 ### 3. The three ways to play
+
+*In the beta these have plainer names: **Walk** (Present), **Home** and **Roam**, and finds say
+how you made them: **walked**, **from home** or **echo** (instead of "claimed").*
 
 The buttons at the top switch between them. Each one has a different rule:
 
@@ -341,7 +346,7 @@ overview of everything above.
 - **"Unavailable right now: …"** at the bottom: one of the free data services is busy or down.
   The game keeps working without it and tries again later.
 - **"Device location failed"**: allow location for this site in your browser settings, or
-  use *Locate me via my internet connection* instead.
+  use *Locate me via my internet connection* instead (beta: set a home base and play Home).
 - **I'm in the wrong town (internet location)**: that's normal for internet location.
   Use your phone with *Be here* for an accurate position.
 - **I can't move**: you're in Present mode, so walk for real, or switch to Home or Roam.

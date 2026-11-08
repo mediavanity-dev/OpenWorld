@@ -19,6 +19,7 @@ import { wildHabitat } from '../world/habitats.js';
 import { fitsHabitat } from '../data/wildlife.js';
 import { isQuirk } from './journal.js';
 import { RULES } from './game.js';
+import { WALK } from '../names.js';
 import { placeFacts } from '../data/wikidata.js';
 import { wikiSummary } from '../data/wiki.js';
 import { reachable as walkableTo, nearestPath, closedToPublic } from './reach.js';
@@ -470,7 +471,7 @@ export class Quests {
   blocked(o) {
     const g = this.game;
     if (g.mode === 'present' && g.fix?.source === 'ip') return 'You’re placed by your internet connection, so you can’t move. Set a home base, or play on your phone.';
-    if (!this.reachable(o)) return 'Outside your home range. Play it Present, or in Roam as an echo.';
+    if (!this.reachable(o)) return `Outside your home range. Play it in ${WALK}, or in Roam as an echo.`;
     return null;
   }
   // today's progress: cards won and (real) stars earned
@@ -573,7 +574,7 @@ export class Quests {
     if (changed) { this._tries = 0; this._fillT = 0; }
     this.profile.save();
     const a = this.active();
-    if (a && !this.reachable(a)) this.emit('quest-info', 'Your expedition’s goal is outside your home range. Finish it Present, or in Roam as an echo.');
+    if (a && !this.reachable(a)) this.emit('quest-info', `Your expedition’s goal is outside your home range. Finish it in ${WALK}, or in Roam as an echo.`);
   }
   buyClue(key) {
     const o = this.active();

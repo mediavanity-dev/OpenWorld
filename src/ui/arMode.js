@@ -2,6 +2,7 @@
 // photo of the view, and the compass ribbon along the top.
 
 import { ARView } from '../ar.js';
+import { WALK } from '../names.js';
 import { haversine, offsetMeters } from '../geo.js';
 import { GROUP_STYLE } from '../data/wildlife.js';
 import { fmtDist, fmtTemp } from '../units.js';
@@ -25,7 +26,7 @@ export function initArMode(ctx) {
   function setWorldVisible(chunk, on) { for (const o of chunk.group.children) o.visible = on; }
 
   async function enter() {
-    if (game.mode !== 'present') return toast('AR works in Present mode, where you really are.', 'error');
+    if (game.mode !== 'present') return toast(`AR works in ${WALK} mode, where you really are.`, 'error');
     try {
       await ar.start();
     } catch (err) {
