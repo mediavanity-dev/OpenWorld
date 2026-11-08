@@ -6,6 +6,18 @@
 import { geohash, hashStr } from '../geo.js';
 import { GRADE_RANK } from './profile.js';
 import { groupOf } from '../world/icons.js';
+import { walkCells } from './reach.js';
+
+// Depth of exploration per area (BACKLOG item 8): the share of its public paths and streets
+// walked for real. Rewards knowing a place, not travelling far.
+export const DEPTH_TIERS = [[0.9, 'Known by heart'], [0.75, 'Mapped'], [0.5, 'Surveyed'], [0.25, 'Explored'], [0, 'Visited']];
+export function depthTier(cov) { return cov > 0 ? (DEPTH_TIERS.find(([t]) => cov >= t) || DEPTH_TIERS.at(-1))[1] : null; }
+/** Explorer score: the sum over areas of coverage squared, so depth counts far more than breadth. */
+export function explorerScore(areas) {
+  let s = 0;
+  for (const a of Object.values(areas || {})) if (a.walk) s += (Math.min(a.foot || 0, a.walk) / a.walk) ** 2;
+  return Math.round(s * 100);
+}
 
 const MODE_RANK = { roam: 1, home: 2, present: 3 };
 
@@ -45,6 +57,8 @@ export class Journal {
     this.profile = profile;
     this.env = env;
     this.onEvent = onEvent || (() => {});
+    /** @type {((lat: number, lon: number) => any) | null} the map area at a point (set by the app) */
+    this.chunkAt = null;
     this.ensure();
   }
 
@@ -98,10 +112,17 @@ export class Journal {
   }
 
   // ---- hooks called by the game ----
-  onMove(mode, meters, pos, ground) {
+  // onFoot: false while moving faster than walking/running for real (a car, a train): that
+  // ground isn't explored, and no distance is counted.
+  onMove(mode, meters, pos, ground, onFoot = true) {
+    if (!onFoot) return;
     const cell = geohash(pos.lat, pos.lon, 7);
     const rank = MODE_RANK[mode];
-    if ((this.d.cells[cell] || 0) < rank) { this.d.cells[cell] = rank; this.profile.save(); }
+    if ((this.d.cells[cell] || 0) < rank) {
+      this.d.cells[cell] = rank; this.profile.save();
+      const ch = this.chunkAt?.(pos.lat, pos.lon);
+      if (ch && rank >= 2 && walkCells(ch).has(cell)) this.countDepth(ch, true);
+    }
     if (mode === 'roam') return;
     const day = this.today();
     if (meters > 0) {
@@ -164,8 +185,28 @@ export class Journal {
     const a = this.d.areas[chunk.key];
     const total = chunk.pois.length;
     if (!a || a.total < total || (!a.name && chunk.areaName)) {
-      this.d.areas[chunk.key] = { name: chunk.areaName || a?.name || null, total: Math.max(total, a?.total || 0), lat: +chunk.latc.toFixed(4), lon: +chunk.lonc.toFixed(4) };
+      this.d.areas[chunk.key] = { ...(a || {}), name: chunk.areaName || a?.name || null, total: Math.max(total, a?.total || 0), lat: +chunk.latc.toFixed(4), lon: +chunk.lonc.toFixed(4) };
       this.profile.save();
+    }
+    this.countDepth(chunk, false);
+  }
+
+  // Recount an area's walkable ground and how much of it you've covered (on foot / from home).
+  // Announces a new depth tier when `announce` (only real, on-foot progress does).
+  countDepth(chunk, announce) {
+    const cells = walkCells(chunk);
+    if (!cells.size) return;
+    const a = (this.d.areas[chunk.key] ||= { name: chunk.areaName || null, total: chunk.pois.length, lat: +chunk.latc.toFixed(4), lon: +chunk.lonc.toFixed(4) });
+    let foot = 0, home = 0;
+    for (const c of cells) { const r = this.d.cells[c] || 0; if (r >= 3) foot++; if (r >= 2) home++; }
+    const before = depthTier((a.foot || 0) / (a.walk || 1));
+    if (a.walk === cells.size && a.foot === foot && a.home === home) return;
+    a.walk = cells.size; a.foot = foot; a.home = home;
+    this.profile.save();
+    const tier = depthTier(foot / a.walk);
+    if (announce && tier && tier !== before && tier !== 'Visited') {
+      this.profile.log(`${a.name || 'An area'}: ${tier} (${Math.round((foot / a.walk) * 100)}% walked)`);
+      this.onEvent({ type: 'area-tier', msg: `${a.name || 'This area'}: ${tier}! You've walked ${Math.round((foot / a.walk) * 100)}% of its streets and paths.`, area: a, tier });
     }
   }
 }

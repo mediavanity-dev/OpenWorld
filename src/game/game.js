@@ -26,7 +26,8 @@ export const RULES = {
   BEACON_BUILDING_M: 35,    // ...or else the nearest building
   WALK: 6, RUN: 20, ROAM_FAST: 90,  // m/s (game-time, not real walking)
   ENCOUNTER_EVERY_M: 110,   // roll for wildlife every this many metres moved (at walking/running speed only)
-  ENCOUNTER_MAX_SPEED: 12,  // m/s: faster travel (Roam fast-travel, vehicles) doesn't meet wildlife
+  ENCOUNTER_MAX_SPEED: 12, // m/s: faster travel (Roam fast-travel, vehicles) doesn't meet wildlife
+  ON_FOOT_MAX_SPEED: 4.47, // m/s (10 mph): Present ground only counts as explored on foot (walking or running)
   CRITTER_TTL_S: 120,
 };
 
@@ -203,7 +204,9 @@ export class Game {
       // wildlife and walking records only at human speeds
       // (Present: judged by the GPS's real speed, not the smoothed on-screen glide)
       const speed = this.mode === 'present' ? (this.fixSpeed ?? 0) : dt > 0 ? moved / dt : 0;
-      if (speed < RULES.ENCOUNTER_MAX_SPEED) { this._moved += moved; this._walk += moved; }
+      if (speed < RULES.ENCOUNTER_MAX_SPEED) this._moved += moved;
+      // explored ground and distance walked: on foot only (Present: real speed up to 10 mph)
+      if (this.mode === 'present' ? speed <= RULES.ON_FOOT_MAX_SPEED : speed < RULES.ENCOUNTER_MAX_SPEED) this._walk += moved;
     }
     if (this._moved > RULES.ENCOUNTER_EVERY_M) { this._moved = 0; this.rollEncounter(); }
 
@@ -214,7 +217,8 @@ export class Game {
       if (this.hunt) this.stepHunt();
       if (this.features.treasure) this.checkTreasure();
       if (this.features.quests) this.quests?.step();
-      this.journal?.onMove(this.mode, this._walk, this.pos, this.world.groundAt(this.pos.lat, this.pos.lon));
+      const onFoot = this.mode !== 'present' || (this.fixSpeed ?? 0) <= RULES.ON_FOOT_MAX_SPEED;
+      this.journal?.onMove(this.mode, this._walk, this.pos, this.world.groundAt(this.pos.lat, this.pos.lon), onFoot);
       this._walk = 0;
     }
     this._saveT += dt;

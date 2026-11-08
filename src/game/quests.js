@@ -21,6 +21,7 @@ import { isQuirk } from './journal.js';
 import { RULES } from './game.js';
 import { placeFacts } from '../data/wikidata.js';
 import { wikiSummary } from '../data/wiki.js';
+import { reachable as walkableTo, nearestPath, closedToPublic } from './reach.js';
 
 export const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 const bump = (r, n = 1) => RARITIES[Math.max(0, Math.min(RARITIES.length - 1, RARITIES.indexOf(r) + n))];
@@ -218,11 +219,11 @@ export const ERAS = [
 export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = new Set(), inside = (_p) => true) {
   const cands = [];
   for (const p of pois) {
-    if (!p.name || avoid.has(p.ref) || !inside(p)) continue;
+    if (!p.name || avoid.has(p.ref) || closedToPublic(p)) continue;
     const grp = groupOf(p.kind, p.cls);
     if (BUSINESS.has(grp)) continue;
     const d = haversine(pos.lat, pos.lon, p.lat, p.lon);
-    if (d < 120 || d > 800) continue;
+    if (d < 120 || d > 800 || !inside(p)) continue;
     cands.push({ p, d, grp, brg: bearingTo(pos, p) });
   }
   if (!cands.length) return null;
@@ -323,33 +324,51 @@ export function parTime(d, mode) { return Math.round((d * 1.4) / (PACE[mode] || 
  * Race: the highest ground within reach (or a viewpoint / landmark), against par or sunset.
  * @param {(lat:number, lon:number) => number|null} groundAt
  */
-export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random, inside = (_p) => true) {
+/**
+ * @param {(lat: number, lon: number) => ({lat: number, lon: number} | null)} [snap] the nearest
+ *   point on a public way (null: nothing walkable near); finishes are never off the paths
+ */
+export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random, inside = (_p) => true, snap = (lat, lon) => ({ lat, lon })) {
   const here = groundAt(pos.lat, pos.lon);
-  let best = null;
+  let target = null, kind, gain = 0;
   if (here != null) {
+    // the highest ground that a public path actually reaches
+    const samples = [];
     for (let e = -650; e <= 650; e += 30) for (let n = -650; n <= 650; n += 30) {
       const r = Math.hypot(e, n);
       if (r < 150 || r > 650) continue;
       const p = offsetGeo(pos.lat, pos.lon, e, n);
       if (!inside(p)) continue;
       const h = groundAt(p.lat, p.lon);
-      if (h != null && (!best || h > best.h)) best = { ...p, h, d: r };
+      if (h != null && h - here >= 6) samples.push({ ...p, h });
     }
+    samples.sort((a, b) => b.h - a.h);
+    for (const p of samples.slice(0, 60)) {
+      const q = snap(p.lat, p.lon);
+      const h = q && groundAt(q.lat, q.lon);
+      const d = q && haversine(pos.lat, pos.lon, q.lat, q.lon);
+      if (h != null && h - here >= 6 && d >= 150 && inside(q)) { target = { lat: q.lat, lon: q.lon, h, d }; break; }
+    }
+    if (target) { kind = 'summit'; gain = Math.round(target.h - here); }
   }
-  let target, kind, gain = 0;
-  if (best && best.h - here >= 6) { target = best; kind = 'summit'; gain = Math.round(best.h - here); }
-  else {
-    const spots = pois.filter((p) => {
-      if (!p.name || !inside(p)) return false;
+  if (!target) {
+    const spots = [];
+    for (const p of pois) {
+      if (!p.name || closedToPublic(p)) continue;
       const d = haversine(pos.lat, pos.lon, p.lat, p.lon), grp = groupOf(p.kind, p.cls);
-      return d >= 200 && d <= 750 && !BUSINESS.has(grp);
-    });
+      if (d < 200 || d > 750 || BUSINESS.has(grp) || !inside(p)) continue;
+      spots.push(p);
+    }
     const view = spots.filter((p) => /viewpoint|peak|tower|lighthouse/.test(p.kind || ''));
-    const list = view.length ? view : spots;
-    if (!list.length) return null;
-    const p = list[Math.floor(rand() * list.length)];
-    target = { lat: p.lat, lon: p.lon, name: p.name, d: haversine(pos.lat, pos.lon, p.lat, p.lon) };
-    kind = view.length ? 'viewpoint' : 'dash';
+    for (const list of [view, spots]) {
+      for (let tries = 0; tries < 8 && list.length && !target; tries++) {
+        const p = list[Math.floor(rand() * list.length)];
+        const q = snap(p.lat, p.lon); // the finish line is on the path next to it
+        if (q) { target = { lat: q.lat, lon: q.lon, name: p.name, d: haversine(pos.lat, pos.lon, q.lat, q.lon) }; kind = list === view ? 'viewpoint' : 'dash'; }
+      }
+      if (target) break;
+    }
+    if (!target) return null;
   }
   const par = parTime(target.d, mode);
   // the real sunset as the clock, if it's close and reachable
@@ -420,6 +439,25 @@ export class Quests {
   rank() { return rankOf(this.stars()); }
   active() { return this.s.offers.find((o) => o && o.id === this.s.active) || null; }
 
+  // Places and finish lines players told us they couldn't reach (never offered again)
+  isBlocked(p) {
+    return (this.s.blocked || []).some((b) => (b.ref && b.ref === p.ref) || haversine(b.lat, b.lon, p.lat, p.lon) < 60);
+  }
+  // Swap the active quest for another of the same kind, with no penalty, and remember the spot.
+  cantReach() {
+    const s = this.s, o = this.active();
+    if (!o || o.type === 'bounty') return null;
+    (s.blocked ||= []).push({ ref: o.ref || null, lat: +o.lat.toFixed(5), lon: +o.lon.toFixed(5) });
+    if (s.blocked.length > 300) s.blocked.splice(0, s.blocked.length - 300);
+    const i = s.offers.indexOf(o);
+    s.active = null;
+    s.offers[i] = this.make(o.type) || null; // null: refilled when something fits
+    this.profile.log(`Couldn't reach: ${o.title}${o.place?.name ? ` (${o.place.name})` : ''}`);
+    this.profile.save();
+    this.emit('quest-info', 'Thanks. We won’t send you there again. Here’s a fresh one instead, no stars lost.');
+    return s.offers[i];
+  }
+
   // Can the player get to a point in this mode? (Home: only inside the home range.)
   inside(p) {
     const g = this.game, h = this.profile.data.home;
@@ -469,12 +507,14 @@ export class Quests {
     const g = this.game, pos = g.pos, w = g.world;
     const pois = [...w.pois(pos.lat, pos.lon, 900)].map((x) => x.poi);
     for (const o of this.s.offers) if (o?.ref) avoid.add(o.ref);
-    const inside = (p) => this.inside(p);
-    if (type === 'mystery') { const m = makeMystery(pos, pois, this.profile.data.discoveries, Math.random, avoid, inside); if (m) this.enrich(m); return m; }
+    const inside = (p) => this.inside(p) && !this.isBlocked(p);
+    // finish lines on public ways (where the map has path data; elsewhere the point stands)
+    const snap = (lat, lon) => { const n = nearestPath(w, lat, lon, 60); return !n.known ? { lat, lon } : n.d <= 60 ? { lat: n.lat, lon: n.lon } : null; };
+    if (type === 'mystery') { const m = makeMystery(pos, pois, this.profile.data.discoveries, Math.random, avoid, (p) => inside(p) && walkableTo(w, p)); if (m) this.enrich(m); return m; }
     if (type === 'bounty') return g.wild.species.length ? makeBounty(pos, g.wild.species, this.profile.data.species || {}, (a, b) => w.habitatAt(a, b), Math.random, avoid, inside) : null;
     if (type === 'race') {
       const ss = sunsetIn((t) => g.env.sun(pos.lat, pos.lon, new Date(t)).alt);
-      return makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside);
+      return makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside, snap);
     }
     return null;
   }

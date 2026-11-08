@@ -382,6 +382,11 @@ neighbourhood"), and neighbourhood tier cards with rarity by tier.
 **First step:** the speed and dwell filter for cells, then per-neighbourhood coverage in the
 journal's Areas tab, before any scores or leaderboards.
 
+*Status (Nov 2026): **built**. Cells count only on foot (Present, up to 10 mph; both versions).
+Each area's walkable ground comes from the public ways in the map tiles (`src/game/reach.js`);
+the journal's Areas tab shows coverage on foot and from home, depth tiers with an announcement
+at each new tier, and the explorer score (beta and main). Not yet: dwell time, Uncharted quests, tier cards.*
+
 ---
 
 ## 9. Leaderboards and comparing with other players (sustainably)
@@ -425,6 +430,10 @@ disclosures, item 3).
 
 **First step:** option 1 (friend leagues via share codes) in the beta, measuring whether
 people actually compare before building any server.
+
+*Status (Nov 2026): option 1 **built** in the beta (Expeditions → Friends; `src/game/league.js`):
+a generated name plus rank, stars, cards, rare+ cards, species, explorer score and areas
+surveyed; strict decoding of codes; friends kept on the device.*
 
 ---
 
@@ -477,4 +486,10 @@ access at all.
 
 **First step:** race targets snapped to public paths, and mystery candidates filtered by the
 place's own access tags plus a "near a public path" test using the tiles already loaded.
+
+*Status (Nov 2026): first step **built**. The tiles' transportation layer carries `access` and
+`foot` (verified on OpenFreeMap), so walkable ways are kept per area with no extra requests.
+Mysteries skip places tagged private or more than 60 m from a public way; race finishes snap
+onto public ways; **Can't get there** swaps with no penalty and remembers the spot. Next:
+enclosing private areas, then islands and ferries as tier-2 special expeditions.*
 Then enclosing-area checks, then island and ferry detection as tier-2 special expeditions.

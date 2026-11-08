@@ -46,7 +46,7 @@ export async function slot(fn) {
   try { return await fn(); } finally { inflight--; waiting.shift()?.(); }
 }
 
-const TAG_KEYS = ['opening_hours', 'wikidata', 'wikipedia', 'start_date', 'heritage', 'website', 'cuisine', 'description'];
+const TAG_KEYS = ['opening_hours', 'wikidata', 'wikipedia', 'start_date', 'heritage', 'website', 'cuisine', 'description', 'access', 'foot'];
 const KIND_KEYS = ['tourism', 'historic', 'amenity', 'leisure', 'shop', 'natural', 'man_made'];
 
 export async function loadDetail(key, b) {

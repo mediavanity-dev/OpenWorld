@@ -241,6 +241,15 @@ In **Home**, every quest is inside your home range. Directions for a mystery are
 you accept it, and a race's clock is set from where you start. Your cards (with where and when you
 won them) are under *Your cards*, on the journal's overview and as ◆ on the journal map.
 
+**Can't get there?** On an active mystery or race, **Can't get there** swaps it for a fresh one
+with no stars lost, and that spot is never offered again. The game already avoids places tagged
+private and anything without a public path or street close by, and race finishes always sit on a
+public path; the map data isn't perfect, though, so the button covers the rest.
+
+**Friends (beta).** In Expeditions → **Friends**, share your explorer card (a link or code) and add
+your friends' to compare. Only a few numbers and a generated name (like "Swift Heron 42") are
+shared, never where you've been, and nothing is uploaded: codes go from person to person.
+
 **Starting the beta.** First time: the start screen, as usual. After that it skips straight in. On
 a phone it starts where you are (Present); on a computer it starts at your home base. If a computer
 has no home base yet, a short window helps you set one: **use this device's location** (computers
@@ -267,6 +276,15 @@ changes. Their colour tells you what they're attached to:
 - **teal**: attached to the ground
 - **orange**: the building it was on has moved on the map, so the beacon moved with it
 - **red**: the building it was on no longer exists on the map; the beacon stays at its spot
+
+### Explorer depth (journal → Areas)
+
+The game rewards knowing a place, not travelling far. For each area (about 1.5 km across) the
+journal shows how much of its public streets and paths you've walked, and a tier: **Explored**
+(25%), **Surveyed** (50%), **Mapped** (75%) and **Known by heart** (90%). Your **explorer score**
+adds up each area's share squared, so ten areas you know well beat a hundred you've passed
+through. Only real walking or running counts (Present, up to 10 mph): ground covered by car,
+bus or train doesn't, and Home progress shows separately.
 
 ### 12. See just the map
 

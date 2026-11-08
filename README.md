@@ -42,7 +42,10 @@ unnamed real place, a bounty on a locally recorded animal, a race to the high gr
 against the real sunset). Each one wins a collectible card whose rarity comes from real facts.
 The beta also skips the start screen for returning players (phones start where you are,
 computers at your home base) and lets a computer set its home base by Wi-Fi location or by a
-typed address near you.
+typed address near you. New in the beta: **explorer depth** (journal → Areas: how much of
+each area's streets you've walked, with tiers and a score that rewards depth over distance),
+quests only where there's a public way to get there, and **friend leagues** by share code.
+Everywhere: explored ground only counts on foot (up to 10 mph).
 
 ## For developers
 

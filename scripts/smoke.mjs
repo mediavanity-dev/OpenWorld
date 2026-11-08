@@ -153,7 +153,8 @@ try {
     o.ctx.expeditions.open('today'); await wait(300);
     if (!document.querySelector('#quests-body .qwelcome')) return 'no welcome blurb on first open';
     if (!document.querySelector('#quests-body .qcard')) return 'board did not render';
-    if (want === 'reveal') { const q = offers.find((x) => x.type !== 'bounty') || offers[0]; o.game.quests.accept(q.id); if (q.type === 'mystery') q.guessRight = true; o.game.quests.complete(q); await wait(2200); }
+    if (want === 'friends') { o.ctx.expeditions.close(); o.ctx.expeditions.open('friends'); await wait(300); if (!document.querySelector('#quests-body table.lg')) return 'no friends table'; }
+    else if (want === 'reveal') { const q = offers.find((x) => x.type !== 'bounty') || offers[0]; o.game.quests.accept(q.id); if (q.type === 'mystery') q.guessRight = true; o.game.quests.complete(q); await wait(2200); }
     else if (want !== 'quests') o.ctx.expeditions.close();
     return 'ok:' + offers.map((x) => x.type).join(','); })()` });
   if (qr.result?.value && !String(qr.result.value).startsWith('ok') && qr.result.value !== 'off') failures.push(`expeditions: ${qr.result.value}`);

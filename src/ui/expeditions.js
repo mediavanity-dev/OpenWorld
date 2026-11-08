@@ -12,6 +12,8 @@ import { esc, safeUrl } from '../util/html.js';
 import { buzz } from '../sensors.js';
 import { toast } from './hud.js';
 import { closeCard } from './card.js';
+import { summaryOf, encode, decode, standings } from '../game/league.js';
+import { explorerScore } from '../game/journal.js';
 
 const $ = (id) => document.getElementById(id);
 const TYPE = {
@@ -63,7 +65,7 @@ export function initExpeditions(ctx) {
         <div class="qbar"><i style="width:${Math.round(r.frac * 100)}%"></i></div></div>
       <div class="qcount"><b>${cards}</b><small>cards</small></div>
     </div>
-    <div class="jtabs"><button data-qtab="today" class="${tab === 'today' ? 'active' : ''}">Today</button><button data-qtab="cards" class="${tab === 'cards' ? 'active' : ''}">Your cards</button></div>`;
+    <div class="jtabs"><button data-qtab="today" class="${tab === 'today' ? 'active' : ''}">Today</button><button data-qtab="cards" class="${tab === 'cards' ? 'active' : ''}">Your cards</button><button data-qtab="friends" class="${tab === 'friends' ? 'active' : ''}">Friends</button></div>`;
   }
   function nextName(r) { const i = r.level; return ['Scout', 'Pathfinder', 'Tracker', 'Ranger', 'Surveyor', 'Naturalist', 'Explorer', 'Cartographer', 'Legend'][i - 1] || ''; }
 
@@ -91,7 +93,7 @@ export function initExpeditions(ctx) {
         </details>`}
         <div class="qdeck">${s.offers.map((o, i) => offerHtml(o, i, act)).join('')}</div>
         ${allDone(s) ? '<button class="primary qmore" data-qmore>Deal three more</button>' : ''}`;
-    } else body = cardsHtml();
+    } else body = tab === 'friends' ? friendsHtml() : cardsHtml();
     const html = header() + body;
     const el = $('quests-body');
     if (el.dataset.v !== html) { el.dataset.v = html; el.innerHTML = html; }
@@ -127,7 +129,7 @@ export function initExpeditions(ctx) {
     if (why) meta.push(`<span class="warn">${esc(why)}</span>`);
     const card = o.done ? q().s.cards.find((c) => c.id === o.id) : null;
     const btns = o.done ? `<span class="qdone">✓ Done${card ? ` ${starsHtml(card.grade === 'echo' ? 0 : card.stars)}` : ''}</span>`
-      : isAct ? '<button data-qabandon>Give up</button><button class="primary" data-qclose>Go!</button>'
+      : isAct ? `<button data-qabandon>Give up</button>${o.type !== 'bounty' ? '<button data-qcant title="Private, fenced off, across water…? Swap it, no stars lost">Can’t get there</button>' : ''}<button class="primary" data-qclose>Go!</button>`
       : `${q().s.swaps > 0 && !locked ? `<button data-qswap="${i}" title="Swap for a different one (once a day)">↻ Swap${' '}<small>(1 left today)</small></button>` : ''}<button class="primary" data-qaccept="${esc(o.id)}" ${locked || why ? 'disabled' : ''}>${locked ? 'One at a time' : why ? 'Not here' : 'Accept'}</button>`;
     return `<article class="qcard ${o.type} r-${o.rarity} ${isAct ? 'active' : ''} ${o.done ? 'done' : ''}">
       <div class="qtop"><span class="qtype">${T.glyph} ${T.label} <small>${T.verb}</small></span><span class="qgem r-${o.rarity}" title="Reward">${RARITY_LABEL[o.rarity]} card</span></div>
@@ -142,6 +144,57 @@ export function initExpeditions(ctx) {
       ${o.clues.map((c) => o.used.includes(c.key)
         ? `<div class="qclue got">💡 ${esc(c.text)}</div>`
         : `<button class="qclue" data-qclue="${c.key}">💡 ${esc(c.label)} <small>−★</small></button>`).join('')}</div>`;
+  }
+
+  // ---------------------------------------------------------------- friend leagues
+  // your card: real progress only (no echoes), and no places
+  function myCard() {
+    const d = profile.data, cards = q().s.cards.filter((c) => c.grade !== 'echo');
+    const deep = Object.values(d.areas || {}).filter((a) => a.walk && (a.foot || 0) / a.walk >= 0.5).length;
+    return summaryOf({
+      id: d.id, level: q().rank().level, stars: q().stars(), cards: cards.length,
+      rare: cards.filter((c) => ['rare', 'epic', 'legendary'].includes(c.rarity)).length,
+      species: Object.values(d.species || {}).filter((x) => x.grade !== 'echo').length,
+      score: explorerScore(d.areas), deep, date: q().date(),
+    });
+  }
+  function shareLink() { return `${location.origin}${location.pathname}#friend=${encode(myCard())}`; }
+  // add (or update) a friend from a pasted code or link; returns their card or null
+  function addFriendCode(input) {
+    const f = decode(input);
+    if (!f) { toast('That isn’t a valid explorer code.', 'error'); return null; }
+    if (f.k === myCard().k) { toast('That’s your own code. Send it to a friend instead!'); return null; }
+    const fr = (profile.data.friends ||= {});
+    const had = !!fr[f.k];
+    fr[f.k] = { ...f, added: fr[f.k]?.added || q().date() };
+    const keys = Object.keys(fr);
+    if (keys.length > 50) delete fr[keys.sort((a, b) => (fr[a].t < fr[b].t ? -1 : 1))[0]];
+    profile.save();
+    toast(had ? `Updated ${f.n}’s card.` : `Added ${f.n} to your league.`, 'quest');
+    return f;
+  }
+  function friendsHtml() {
+    const me = myCard(), fr = Object.values(profile.data.friends || {});
+    const rows = standings([{ ...me, me: true }, ...fr]);
+    return `<p class="qintro">Compare with friends: send them your code, add theirs. Only these numbers and your explorer name are shared, never where you've been. Codes go from person to person; nothing is uploaded.</p>
+      <div class="lg-me"><b>You are ${esc(me.n)}</b>
+        <div class="row"><button class="primary" data-qshare>Share my code</button><button data-qcopy>Copy link</button></div></div>
+      <form class="row lg-add" data-qaddform><input name="code" placeholder="Paste a friend’s code or link" autocomplete="off" aria-label="A friend's code or link" /><button type="submit">Add</button></form>
+      <table class="lg"><thead><tr><th></th><th>Explorer</th><th title="Explorer score: depth of exploration">Depth</th><th title="Stars">★</th><th title="Rare, epic and legendary cards">Rare+</th><th title="Species found">Species</th><th></th></tr></thead><tbody>
+      ${rows.map((r, i) => `<tr class="${r.me ? 'me' : ''}"><td>${i + 1}</td><td><b>${esc(r.n)}</b><small>rank ${r.r} · ${r.c} cards · ${r.a} areas surveyed${r.me ? '' : ` · ${esc(r.t)}`}</small></td>
+        <td>${r.x}</td><td>${r.s}</td><td>${r.e}</td><td>${r.sp}</td><td>${r.me ? '' : `<button class="lg-del" data-qdel="${esc(r.k)}" aria-label="Remove ${esc(r.n)}">✕</button>`}</td></tr>`).join('')}
+      </tbody></table>
+      ${fr.length ? '' : '<p class="credit">No friends added yet. Ask a friend who plays the beta for their code.</p>'}
+      <p class="credit">Depth is the explorer score: how thoroughly you've walked your areas, not how far you've travelled. Friends' rows update when they send you a new code. Codes can be edited by hand, so this is for fun among friends.</p>`;
+  }
+  async function share() {
+    const url = shareLink();
+    try { if (navigator.share) { await navigator.share({ title: 'My OpenWorld explorer card', text: `${myCard().n} on OpenWorld: add me to your league!`, url }); return; } } catch (e) { if (e?.name === 'AbortError') return; }
+    copy(url);
+  }
+  async function copy(url = shareLink()) {
+    try { await navigator.clipboard.writeText(url); toast('Link copied. Send it to a friend.', 'quest'); }
+    catch { prompt('Copy this link and send it to a friend:', url); }
   }
 
   function cardsHtml() {
@@ -162,6 +215,9 @@ export function initExpeditions(ctx) {
     const b = t.closest('button');
     if (!b) return;
     if (b.dataset.qtab) { tab = b.dataset.qtab; render(); }
+    else if (b.dataset.qshare !== undefined) share();
+    else if (b.dataset.qcopy !== undefined) copy();
+    else if (b.dataset.qdel) { const f = profile.data.friends?.[b.dataset.qdel]; if (f && confirm(`Remove ${f.n} from your league?`)) { delete profile.data.friends[b.dataset.qdel]; profile.save(); render(); } }
     else if (b.dataset.qintro !== undefined) { intro = false; render(); $('quests-body').scrollTop = 0; }
     else if (b.dataset.qhome !== undefined) { close(); ctx.homeSetup?.open({ onSet: () => ctx.hud.render() }); }
     else if (b.dataset.qaccept) {
@@ -171,10 +227,17 @@ export function initExpeditions(ctx) {
       buzz([20, 30, 20]); ctx.ambience.chime(4);
       if (o.type !== 'mystery') setTimeout(close, 450); // mysteries stay open so you can read the riddle and clues
     } else if (b.dataset.qswap) { if (!q().swap(+b.dataset.qswap)) toast('Nothing else to swap in around here right now.'); render(); }
+    else if (b.dataset.qcant !== undefined) { if (confirm('Can’t get there (private, fenced off, across water…)? You’ll get a fresh one instead with no stars lost, and we won’t send you there again.')) { q().cantReach(); render(); } }
     else if (b.dataset.qabandon) { if (confirm('Give up this expedition? It goes back on the board.')) { q().abandon(); render(); } }
     else if (b.dataset.qclue) { const c = q().buyClue(b.dataset.qclue); if (c) { buzz(15); ctx.ambience.chime(2); } render(); }
     else if (b.dataset.qmore !== undefined) { q().more(); render(); }
     else if (b.dataset.qcard) reveal(q().s.cards[+b.dataset.qcard], { replay: true });
+  });
+  $('quests').addEventListener('submit', (e) => {
+    const f = e.target.closest('[data-qaddform]');
+    if (!f) return;
+    e.preventDefault();
+    if (addFriendCode(f.elements.code.value)) { tab = 'friends'; render(); }
   });
   $('quests-close').onclick = close;
 
@@ -356,5 +419,8 @@ export function initExpeditions(ctx) {
 
   setInterval(() => { if (isOpen() && tab === 'today') render(); }, 1000); // clocks, scouting
 
-  return { open, close, render, hud, chip, minimap, onEvent, openOnStart, isOpen, whenClear };
+  // a friend's link opened (#friend=…): add them, then show the league
+  function friendLink(code) { if (on() && addFriendCode(code)) open('friends'); }
+
+  return { open, close, render, hud, chip, minimap, onEvent, openOnStart, isOpen, whenClear, friendLink };
 }

@@ -2,7 +2,7 @@
 // records, survey areas and a map of explored ground; plus a shareable summary image.
 
 import { geohashBounds, chunkIndex, chunkKey, offsetMeters } from '../geo.js';
-import { TASKS } from '../game/journal.js';
+import { TASKS, DEPTH_TIERS, depthTier, explorerScore } from '../game/journal.js';
 import { GROUP_STYLE } from '../data/wildlife.js';
 import { TAG_ICONS } from '../game/environment.js';
 import { ageText } from '../data/science.js';
@@ -175,12 +175,22 @@ function areas(profile) {
     const { i, j } = chunkIndex(la, lo), k = chunkKey(i, j);
     (x.grade === 'echo' ? echo : found)[k] = ((x.grade === 'echo' ? echo : found)[k] || 0) + 1;
   }
-  const list = Object.entries(d.areas || {}).filter(([k]) => found[k] || echo[k])
-    .map(([k, a]) => ({ k, a, f: found[k] || 0, e: echo[k] || 0, pct: a.total ? Math.min(100, Math.round(((found[k] || 0) / a.total) * 100)) : 0 }))
-    .sort((x, y) => y.pct - x.pct || y.f - x.f);
-  if (!list.length) return '<p class="credit">Your surveyed areas appear here once you discover places. Each area is about 1.5 km across.</p>';
-  return `<p class="credit">Survey completion: places you've found for real out of the notable places in each area.</p>
-    ${list.map((x) => `<div class="area"><div><b>${esc(x.a.name || 'Unnamed area')}</b><small>${x.f}/${x.a.total} found${x.e ? ` · ${x.e} echoes` : ''}</small></div><div class="pbar"><i style="width:${x.pct}%"></i></div><span>${x.pct}%</span></div>`).join('')}`;
+  const share = (n, of) => (of ? Math.min(1, (n || 0) / of) : 0);
+  const list = Object.entries(d.areas || {}).filter(([k, a]) => found[k] || echo[k] || a.foot || a.home)
+    .map(([k, a]) => ({ k, a, f: found[k] || 0, e: echo[k] || 0, foot: share(a.foot, a.walk), home: share(a.home, a.walk) }))
+    .map((x) => ({ ...x, tier: depthTier(x.foot), placePct: x.a.total ? Math.min(100, Math.round((x.f / x.a.total) * 100)) : 0 }))
+    .sort((x, y) => y.foot - x.foot || y.home - x.home || y.f - x.f);
+  const score = explorerScore(d.areas);
+  const deep = list.filter((x) => x.foot >= 0.5).length;
+  const head = `<div class="depth-head"><div><b>${score}</b><span>explorer score</span></div><div><b>${deep}</b><span>areas surveyed (50%+)</span></div>
+    <p class="credit">Depth beats distance. Each area scores by how much of its streets and paths you've walked for real, squared, so knowing your own neighbourhood counts far more than passing through many places. Only walking or running counts (Present, up to 10 mph); Home progress shows separately.</p>
+    <p class="credit tiers">${DEPTH_TIERS.slice().reverse().filter(([t]) => t > 0).map(([t, n]) => `<span>${n} ${Math.round(t * 100)}%</span>`).join(' · ')}</p></div>`;
+  if (!list.length) return head + '<p class="credit">Your areas appear here as you walk and discover places. Each area is about 1.5 km across.</p>';
+  return head + list.map((x) => `<div class="area depth">
+      <div><b>${esc(x.a.name || 'Unnamed area')}</b>${x.tier ? ` <span class="tierchip t-${x.tier.split(' ')[0].toLowerCase()}">${esc(x.tier)}</span>` : ''}
+        <small>${x.a.walk ? `Streets walked: <b>${Math.round(x.foot * 100)}%</b> on foot${x.home > x.foot ? ` · ${Math.round(x.home * 100)}% from home` : ''} · ` : ''}places ${x.f}/${x.a.total}${x.e ? ` · ${x.e} echoes` : ''}</small></div>
+      <div class="pbar two"><i class="home" style="width:${Math.round(x.home * 100)}%"></i><i style="width:${Math.round(x.foot * 100)}%"></i></div>
+      <span>${x.a.walk ? Math.round(x.foot * 100) : x.placePct}%</span></div>`).join('');
 }
 
 function map() {
