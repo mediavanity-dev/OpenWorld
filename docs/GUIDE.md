@@ -52,7 +52,7 @@ You're the small coloured figure with the arrow above its head. The arrow shows 
 buildings, so you can always find yourself.
 
 On phones, the **▸** button next to the mode buttons opens more options (locate, home
-base, beacons, search).
+base, search).
 
 ### 3. The three ways to play
 
@@ -65,8 +65,7 @@ The buttons at the top switch between them. Each one has a different rule:
   600 m of it, from your sofa. Finds count as "home". A blue ring shows your limit.
 - **Roam** (purple, see-through): go anywhere in the world. It's great for exploring,
   but anything you find there is only an **echo**: a note that you've seen it
-  virtually. Visit it for real (Present) later to claim it properly. You can't place
-  beacons while roaming.
+  virtually. Visit it for real (Present) later to claim it properly.
 
 ### 4. Discover places
 
@@ -193,7 +192,7 @@ locally, and which months it's usually seen around here.
 
 Tap **📷** to see the game through your phone's camera. Places appear as small icon pins
 with their distance (tap one for its name and details), the names of streets ahead of you show near the
-ground, beacons rise up as glowing pillars, and nearby creatures appear with a green
+ground, and nearby creatures appear with a green
 "tap to photograph" tag. **Tap a creature to photograph it** from up to 40 m away.
 Tap **✕ Exit AR** to go back to the map.
 
@@ -256,11 +255,13 @@ home. After that you can play **Home** mode from anywhere.
 
 Choose carefully: **a home base can only be moved once every 30 days.**
 
-### 11. Leave beacons
+### 11. Beacons (switched off for now)
 
-Tap **Place beacon** (or press **B**) to drop a glowing marker where you're standing, with
-a label of your choice. Beacons stay put for good, even when the map data changes.
-Their colour tells you what they're attached to:
+Beacons are hidden until they can be shared with other players (see the backlog's shared
+content plan). Any you placed are kept in your profile and backups, and will come back.
+When they return: tap **Place beacon** (or press **B**) to drop a glowing marker where you're
+standing, with a label of your choice. Beacons stay put for good, even when the map data
+changes. Their colour tells you what they're attached to:
 
 - **gold**: attached to a nearby place or building
 - **teal**: attached to the ground

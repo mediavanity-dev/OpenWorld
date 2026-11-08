@@ -99,7 +99,7 @@ export function initSettingsPanel(ctx) {
     } catch (err) { toast('Import failed: ' + err.message, 'error'); }
     e.target.value = '';
   };
-  $('p-reset').onclick = () => { if (confirm('Erase this profile (discoveries, species, beacons, home base)?')) { profile.reset(); location.reload(); } };
+  $('p-reset').onclick = () => { if (confirm('Erase this profile (discoveries, species, cards, home base)?')) { profile.reset(); location.reload(); } };
 
   // playtest stats (local only)
   const pct = (x) => (x == null ? '–' : `${Math.round(x * 100)}%`);

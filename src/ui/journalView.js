@@ -8,6 +8,7 @@ import { TAG_ICONS } from '../game/environment.js';
 import { ageText } from '../data/science.js';
 import { fmtDist, fmtElev } from '../units.js';
 import { esc, safeUrl } from '../util/html.js';
+import { SHOW_BEACONS } from '../channel.js';
 
 const $ = (id) => document.getElementById(id);
 const KIND_LABEL = { tourism: 'Sights', historic: 'History', amenity: 'Cafés, culture & services', shop: 'Shops', leisure: 'Parks & sport', natural: 'Nature', transport: 'Stations' };
@@ -104,7 +105,7 @@ function overview(profile) {
     ${expeditionBox() || `<div class="task ${t.done ? 'done' : ''}"><span>Today's field assignment</span><b>${esc(T.text)}</b><small>${t.done ? 'Complete ✓' : prog} · Present or Home mode</small></div>`}
     <div class="jgrid">
       ${stat(s.present, 'claimed', '#ff7a3d')}${stat(s.home, 'found from home', '#3db8ff')}${stat(s.echo, 'echoes', '#b07aff')}
-      ${stat(s.species, 'species', '#5fd08a')}${stat(s.rocks, 'rock units', '#c9a27a')}${stat(s.beacons, 'beacons', '#ffd36b')}
+      ${stat(s.species, 'species', '#5fd08a')}${stat(s.rocks, 'rock units', '#c9a27a')}${SHOW_BEACONS ? stat(s.beacons, 'beacons', '#ffd36b') : ''}
     </div>
     <div class="jgrid">
       ${stat(s.exploredKm2.toFixed(2), 'km² explored on foot')}${stat(fmtDist(s.walked), 'walked')}${stat(s.daysActive, 'days out')}

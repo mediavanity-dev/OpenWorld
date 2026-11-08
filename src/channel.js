@@ -23,4 +23,8 @@ export const FEATURES = {
   rephoto: { label: 'Rephotography: line up old photos of a place in the camera', stable: false },
   quests: { label: 'Expeditions: daily mysteries, bounties and races that win collectible cards', stable: false },
 };
+// Beacons are hidden (both versions) until there is a shared-content model to give them a
+// purpose (BACKLOG item 1). Beacons already placed stay in profiles and exports.
+export const SHOW_BEACONS = false;
+
 export const featureAvailable = (k) => (BETA || !!FEATURES[k]?.stable) && (!FEATURES[k]?.needsKeys || Object.values(OKAPI_KEYS).some((v) => (v || '').trim()));

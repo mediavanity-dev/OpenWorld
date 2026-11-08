@@ -554,3 +554,7 @@ body.reduce-motion .nearest.quest.qnew, body.reduce-motion .nearest.quest.qnew #
 
 /* a real fact (from Wikidata) as the riddle's second line */
 .qriddle .qfact { display: block; margin-top: 4px; font: 13.5px/1.4 system-ui, sans-serif; font-style: normal; color: #e6dcff; }
+
+/* beacons are hidden until shared content (BACKLOG 1); the stats row closes up to four */
+body.no-beacons .beacon-ui { display: none !important; }
+body.no-beacons .stats { grid-template-columns: repeat(4, 1fr); }

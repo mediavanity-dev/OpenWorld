@@ -25,7 +25,7 @@ import { haversine } from './geo.js';
 import { settings, saveSettings, TIERS, startTier, isTouch } from './settings.js';
 import { storage, onStorageError, isVolatile } from './storage.js';
 import { startCompass, stopCompass, onHeading, currentHeading, keepAwake, watchBattery, buzz } from './sensors.js';
-import { BETA, FEATURES, featureAvailable, storeKey } from './channel.js';
+import { BETA, FEATURES, featureAvailable, storeKey, SHOW_BEACONS } from './channel.js';
 import { Controls } from './ui/controls.js';
 import { initCard, showPlace, showSpecies, showHere, closeCard } from './ui/card.js';
 import { Minimap } from './ui/minimap.js';
@@ -116,6 +116,7 @@ function applyFeatures() {
 }
 applyFeatures();
 if (BETA) document.body.classList.add('beta');
+if (!SHOW_BEACONS) document.body.classList.add('no-beacons'); // hidden until shared content (BACKLOG 1)
 
 // saving problems are the one thing a player must hear about
 onStorageError(() => {
@@ -189,7 +190,7 @@ initCard();
 
 addEventListener('keydown', (e) => {
   if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || !game.mode) return;
-  if (e.code === 'KeyB') { game.placeBeacon(); markers.refreshBeacons(); hud.render(); }
+  if (e.code === 'KeyB' && SHOW_BEACONS) { game.placeBeacon(); markers.refreshBeacons(); hud.render(); }
   if (e.code === 'KeyH') setClean(!document.body.classList.contains('clean'));
   if (e.code === 'KeyC') controls.recenter();
 });

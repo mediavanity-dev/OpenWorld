@@ -5,12 +5,14 @@ import * as THREE from 'three';
 import { RULES } from '../game/game.js';
 import { resolveAnchor } from '../game/anchors.js';
 import { MODE_COLOR } from './avatar.js';
+import { SHOW_BEACONS } from '../channel.js';
 
 const STATUS_COLOR = { feature: '#ffd36b', ground: '#5fe0d0', shifted: '#ffa04d', orphaned: '#ff5d5d', pending: '#c9c9c9' };
 
 export function initMarkers(ctx) {
   const { scene, world, profile } = ctx;
   const beaconGroup = new THREE.Group();
+  beaconGroup.visible = SHOW_BEACONS; // hidden until shared content (BACKLOG 1)
   scene.add(beaconGroup);
   const pillarGeo = new THREE.CylinderGeometry(0.6, 0.6, 60, 8, 1, true).translate(0, 30, 0);
   const orbGeo = new THREE.SphereGeometry(1.4, 16, 12);

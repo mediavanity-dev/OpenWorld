@@ -27,7 +27,7 @@ roam 600 m around a home base you set once. **Roam** goes anywhere, but finds th
 **Your progress stays on your device.** Nothing about where you go is uploaded. Use **Export**
 to keep a backup.
 
-Everything else (all the controls, the camera AR view, beacons, geocaches, settings and
+Everything else (all the controls, the camera AR view, geocaches, settings and
 troubleshooting) is in the **[full guide](docs/GUIDE.md)**, and in the game under
 Settings → *Help & about*.
 
@@ -87,7 +87,7 @@ Add `?dev` to bypass the 30-day home-base cooldown while testing.
 
 ## Modes
 
-| Mode | Where you are | Movement | Discoveries | Beacons |
+| Mode | Where you are | Movement | Discoveries | Beacons (hidden for now) |
 |---|---|---|---|---|
 | **Present** | your device's real location (GPS / Wi-Fi / IP) | only by moving in real life | **claimed** | yes |
 | **Home** | your permanent home base (set once, from a real fix) | free, within 600 m | **home** | yes |
