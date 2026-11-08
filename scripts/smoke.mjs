@@ -165,9 +165,26 @@ try {
         document.querySelector('#quests-body [data-qabandon]')?.click(); await wait(100);
         window.confirm = realConfirm;
         if (o.game.quests.active()) return 'Give up did nothing';
+      }
+      // an accepted mystery keeps its clues tucked away behind one button
+      const m = offers.find((x) => x.type === 'mystery' && !o.game.quests.blocked(x));
+      if (m) {
+        o.game.quests.accept(m.id); o.ctx.expeditions.render(); await wait(100);
+        if (document.querySelector('#quests-body [data-qclue]')) return 'clue choices showed before asking';
+        document.querySelector('#quests-body [data-qclues]')?.click(); await wait(100);
+        if (!document.querySelector('#quests-body [data-qclue]')) return 'Get a clue did not show the clues';
+        const realConfirm = window.confirm; window.confirm = () => true;
+        document.querySelector('#quests-body [data-qabandon]')?.click(); await wait(100);
+        window.confirm = realConfirm;
       } }
     if (!document.querySelector('#quests-body .qcard')) return 'board did not render';
-    if (want === 'friends') { o.ctx.expeditions.close(); o.ctx.expeditions.open('friends'); await wait(300); if (!document.querySelector('#quests-body table.lg')) return 'no friends table'; }
+    // a quest's rarity badge explains cards (in "How expeditions work")
+    document.querySelector('#quests-body [data-qintro]')?.click(); await wait(100);
+    document.querySelector('#quests-body .qcard [data-qabout]')?.click(); await wait(400);
+    if (!document.querySelector('#quests-body details.qhow[open] #qhow-cards')) return 'rarity badge did not open the card explanation';
+    if (want === 'about') return 'ok:about';
+    if (want === 'accepted') { const m = o.game.quests.s.offers.find((x) => x?.type === 'mystery'); if (m) { o.game.quests.accept(m.id); o.ctx.expeditions.close(); o.ctx.expeditions.open('today'); await wait(300); document.querySelector('#quests-body .qcard.active')?.scrollIntoView({ block: 'start' }); await wait(300); } }
+    else     if (want === 'friends') { o.ctx.expeditions.close(); o.ctx.expeditions.open('friends'); await wait(300); if (!document.querySelector('#quests-body table.lg')) return 'no friends table'; }
     else if (want === 'reveal') { const q = offers.find((x) => x.type !== 'bounty') || offers[0]; o.game.quests.accept(q.id); if (q.type === 'mystery') q.guessRight = true; o.game.quests.complete(q); await wait(2200); }
     else if (want !== 'quests') o.ctx.expeditions.close();
     return 'ok:' + offers.map((x) => x.type).join(','); })()` });

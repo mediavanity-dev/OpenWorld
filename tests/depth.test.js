@@ -234,3 +234,24 @@ test('help as you go: a bounty gets field notes in its habitat, a sighting clue 
   const p1 = q.encounterBias('water', false).pick, p2 = q.encounterBias('water', false).pick;
   assert.ok(p2 > p1);
 });
+
+test('accepting a race: the clock waits while you read the card, and starts when you head off', () => {
+  const hill = (lat) => 10 + Math.max(0, (lat - C.lat) * 111320) * 0.08;
+  const world = { *pois() {}, groundAt: hill, habitatAt: () => 'urban', isReadyAt: () => true, readyChunks: () => [], chunkAt: () => null, remote: new Map() };
+  const events = [];
+  const g = new Game(world, new Profile({ key: `d8.${Math.random()}`, lastKey: `d8.l.${Math.random()}` }), { localNow: () => NOON, sun: () => ({ alt: 30 }), snapshot: () => ({}), tags: () => [] }, (e) => events.push(e));
+  g.dataSaver = true; g.features = { quests: true };
+  const q = g.quests = new Quests(g, (e) => events.push(e));
+  g.enter('roam', { to: C });
+  q.step();
+  const r = q.accept(q.s.offers[2].id);
+  assert.equal(r.type, 'race');
+  assert.equal(r.startedAt, null);
+  q.step();
+  assert.equal(q.active().startedAt, null); // still reading
+  g.pos = offsetGeo(C.lat, C.lon, 0, 20);   // set off without closing the board (e.g. after a reload)
+  q.step();
+  assert.ok(q.active().startedAt);
+  assert.equal(events.filter((e) => e.type === 'quest-clock').length, 1);
+  assert.equal(q.startClock(), false); // once
+});

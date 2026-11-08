@@ -104,7 +104,7 @@ test('quests: real completions earn stars and rank', () => {
   const done = events.find((e) => e.type === 'quest-done');
   assert.equal(done.card.grade, 'present');
   assert.equal(done.card.stars, 3);
-  assert.equal(q.stars(), 3);
+  assert.equal(q.stars(), 5); // 3 stars earned + 2 for an epic card
   assert.equal(done.card.rarity, 'epic');
 });
 
