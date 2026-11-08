@@ -585,8 +585,6 @@ table.lg td small { display: block; color: var(--muted); font-size: 10.5px; }
 table.lg tr.me td { background: rgba(255,211,107,0.08); } table.lg tr.me b { color: #ffe39b; }
 .lg-del { padding: 2px 7px; font-size: 11px; }
 
-/* beta: Present always asks the device; the home base window replaces internet (IP) location */
-body.beta .beta-hide { display: none !important; }
 
 /* the deep layer is open in this area */
 .tierchip.deep { border-color: #c07aff; color: #e3c8ff; box-shadow: 0 0 8px rgba(192,122,255,0.35); }

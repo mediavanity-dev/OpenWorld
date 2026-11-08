@@ -124,15 +124,10 @@ try {
     const o = window.openworld, tip = document.getElementById('tips');
     const tab = (m) => document.querySelector('.tabs button[data-mode="' + m + '"]');
     tab('home').click(); await wait(300);
-    const beta = document.body.classList.contains('beta'), hs = document.getElementById('homesetup');
-    if (beta) {
-      // beta: no home base opens the home base setup (device location or a typed address)
-      if (hs.hidden || !document.getElementById('hs-device')) return 'Home without a home base did not open the setup';
-      click('hs-later'); await wait(100);
-    } else {
-      if (tip.hidden || !/home base first/i.test(tip.textContent)) return 'no "set a home base first" hint';
-      tip.querySelector('.next').click();
-    }
+    // no home base: Home opens the home base setup (device location or a typed address)
+    const hs = document.getElementById('homesetup');
+    if (hs.hidden || !document.getElementById('hs-device')) return 'Home without a home base did not open the setup';
+    click('hs-later'); await wait(100);
     o.profile.data.home = { lat: o.game.pos.lat, lon: o.game.pos.lon, trust: 'gps', accuracy: 5, source: 'device', setAt: new Date().toISOString() };
     tab('home').click(); await wait(900);
     if (o.game.mode !== 'home') return 'did not enter Home';
@@ -191,13 +186,13 @@ try {
   if (qr.result?.value && !String(qr.result.value).startsWith('ok') && qr.result.value !== 'off') failures.push(`expeditions: ${qr.result.value}`);
   else if (qr.result?.value) console.log(`smoke: expeditions ${qr.result.value}`);
 
-  // beta, returning player on a computer: the start screen is skipped. Without a home base the
+  // returning player on a computer: the start screen is skipped. Without a home base the
   // setup window opens; with one, the game goes straight into Home.
-  if (process.env.SMOKE_PATH?.includes('beta') && !process.env.SMOKE_TOUCH && !process.env.SMOKE_OPEN) {
+  if (!process.env.SMOKE_TOUCH && !process.env.SMOKE_OPEN) {
     const probe = async (prep) => {
       await send('Runtime.evaluate', { expression: prep });
       await sleep(400);
-      await send('Page.navigate', { url: `http://localhost:${PORT}${process.env.SMOKE_PATH}` });
+      await send('Page.navigate', { url: `http://localhost:${PORT}${process.env.SMOKE_PATH || '/'}` });
       await sleep(4000);
       return (await send('Runtime.evaluate', { returnByValue: true, expression: `({ start: !document.getElementById('start').hidden, setup: !document.getElementById('homesetup').hidden, mode: window.openworld?.game.mode || null })` })).result?.value;
     };

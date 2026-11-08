@@ -369,6 +369,13 @@ Settings → Game features. **Rephotography** ("Then & now") is now **in the bet
 
 ---
 
+*Graduated (Nov 2026, owner's decision): everything in the beta moved to the main version:
+Expeditions (with richer riddles, help as you go, New ground, cards and friend leagues), Then &
+now, explorer depth and deeper layers, the home base window and no-splash start, and the names
+Walk / Home / Roam. The beta stays as the place to try the next ideas.*
+
+---
+
 ## 8. Reward exploring deeply, not travelling far ("explorer depth")
 
 **Problem:** distance and "places visited" reward whoever can afford to travel. Someone who flies
