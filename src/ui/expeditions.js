@@ -105,7 +105,7 @@ export function initExpeditions(ctx) {
     if (o.type === 'mystery') {
       const col = groupInfo(o.place.kind, o.place.cls).color;
       art = `<div class="qart mystery" style="--c:${col}"><span>?</span></div>`;
-      hook = `<p class="qriddle">“${esc(o.riddle)}”</p><p class="qhook">${isAct ? 'From where you started: to' : 'Somewhere to'} the <b>${o.sector}</b>, about ${fmtDist(o.dist)} away.${o.alike >= 2 ? ` One of ${o.alike} places like it in that direction.` : ''}</p>`;
+      hook = `<p class="qriddle">“${esc(o.riddle)}”${o.fact ? `<span class="qfact">${esc(o.fact)}</span>` : ''}</p><p class="qhook">${isAct ? 'From where you started: to' : 'Somewhere to'} the <b>${o.sector}</b>, about ${fmtDist(o.dist)} away.${o.alike >= 2 ? ` One of ${o.alike} places like it in that direction.` : ''}</p>`;
       meta.push(`${o.clues.length} clues to buy · each costs ★`);
       if (isAct) extra = cluesHtml(o);
     } else if (o.type === 'bounty') {

@@ -551,3 +551,6 @@ body.reduce-motion .nearest.quest.qnew, body.reduce-motion .nearest.quest.qnew #
 .qwelcome h3 { margin: 0 0 6px; font-size: 17px; color: #ffe39b; }
 .qwelcome p { margin: 6px 0; color: #e8ecf0; }
 .qwelcome button { width: 100%; min-height: 44px; margin-top: 6px; background: var(--accent); color: #1c1606; }
+
+/* a real fact (from Wikidata) as the riddle's second line */
+.qriddle .qfact { display: block; margin-top: 4px; font: 13.5px/1.4 system-ui, sans-serif; font-style: normal; color: #e6dcff; }

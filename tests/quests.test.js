@@ -253,3 +253,77 @@ test('home base: a typed address must be near where the device or connection say
   assert.equal(game.setHomeAt(HOME, gps), undefined);
   assert.ok(events.some((e) => e.type === 'error' && /permanent/.test(e.msg)));
 });
+
+// ---------------------------------------------------------------- richer riddles (rules, never invented)
+import { riddleFor, redact, factLines, storyLine, applyFacts } from '../src/game/quests.js';
+import { factsFrom, referencedIds } from '../src/data/wikidata.js';
+
+// a trimmed copy of the real Wikidata entity for St Alfege Church, Greenwich (Q1975627)
+const ALFEGE = { claims: {
+  P31: [{ rank: 'normal', mainsnak: { datavalue: { value: { id: 'Q1' } } } }],
+  P571: [{ rank: 'normal', mainsnak: { datavalue: { value: { time: '+1714-00-00T00:00:00Z' } } } }],
+  P84: [{ rank: 'normal', mainsnak: { datavalue: { value: { id: 'Q2' } } } }],
+  P149: [{ rank: 'deprecated', mainsnak: { datavalue: { value: { id: 'Q9' } } } }, { rank: 'normal', mainsnak: { datavalue: { value: { id: 'Q3' } } } }],
+  P1435: [{ rank: 'preferred', mainsnak: { datavalue: { value: { id: 'Q4' } } } }],
+} };
+const REFS = { Q1: { label: 'church building' }, Q2: { label: 'Nicholas Hawksmoor', desc: 'British architect' }, Q3: { label: 'English Baroque architecture' }, Q4: { label: 'Grade I listed building' }, Q9: { label: 'Wrong style' } };
+const EXTRACT = 'St Alfege Church is an Anglican church in the centre of Greenwich, part of the Royal Borough of Greenwich in London.Of medieval origin, it reputedly marks the site where Alfege was martyred in 1012.';
+
+test('riddles: several hand-written lines per kind, so the same kind of place reads differently', () => {
+  const lines = new Set();
+  const r = rng(7);
+  for (let k = 1; k < 40; k++) lines.add(riddleFor({ kind: 'amenity:fountain' }, r));
+  assert.ok(lines.size >= 3);
+});
+
+test('riddles: Wikidata facts are read as plain facts; deprecated statements are ignored', () => {
+  assert.deepEqual(referencedIds(ALFEGE).sort(), ['Q1', 'Q2', 'Q3', 'Q4']); // not the deprecated Q9
+  const f = factsFrom(ALFEGE, REFS);
+  assert.equal(f.year, 1714);
+  assert.equal(f.architect.label, 'Nicholas Hawksmoor');
+  assert.equal(f.style.label, 'English Baroque architecture');
+});
+
+test('riddles: facts become first-person lines, and nothing gives the name away', () => {
+  assert.equal(redact('St Alfege Church is in Greenwich', 'St Alfege Church'), 'St … Church is in Greenwich');
+  const lines = factLines(factsFrom(ALFEGE, REFS), 'St Alfege Church');
+  assert.equal(lines.maker, 'Nicholas Hawksmoor designed me.');
+  assert.equal(lines.style, 'I was built in the English Baroque style.');
+  // a fact that repeats the name is left out rather than shown half-blank
+  assert.equal(factLines({ type: { label: 'astronomical observatory' } }, 'Royal Observatory').type, undefined);
+  // one sentence, even when the summary has no space after a full stop
+  assert.equal(storyLine(EXTRACT, 'St Alfege Church'), 'St … Church is an Anglican church in the centre of Greenwich, part of the Royal Borough of Greenwich in London.');
+});
+
+test('riddles: facts add a second line, the build year (age guess, rarity) and better clues', () => {
+  const o = makeMystery(HOME, [{ ...chapel, tags: { wikidata: 'Q1975627' } }], {}, rng(1));
+  assert.equal(o.place.year, null);
+  const before = o.rarity;
+  applyFacts(o, factsFrom(ALFEGE, REFS), EXTRACT);
+  assert.equal(o.fact, 'Nicholas Hawksmoor designed me.');
+  assert.equal(o.place.year, 1714);
+  assert.ok(['epic', 'legendary'].includes(o.rarity) && o.rarity !== before);
+  assert.deepEqual(o.clues.map((c) => c.key), ['age', 'fact', 'story', 'name', 'zone']);
+  assert.ok(o.clues.every((c) => !/Alfege/.test(c.text)));
+  // once a clue is bought, the clues never change under the player
+  const m = makeMystery(HOME, [chapel], {}, rng(2));
+  m.used.push('name');
+  const keys = m.clues.map((c) => c.key);
+  applyFacts(m, factsFrom(ALFEGE, REFS), EXTRACT);
+  assert.deepEqual(m.clues.map((c) => c.key), keys);
+});
+
+test('riddles: facts are fetched once per mystery in the background, and never with data saver on', async () => {
+  const { game, q } = setup({ pois: [{ ...chapel, tags: { wikidata: 'Q1975627' } }] });
+  let calls = 0;
+  q.lookup = { facts: async () => { calls++; return factsFrom(ALFEGE, REFS); }, summary: async () => ({ extract: EXTRACT }) };
+  game.enter('roam', { to: HOME });
+  q.step(); await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls, 0); // data saver (set in setup)
+  game.dataSaver = false;
+  q.s.offers[0] = null; q._fillT = 0;
+  q.step(); await new Promise((r) => setTimeout(r, 0));
+  q.step(); await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls, 1);
+  assert.equal(q.s.offers[0].fact, 'Nicholas Hawksmoor designed me.');
+});
