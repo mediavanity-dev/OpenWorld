@@ -22,6 +22,7 @@ export const FEATURES = {
   geocaching: { label: 'Geocaches from Opencaching', stable: true, needsKeys: true },
   rephoto: { label: 'Rephotography: line up old photos of a place in the camera', stable: false },
   quests: { label: 'Expeditions: daily mysteries, bounties and races that win collectible cards', stable: false },
+  deep: { label: 'Deeper layers: small hidden finds open up in areas you know well', stable: false },
 };
 // Beacons are hidden (both versions) until there is a shared-content model to give them a
 // purpose (BACKLOG item 1). Beacons already placed stay in profiles and exports.

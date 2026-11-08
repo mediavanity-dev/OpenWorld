@@ -23,6 +23,7 @@ import { WALK } from '../names.js';
 import { placeFacts } from '../data/wikidata.js';
 import { wikiSummary } from '../data/wiki.js';
 import { reachable as walkableTo, nearestPath, closedToPublic } from './reach.js';
+import { taxonDetails, seasonality, lastSightings } from '../data/science.js';
 
 export const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 const bump = (r, n = 1) => RARITIES[Math.max(0, Math.min(RARITIES.length - 1, RARITIES.indexOf(r) + n))];
@@ -155,6 +156,15 @@ export function factLines(f, name) {
   return out;
 }
 
+/** A plaque's or bench's inscription (name blanked, one line) as the riddle's second line. */
+export function inscriptionLine(poi) {
+  const t = (poi.tags?.inscription || '').replace(/\s+/g, ' ').trim();
+  if (t.length < 12) return null;
+  const red = redact(t, poi.name);
+  const cut = red.length > 160 ? `${red.slice(0, 157).replace(/\s+\S*$/, '')}…` : red;
+  return hasWords(cut) ? `It reads: “${cut}”` : null;
+}
+
 /** The first sentence of an encyclopedia summary, name blanked, as a clue (or null). */
 export function storyLine(extract, name) {
   // first sentence (summaries sometimes lack the space after a full stop: "London.Of medieval…")
@@ -180,7 +190,7 @@ export function applyFacts(o, f, extract = null) {
     }
   }
   const lead = ['namedAfter', 'maker', 'style', 'heritage'].find((k) => lines[k]);
-  if (lead && !o.fact) o.fact = lines[lead];
+  if (lead && !o.fact) o.fact = lines[lead]; // (an inscription, when there is one, stays)
   if (o.used.length) return o;
   const rest = ['type', 'heritage', 'maker', 'style', 'religion', 'material', 'namedAfter'].filter((k) => lines[k] && lines[k] !== o.fact);
   const keep = (k) => o.clues.find((c) => c.key === k);
@@ -233,6 +243,7 @@ export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = n
     c.alike = cands.filter((o) => o.grp === c.grp && o.sector === c.sector).length;
     let s = rand() * 1.5;
     if (!discovered[c.p.ref]) s += 3;
+    if (c.p.deep) s += 2; // the deep layer is the reward for knowing an area
     if (yearOf(c.p)) s += 3;
     if (c.p.tags?.wikidata || c.p.tags?.wikipedia) s += 2;
     if (c.p.tags?.heritage) s += 1.5;
@@ -260,6 +271,7 @@ export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = n
     riddle: riddleFor(poi, rand),
     sector: c.sector, dist: roundTo(c.d, 50), alike: c.alike,
     rarity: rarityOfPlace(poi),
+    fact: inscriptionLine(poi),
     lat: poi.lat, lon: poi.lon, ref: poi.ref, group: c.grp,
     place: { name: poi.name, kind: poi.kind, cls: poi.cls || null, tags: poi.tags || null, year },
     clues, used: [],
@@ -310,6 +322,45 @@ export function makeBounty(pos, species, known, habitatAt, rand = Math.random, a
     };
   }
   return null;
+}
+
+// ---------------------------------------------------------------- bounty help as you go
+// Where to look, by kind of animal and habitat (hand-written field craft, not data).
+const LOOK = {
+  Aves: { water: 'Scan the water’s edge, the reeds and any posts sticking out of the water.', wood: 'Listen first: woodland birds are heard long before they’re seen. Watch the branches at the edge of the trees.', park: 'Check lawns, hedges and treetops, then stand still for a minute and let them come back.', wetland: 'Scan reedbeds and muddy edges, moving slowly.', scrub: 'Watch the tops of bushes, where birds perch to sing.', farmland: 'Scan hedgerows and the edges of fields.', urban: 'Look along rooftops, ledges and street trees.' },
+  Insecta: { any: 'Look on flowers in sunny, sheltered spots. Warm, still afternoons are best.' },
+  Mammalia: { any: 'Most mammals are shy: try the edges of woods and hedges at dawn or dusk, and walk quietly.' },
+  Amphibia: { any: 'Look near ponds and damp, shady ground, especially after rain.' },
+  Reptilia: { any: 'Check sunny banks and warm stones on bright mornings.' },
+  Actinopterygii: { any: 'Look into clear, slow water from a bank or a bridge.' },
+  Mollusca: { any: 'Check damp stones, walls and the water’s edge.' },
+  Arachnida: { any: 'Look in webs along hedges and fences, and in sheltered corners.' },
+};
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/**
+ * Field notes for a bounty, from what's known about the species (pure).
+ * @param {any} sp the wanted species
+ * @param {{ summary?: string } | null} details iNaturalist taxon details
+ * @param {number[] | null} months records per month near here (12 numbers)
+ * @param {string} hab the habitat you're standing in
+ * @param {number} month this month (0–11)
+ */
+export function fieldNotes(sp, details, months, hab, month) {
+  const notes = [];
+  const look = LOOK[sp.group]?.[hab] || LOOK[sp.group]?.any || 'Stop, listen and look for movement.';
+  notes.push(`Where to look: ${look}`);
+  if (months?.some((v) => v > 0)) {
+    const max = Math.max(...months), top = months.map((v, i) => [v, i]).filter(([v]) => v >= max * 0.6).map(([, i]) => MONTHS[i]);
+    const now = months[month] / max;
+    notes.push(`When: most often recorded around here in ${top.slice(0, 3).join(', ')}. ${now >= 0.5 ? 'Now is a good time.' : now > 0 ? 'It’s recorded now, but less often.' : 'It’s rarely recorded at this time of year, so it may take patience.'}`);
+  }
+  const sum = (details?.summary || '').replace(/\s+/g, ' ').trim();
+  if (sum) {
+    const first = sum.split(/(?<=[.!?])\s+(?=[A-Z])/).slice(0, 2).join(' ');
+    notes.push(`About it: ${first.length > 260 ? `${first.slice(0, 257).replace(/\s+\S*$/, '')}…` : first}`);
+  }
+  return notes;
 }
 
 // time (ms from `now`) until the sun sets, if within `maxMin`; null otherwise
@@ -387,6 +438,7 @@ export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random
 
 // ---------------------------------------------------------------- the live state
 const TYPES = ['mystery', 'bounty', 'race'];
+export const MYSTERY_WARM_M = 150, MYSTERY_HOT_M = 60; // closeness signals for a mystery
 const REDEAL_M = 1500;          // walk/roam this far from where the board was dealt and it re-deals
 const FILL_FALLBACK_S = 25;     // a slot that can't be filled (no wildlife data…) becomes another type
 
@@ -399,7 +451,7 @@ export class Quests {
     this._tries = 0;
     this._wrong = new Set();
     // where real facts come from (swappable in tests)
-    this.lookup = { facts: placeFacts, summary: wikiSummary };
+    this.lookup = { facts: placeFacts, summary: wikiSummary, taxon: taxonDetails, season: seasonality, sightings: lastSightings };
     this.tidy();
   }
 
@@ -432,7 +484,7 @@ export class Quests {
   }
   // after loading a save: drop moment-to-moment state (a pending age guess re-asks on arrival)
   tidy() {
-    for (const o of this.ensure().offers) if (o) { delete o.pending; delete o.live; }
+    for (const o of this.ensure().offers) if (o) { delete o.pending; delete o.live; delete o.band; }
     this._wrong.clear();
   }
   date() { return this.game.env.localNow().toISOString().slice(0, 10); }
@@ -606,6 +658,13 @@ export class Quests {
         if (o.place.year && !o.guessed) { o.pending = true; return this.emit('quest-guess', null, { quest: o }); }
         return this.complete(o);
       }
+      // getting close: warm (~150 m) then hot (~60 m); never a direction, so it's still a puzzle
+      const band = d <= MYSTERY_HOT_M ? 'hot' : d <= MYSTERY_WARM_M ? 'warm' : null;
+      if (band !== o.band) {
+        const closer = band === 'hot' || (band === 'warm' && !o.band);
+        o.band = band;
+        if (closer) this.emit('quest-warm', null, { quest: o, band });
+      }
       // the wrong place: a nudge, not a penalty
       for (const { poi } of g.world.pois(g.pos.lat, g.pos.lon, 60)) {
         if (poi.ref === o.ref || this._wrong.has(poi.ref) || groupOf(poi.kind, poi.cls) !== o.group) continue;
@@ -613,6 +672,17 @@ export class Quests {
         this._wrong.add(poi.ref);
         const dd = haversine(poi.lat, poi.lon, o.lat, o.lon);
         this.emit('quest-wrong', `Not me! Look about ${roundTo(dd, 50)} m ${sectorOf(bearingTo(poi, o))} of ${poi.name}.`);
+      }
+    } else if (o.type === 'bounty') {
+      if (!o.inHabitat) {
+        const hab = wildHabitat(g.world.habitatAt(g.pos.lat, g.pos.lon));
+        const there = o.habitat ? hab === o.habitat.hab : hab !== 'urban' && fitsHabitat(o.sp.group, hab, false);
+        if (there || (o.habitat && haversine(g.pos.lat, g.pos.lon, o.habitat.lat, o.habitat.lon) < 40)) {
+          o.inHabitat = true;
+          this.profile.save();
+          this.emit('quest-habitat', null, { quest: o });
+          this.notes(o, hab);
+        }
       }
     } else if (o.type === 'race') {
       if (o.sunset && Date.now() > o.sunsetAt) {
@@ -655,6 +725,33 @@ export class Quests {
     return o.guessRight;
   }
 
+  // Field notes for a bounty once you're in its habitat (free): where to look, when, what it is.
+  async notes(o, hab) {
+    if (o.notes) return;
+    const g = this.game, pos = g.pos;
+    const [details, months] = g.dataSaver ? [null, null] : await Promise.all([
+      this.lookup.taxon(o.sp.id).catch(() => null),
+      this.lookup.season(o.sp.id, pos.lat, pos.lon).catch(() => null),
+    ]);
+    o.notes = fieldNotes(o.sp, details, months, hab, g.env.localNow().getUTCMonth());
+    this.profile.save();
+    this.emit('quest-dealt', null);
+  }
+  // The latest public record of the bounty nearby (a clue: costs a star; free if there's none).
+  async buySighting() {
+    const o = this.bounty(), g = this.game;
+    if (!o || o.sighting || g.dataSaver) return null;
+    const list = await this.lookup.sightings(o.sp.id, g.pos.lat, g.pos.lon).catch(() => []);
+    if (!list?.length) { this.emit('quest-info', 'No exact recent records of it are shared near here. Keep to its habitat and watch for signs.'); return null; }
+    const best = list[0];
+    const d = haversine(g.pos.lat, g.pos.lon, best.lat, best.lon);
+    o.sighting = { lat: best.lat, lon: best.lon, date: best.date, d: roundTo(d, 10), sector: sectorOf(bearingTo(g.pos, best)) };
+    (o.used ||= []).push('sighting');
+    this.profile.save();
+    this.emit('quest-dealt', null);
+    return o.sighting;
+  }
+
   // game hooks
   bounty() { const o = this.active(); return o?.type === 'bounty' ? o : null; }
   onFlee(sp) { const o = this.bounty(); if (o && o.sp.id === sp.id) { o.fled++; this.profile.save(); } }
@@ -662,7 +759,7 @@ export class Quests {
 
   starsFor(o, secs) {
     if (o.type === 'mystery') return Math.min(3, Math.max(1, 3 - o.used.length) + (o.guessRight ? 1 : 0));
-    if (o.type === 'bounty') return Math.max(1, 3 - o.fled);
+    if (o.type === 'bounty') return Math.max(1, 3 - o.fled - (o.used?.length || 0));
     return secs <= o.par ? 3 : secs <= o.par * 1.5 ? 2 : 1;
   }
 
@@ -698,7 +795,8 @@ export class Quests {
   encounterBias(hab, night) {
     const o = this.bounty();
     if (!o || !fitsHabitat(o.sp.group, hab, night)) return null;
-    return { chance: 0.9, sp: o.sp, pick: 0.65 };
+    o.misses = (o.misses || 0) + 1;
+    return { chance: 0.9, sp: o.sp, pick: Math.min(0.95, 0.55 + 0.1 * o.misses) };
   }
 }
 

@@ -155,3 +155,82 @@ test('league: a code carries numbers and a generated name only, and bad codes ar
   const order = standings([{ ...me, n: 'A A 10', x: 10 }, { ...me, n: 'B B 10', x: 300 }]);
   assert.equal(order[0].n, 'B B 10'); // depth first
 });
+
+// ---------------------------------------------------------------- the deep layer (BACKLOG 11), help as you go
+import { normalizeDeep, deepQuery } from '../src/data/deep.js';
+import { inscriptionLine, fieldNotes, MYSTERY_WARM_M, MYSTERY_HOT_M } from '../src/game/quests.js';
+
+test('deep layer: small real things become places, private ones never', () => {
+  assert.match(deepQuery({ s: 1, w: 2, n: 3, e: 4 }), /\(1,2,3,4\)/);
+  const places = normalizeDeep({ elements: [
+    { type: 'node', id: 1, lat: 51.48, lon: 0, tags: { man_made: 'survey_point', 'survey_point:structure': 'pillar' } },
+    { type: 'node', id: 2, lat: 51.48, lon: 0, tags: { amenity: 'post_box', royal_cypher: 'VR' } },
+    { type: 'way', id: 3, center: { lat: 51.48, lon: 0 }, tags: { memorial: 'plaque', name: 'Wolfe plaque', inscription: 'General James Wolfe lived here 1752–1759' } },
+    { type: 'node', id: 4, lat: 51.48, lon: 0, tags: { historic: 'boundary_stone', access: 'private' } },
+    { type: 'node', id: 5, lat: 51.48, lon: 0, tags: { amenity: 'post_box', royal_cypher: 'XYZ' } },
+  ] });
+  assert.deepEqual(places.map((p) => p.name), ['Survey mark', 'Victorian post box (VR)', 'Wolfe plaque']);
+  assert.ok(places.every((p) => p.deep && p.kind.startsWith('historic:')));
+  // a plaque's inscription becomes the riddle's second line, with the name blanked out
+  assert.equal(inscriptionLine(places[2]), 'It reads: “General James … lived here 1752–1759”');
+});
+
+test('deep layer: opens once half an area is walked, once, and only then', () => {
+  const profile = new Profile({ key: `d5.${Math.random()}`, lastKey: `d5.l.${Math.random()}` });
+  const events = [];
+  const j = new Journal(profile, { localNow: () => NOON }, (e) => events.push(e));
+  const ch = area();
+  j.chunkAt = () => ch;
+  j.onArea(ch);
+  for (let x = -590; x <= -100; x += 40) j.onMove('present', 40, offsetGeo(C.lat, C.lon, x, 0), 10, true);
+  assert.equal(events.filter((e) => e.type === 'deep-unlock').length, 0); // under half
+  for (let x = -100; x <= 590; x += 40) j.onMove('present', 40, offsetGeo(C.lat, C.lon, x, 0), 10, true);
+  assert.equal(events.filter((e) => e.type === 'deep-unlock').length, 1);
+  assert.ok(profile.data.areas[ch.key].deep);
+});
+
+test('help as you go: a mystery gets warm, then hot, but never gives a direction', () => {
+  const target = { ref: 'osm:node/7', name: 'Old Well', kind: 'historic:well', tags: null, hours: null, ...offsetGeo(C.lat, C.lon, 0, 400) };
+  const world = {
+    *pois(lat, lon, r) { if (haversine(lat, lon, target.lat, target.lon) <= r + 50) yield { poi: target, chunk: { markPoi() {}, setClosed() {} } }; },
+    groundAt: () => 10, habitatAt: () => 'urban', isReadyAt: () => true, readyChunks: () => [], chunkAt: () => null, remote: new Map(),
+  };
+  const events = [];
+  const g = new Game(world, new Profile({ key: `d6.${Math.random()}`, lastKey: `d6.l.${Math.random()}` }), { localNow: () => NOON, sun: () => ({ alt: 30 }), snapshot: () => ({}), tags: () => [] }, (e) => events.push(e));
+  g.dataSaver = true; g.features = { quests: true };
+  const q = g.quests = new Quests(g, (e) => events.push(e));
+  g.enter('roam', { to: C });
+  q.step();
+  q.accept(q.s.offers[0].id);
+  const at = (m) => { g.pos = offsetGeo(C.lat, C.lon, 0, 400 - m); q.step(); };
+  at(300); at(MYSTERY_WARM_M - 10); at(MYSTERY_HOT_M - 10); at(MYSTERY_WARM_M - 10); at(MYSTERY_HOT_M - 10);
+  assert.deepEqual(events.filter((e) => e.type === 'quest-warm').map((e) => e.band), ['warm', 'hot', 'hot']);
+  assert.ok(events.filter((e) => e.type === 'quest-warm').every((e) => !('bearing' in e)));
+});
+
+test('help as you go: a bounty gets field notes in its habitat, a sighting clue costs a star, patience pays', async () => {
+  const notes = fieldNotes({ group: 'Aves' }, { summary: 'The grey heron is a long-legged wading bird. It is common. It eats fish.' }, [0, 0, 1, 2, 8, 10, 9, 4, 1, 0, 0, 0], 'water', 5);
+  assert.match(notes[0], /water’s edge/);
+  assert.match(notes[1], /May, June, July.*good time/);
+  assert.equal(notes[2], 'About it: The grey heron is a long-legged wading bird. It is common.');
+  // in the game
+  const world = { *pois() {}, groundAt: () => 10, habitatAt: () => 'water', isReadyAt: () => true, readyChunks: () => [], chunkAt: () => null, remote: new Map() };
+  const events = [];
+  const g = new Game(world, new Profile({ key: `d7.${Math.random()}`, lastKey: `d7.l.${Math.random()}` }), { localNow: () => NOON, sun: () => ({ alt: 30 }), snapshot: () => ({}), tags: () => [] }, (e) => events.push(e));
+  g.features = { quests: true, hunt: true };
+  const q = g.quests = new Quests(g, (e) => events.push(e));
+  q.lookup = { ...q.lookup, taxon: async () => ({ summary: 'A wading bird.' }), season: async () => null, sightings: async () => [{ ...offsetGeo(C.lat, C.lon, 200, 0), date: '2026-11-06' }] };
+  g.enter('roam', { to: C });
+  const heron = { id: 7, name: 'Grey Heron', sci: 'Ardea cinerea', group: 'Aves', count: 40, rarity: 'uncommon' };
+  q.s.offers[1] = { type: 'bounty', id: 'b1', title: 'Wanted: Grey Heron', sp: heron, rarity: 'rare', fled: 0, habitat: { hab: 'water', text: 'water', lat: C.lat, lon: C.lon, d: 0, sector: 'north' } };
+  q.s.date = q.date(); q.s.mode = 'roam';
+  q.accept('b1');
+  q.step(); await new Promise((r) => setTimeout(r, 0));
+  assert.ok(events.some((e) => e.type === 'quest-habitat'));
+  assert.equal(q.active().notes.at(-1), 'About it: A wading bird.');
+  const s = await q.buySighting();
+  assert.equal(s.sector, 'east');
+  assert.equal(q.starsFor(q.active(), 0), 2);
+  const p1 = q.encounterBias('water', false).pick, p2 = q.encounterBias('water', false).pick;
+  assert.ok(p2 > p1);
+});

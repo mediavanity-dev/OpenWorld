@@ -166,6 +166,21 @@ export async function seasonality(id, lat, lon) {
   return arr.some((v) => v > 0) ? arr : null;
 }
 
+// ---------- the latest public records of one species near a point (bounty "last sighting") ----------
+// Records with a deliberately blurred location (sensitive species, private observers) are left out.
+export async function lastSightings(taxonId, lat, lon) {
+  const j = await cachedJson(`sight:${taxonId}:${geohash(lat, lon, 5)}`,
+    `https://api.inaturalist.org/v1/observations?taxon_id=${taxonId}&lat=${lat.toFixed(3)}&lng=${lon.toFixed(3)}&radius=3&order_by=observed_on&order=desc&per_page=15&quality_grade=research,needs_id`,
+    { ttl: 6 * 3600 * 1000 });
+  const out = [];
+  for (const o of j?.results || []) {
+    if (o.obscured || o.geoprivacy || o.taxon_geoprivacy === 'obscured' || !o.location) continue;
+    const [la, lo] = String(o.location).split(',').map(Number);
+    if (isFinite(la) && isFinite(lo) && o.observed_on) out.push({ lat: la, lon: lo, date: o.observed_on });
+  }
+  return out;
+}
+
 // ---------- recently seen here (iNaturalist, last 14 days, ~1 km) ----------
 export async function recentNearby(lat, lon) {
   const since = new Date(Date.now() - 14 * DAY).toISOString().slice(0, 10);

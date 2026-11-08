@@ -499,3 +499,32 @@ Mysteries skip places tagged private or more than 60 m from a public way; race f
 onto public ways; **Can't get there** swaps with no penalty and remembers the spot. Next:
 enclosing private areas, then islands and ferries as tier-2 special expeditions.*
 Then enclosing-area checks, then island and ferry detection as tier-2 special expeditions.
+
+---
+
+## 11. Going deeper once you know an area (layers that open with mastery)
+
+**Problem:** a dedicated player can exhaust the obvious things around them (the landmarks,
+the common species, the streets). The game should get *richer* for them, not emptier, without
+making them travel.
+
+**Principle:** each layer opens **per area**, only when that area reaches a depth tier (item 8),
+and is **invisible until then**: no teaser, just a surprise ("A new layer has opened in
+Deptford"). Real data only, as everywhere else.
+
+| Tier in an area | What opens there | Real data behind it |
+|---|---|---|
+| **Surveyed** (50% walked) | Small things most people walk past: survey marks and benchmarks, plaques and memorial benches (the inscription becomes the riddle, name blanked), boundary stones, milestones, wayside crosses and shrines, historic wells, old post boxes dated by their royal cipher | OSM: `man_made=survey_point`, `memorial=plaque/bench/stone`, `inscription=*`, `historic=boundary_stone/milestone/…`, `amenity=post_box` + `royal_cypher`; one Overpass query per area, cached |
+| **Mapped** (75%) | The past layer: old street names ("this lane used to be called…"), the oldest buildings on your streets, lost places that used to stand here; your last unwalked streets highlighted as an *Uncharted* quest | OSM `old_name`, building `start_date`; OpenHistoricalMap (*verify* its API and licence) |
+| **Known by heart** (90%) | Steward: watch your area through the seasons (species recorded only in certain months), and become a contributor: report missing or wrong places as OpenStreetMap Notes, log real sightings to iNaturalist | iNaturalist seasonality; OSM Notes and iNaturalist sign-in (item 2) |
+
+The last tier closes the loop: the deepest players start improving the open data the game is
+built from.
+
+*Status (Nov 2026): the **Surveyed** layer is **built** in the beta (feature switch "Deeper
+layers"; `src/data/deep.js`). It opens the first time half an area's streets are walked (on
+foot or from home), announces itself once, adds the small finds to that area as history places,
+and mysteries favour them, using an inscription as the riddle's second line. Not yet verified
+against live Overpass results: every public Overpass server was overloaded on the day it was
+built (the query was accepted; the servers were too busy to run it). The layer simply stays
+empty until a query succeeds. Next: the Mapped layer.*

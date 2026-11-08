@@ -11,6 +11,8 @@ import { walkCells } from './reach.js';
 // Depth of exploration per area (BACKLOG item 8): the share of its public paths and streets
 // walked for real. Rewards knowing a place, not travelling far.
 export const DEPTH_TIERS = [[0.9, 'Known by heart'], [0.75, 'Mapped'], [0.5, 'Surveyed'], [0.25, 'Explored'], [0, 'Visited']];
+/** Share of an area's streets walked that opens its deep layer (Surveyed). */
+export const DEEP_AT = 0.5;
 export function depthTier(cov) { return cov > 0 ? (DEPTH_TIERS.find(([t]) => cov >= t) || DEPTH_TIERS.at(-1))[1] : null; }
 /** Explorer score: the sum over areas of coverage squared, so depth counts far more than breadth. */
 export function explorerScore(areas) {
@@ -204,6 +206,12 @@ export class Journal {
     a.walk = cells.size; a.foot = foot; a.home = home;
     this.profile.save();
     const tier = depthTier(foot / a.walk);
+    // the deep layer (BACKLOG 11) opens once half the area is walked, on foot or from home
+    if (!a.deep && Math.max(foot, home) / a.walk >= DEEP_AT) {
+      a.deep = this.dayKey();
+      this.profile.log(`A new layer has opened in ${a.name || 'an area'}`);
+      this.onEvent({ type: 'deep-unlock', area: a, key: chunk.key, msg: `A new layer has opened in ${a.name || 'this area'}: survey marks, plaques, boundary stones and other small things most people walk past. Look for new history icons.` });
+    }
     if (announce && tier && tier !== before && tier !== 'Visited') {
       this.profile.log(`${a.name || 'An area'}: ${tier} (${Math.round((foot / a.walk) * 100)}% walked)`);
       this.onEvent({ type: 'area-tier', msg: `${a.name || 'This area'}: ${tier}! You've walked ${Math.round((foot / a.walk) * 100)}% of its streets and paths.`, area: a, tier });

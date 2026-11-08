@@ -117,6 +117,16 @@ export function initExpeditions(ctx) {
       hook = `<p class="qhook"><i>${esc(o.sp.sci || '')}</i>, ${/^[aeiou]/.test(lbl) ? 'an' : 'a'} ${esc(lbl)} recorded <b>${o.sp.count}</b> times near here by real naturalists.</p>
         <p class="qhook">${o.habitat ? `It favours ${esc(o.habitat.text)}: the nearest is ${o.habitat.d ? `about ${fmtDist(o.habitat.d)} to the <b>${o.habitat.sector}</b>` : '<b>right here</b>'}.` : 'It gets by among the streets. Keep your eyes open as you walk.'}</p>`;
       meta.push('Follow its signs · approach gently');
+      if (isAct) {
+        // help as you go: field notes once you're in its habitat, and a last-sighting clue
+        const used = o.used?.length || 0;
+        extra += `<div class="qclues"><p class="qmeta">Worth ${starsHtml(Math.max(1, 3 - (o.fled || 0) - used))} now</p>`;
+        if (o.notes) extra += o.notes.map((n) => `<div class="qclue got">📖 ${esc(n)}</div>`).join('');
+        else extra += `<div class="qclue">📖 <small style="float:none">Field notes appear when you reach its habitat.</small></div>`;
+        if (o.sighting) extra += `<div class="qclue got">📍 Last recorded ${esc(o.sighting.date)}, about ${fmtDist(o.sighting.d)} to the ${o.sighting.sector} of where you asked (marked on your minimap).</div>`;
+        else if (!game.dataSaver) extra += `<button class="qclue" data-qsight>📍 Last recorded sighting nearby <small>−★</small></button>`;
+        extra += '</div>';
+      }
       if (o.fled) meta.push(`Fled ${o.fled}×`);
       if (o.sp.credit) extra += `<p class="credit">Photo: ${esc(o.sp.credit)}</p>`;
     } else {
@@ -215,6 +225,7 @@ export function initExpeditions(ctx) {
     if (t.id === 'quests' || t.closest('#quests-close') || t.closest('[data-qclose]')) return close();
     const b = t.closest('button');
     if (!b) return;
+    // value-less attributes (data-qabandon, …) read as '', which is falsy: test them with !== undefined
     if (b.dataset.qtab) { tab = b.dataset.qtab; render(); }
     else if (b.dataset.qshare !== undefined) share();
     else if (b.dataset.qcopy !== undefined) copy();
@@ -229,7 +240,11 @@ export function initExpeditions(ctx) {
       if (o.type !== 'mystery') setTimeout(close, 450); // mysteries stay open so you can read the riddle and clues
     } else if (b.dataset.qswap) { if (!q().swap(+b.dataset.qswap)) toast('Nothing else to swap in around here right now.'); render(); }
     else if (b.dataset.qcant !== undefined) { if (confirm('Can’t get there (private, fenced off, across water…)? You’ll get a fresh one instead with no stars lost, and we won’t send you there again.')) { q().cantReach(); render(); } }
-    else if (b.dataset.qabandon) { if (confirm('Give up this expedition? It goes back on the board.')) { q().abandon(); render(); } }
+    else if (b.dataset.qabandon !== undefined) { if (confirm('Give up this expedition? It goes back on the board.')) { q().abandon(); render(); } }
+    else if (b.dataset.qsight !== undefined) {
+      if (!confirm('Show the last recorded sighting nearby? It costs a star (free if there isn’t one).')) return;
+      b.disabled = true; q().buySighting().then((x) => { if (x) { buzz(15); ctx.ambience.chime(2); } render(); });
+    }
     else if (b.dataset.qclue) { const c = q().buyClue(b.dataset.qclue); if (c) { buzz(15); ctx.ambience.chime(2); } render(); }
     else if (b.dataset.qmore !== undefined) { q().more(); render(); }
     else if (b.dataset.qcard) reveal(q().s.cards[+b.dataset.qcard], { replay: true });
@@ -266,12 +281,12 @@ export function initExpeditions(ctx) {
       na.textContent = '✦';
     } else if (o.type === 'mystery') {
       nm.textContent = `Who am I? “${o.riddle}”`;
-      nd.textContent = `${o.sector} of where you started · ${o.used.length}/${o.clues.length} clues · worth ${'★'.repeat(Math.max(1, 3 - o.used.length))}`;
+      nd.textContent = `${o.band === 'hot' ? 'Very close now! · ' : o.band === 'warm' ? 'Getting warm · ' : ''}${o.sector} of where you started · ${o.used.length}/${o.clues.length} clues · worth ${'★'.repeat(Math.max(1, 3 - o.used.length))}`;
       na.textContent = '🔍';
     } else if (o.type === 'bounty') {
       nm.textContent = `Wanted: ${o.sp.name}`;
       const h = o.habitat, dh = h && game.pos ? haversine(game.pos.lat, game.pos.lon, h.lat, h.lon) : null;
-      nd.textContent = game.hunt?.sp.id === o.sp.id ? 'On its trail! Follow the signs.' : h ? (dh < 40 ? `You're in ${h.text}. Walk and watch for signs.` : `Head for ${h.text} · ${fmtDist(dh)}`) : 'Walk and watch for signs';
+      nd.textContent = game.hunt?.sp.id === o.sp.id ? 'On its trail! Follow the signs.' : o.inHabitat ? 'In its habitat · tap for field notes' : h ? (dh < 40 ? `You're in ${h.text}. Walk and watch for signs.` : `Head for ${h.text} · ${fmtDist(dh)}`) : 'Walk and watch for signs';
       if (h && dh >= 40) arrow = bearingTo(game.pos, h); else na.textContent = '🎯';
     } else {
       const t = o.startedAt ? (Date.now() - o.startedAt) / 1000 : 0;
@@ -295,7 +310,7 @@ export function initExpeditions(ctx) {
       const late = o.sunset ? false : t > o.par;
       return `<span class="tk-quest race ${late ? 'late' : ''}">⏱ ${o.sunset ? `🌅 ${mmss((o.sunsetAt - Date.now()) / 1000)}` : mmss(t)}<i style="transform:rotate(${Math.round((bearingTo(game.pos, o) + yaw) / 5) * 5}deg)">↑</i></span>`;
     }
-    if (o.type === 'mystery') return `<span class="tk-quest">🔍 ${o.sector}</span>`;
+    if (o.type === 'mystery') return `<span class="tk-quest ${o.band || ''}">🔍 ${o.band === 'hot' ? 'Very close!' : o.band === 'warm' ? 'Getting warm' : o.sector}</span>`;
     return `<span class="tk-quest">🎯 ${esc(o.sp.name)}</span>`;
   }
   // what the minimap should draw for the active quest
@@ -304,7 +319,7 @@ export function initExpeditions(ctx) {
     if (!o) return null;
     if (o.type === 'mystery') { const z = o.used.includes('zone') && o.clues.find((c) => c.key === 'zone'); return z ? { zone: z.zone } : null; }
     if (o.type === 'race') return { target: { lat: o.lat, lon: o.lon } };
-    if (o.type === 'bounty' && o.habitat?.d) return { habitat: { lat: o.habitat.lat, lon: o.habitat.lon } };
+    if (o.type === 'bounty') return o.sighting ? { zone: { lat: o.sighting.lat, lon: o.sighting.lon, r: 40 } } : o.habitat?.d && !o.inHabitat ? { habitat: { lat: o.habitat.lat, lon: o.habitat.lon } } : null;
     return null;
   }
 
@@ -396,6 +411,12 @@ export function initExpeditions(ctx) {
     else if (ev.type === 'quest-blocked') toast(ev.msg, 'error');
     else if (ev.type === 'quest-guess') { closeBoardQuietly(); buzz([20, 40, 20]); ctx.ambience.chime(7); guess(); }
     else if (ev.type === 'quest-wrong') { toast(ev.msg, 'quest'); buzz(25); }
+    else if (ev.type === 'quest-habitat') { toast(`🎯 You’re in the ${ev.quest.sp.name}’s habitat. Field notes added: tap the Expedition box.`, 'quest'); buzz([20, 40, 20]); ctx.ambience.chime(4); }
+    else if (ev.type === 'quest-warm') {
+      const hot = ev.band === 'hot';
+      toast(hot ? '🔍 Very close now: look around you.' : `🔍 You’re getting warm: it’s within about ${fmtDist(150)}.`, 'quest');
+      buzz(hot ? [30, 40, 30, 40, 30] : [20, 40, 20]); ctx.ambience.chime(hot ? 6 : 3);
+    }
     else if (ev.type === 'quest-info' || ev.type === 'quest-redeal') toast(ev.msg, 'quest');
     else if (ev.type === 'quest-start') {
       const o = ev.quest;
