@@ -71,7 +71,12 @@ export function initHud(ctx) {
       if (el.dataset.v !== html) { el.innerHTML = html; el.dataset.v = html; }
     }
 
-    // today's field assignment, with an arrow to the nearest place that fits it
+    // beta expeditions take this spot when they're on; otherwise today's field assignment,
+    // with an arrow to the nearest place that fits it
+    if (ctx.expeditions?.hud()) return renderLog();
+    $('nearest').classList.remove('quest');
+    const nl = document.querySelector('#nearest .n-label');
+    if (nl.textContent !== 'Today') nl.textContent = 'Today';
     const t = journal.task(), T = TASKS[t.type];
     const tgt = !t.done && T.place ? game.taskTarget : null;
     setText('n-name', t.type === 'walk1k' ? (settings.units === 'imperial' ? 'Walk 0.6 miles' : 'Walk 1 km') : T.text);
@@ -83,6 +88,9 @@ export function initHud(ctx) {
     setText('n-arrow', tgt ? '↑' : t.done ? '✓' : '•');
     $('n-arrow').style.transform = tgt ? `rotate(${tgt.bearing + (controls.yaw * 180) / Math.PI}deg)` : '';
     $('nearest').classList.toggle('done', t.done);
+    renderLog();
+  }
+  function renderLog() {
     const logEl = $('log');
     const items = profile.data.log.slice(0, 12).map((l) => `<li>${new Date(l.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${esc(l.msg)}</li>`).join('');
     if (logEl.dataset.v !== items) { logEl.innerHTML = items; logEl.dataset.v = items; }
@@ -113,12 +121,15 @@ export function initHud(ctx) {
       html += `<span class="hunt ${h.trend > 0 ? 'warmer' : h.trend < 0 ? 'colder' : ''}" title="Tracking">🐾<span class="dots">${dots}</span></span>`;
     }
     if (th?.band) html += `<span class="gold ${th.band}" title="Daily treasure: ${th.band}">✦</span>`;
+    // beta: the active expedition (tap to open the board) instead of the field assignment
+    const quest = ctx.expeditions?.chip() || '';
+    html += quest;
     // map-only view: a faint star + arrow towards today's field assignment (tap to open it)
-    const task = journal.task(), tgt = !task.done && document.body.classList.contains('clean') ? game.taskTarget : null;
+    const task = journal.task(), tgt = !quest && !game.features.quests && !task.done && document.body.classList.contains('clean') ? game.taskTarget : null;
     if (tgt) html += `<span class="tk-task" title="Today's field assignment">★<i style="transform:rotate(${Math.round((tgt.bearing + (controls.yaw * 180) / Math.PI) / 5) * 5}deg)">↑</i></span>`;
     if (el.dataset.v !== html) { el.dataset.v = html; el.innerHTML = html; }
     el.classList.toggle('show', !!html && !ctx.arMode.active);
-    el.classList.toggle('tappable', !!tgt);
+    el.classList.toggle('tappable', !!tgt || !!quest);
   }
 
   return { render, worldStatus, tracker };

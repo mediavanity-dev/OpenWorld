@@ -16,9 +16,9 @@ export const CHASE_GOAL_S = 120; // the design target: something to chase within
 
 // game events counted per session (anything else is ignored)
 const COUNTED = new Set(['discover', 'hunt', 'hunt-reveal', 'hunt-flee', 'hunt-cold', 'hunt-caught', 'spotted', 'critter',
-  'treasure-hot', 'treasure', 'task', 'geocache', 'rock', 'beacon', 'rephoto']);
+  'treasure-hot', 'treasure', 'task', 'geocache', 'rock', 'beacon', 'rephoto', 'quest-start', 'quest-done', 'quest-wrong']);
 // events that mean "there's something to chase right now"
-const CHASE = new Set(['hunt', 'critter', 'treasure-hot']);
+const CHASE = new Set(['hunt', 'critter', 'treasure-hot', 'quest-start']);
 
 /**
  * @typedef {{ start: number, last: number, mode: string | null, modes: Record<string, number>,
@@ -110,5 +110,7 @@ export function summarize(sessions) {
     treasureFoundWhenHot: rate(sum(ss, 'treasure'), sum(ss, 'treasure-hot')),
     discoveries: sum(ss, 'discover'),
     tasksDone: sum(ss, 'task'),
+    questsStarted: sum(ss, 'quest-start'),
+    questsDone: sum(ss, 'quest-done'),
   };
 }

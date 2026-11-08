@@ -217,6 +217,24 @@ view: stand where the photographer stood and line it up. The match meter fills a
 outlines line up; **Capture** keeps it in your journal under *Then & now*, and **Save then &
 now** makes a side-by-side picture. Switch it off in Settings → Beta experiments.
 
+**Expeditions (beta).** When you start, a board deals three quests built from what's really
+around you. Pick one; tap the gold *Expedition* box (or the ✦ pill) to come back to the board.
+- **🔍 Mystery: deduce.** A riddle about a real place nearby that isn't named, plus the
+  direction and rough distance. Buy clues if you're stuck (its age or type, its initial, a
+  search circle on the minimap); each one costs a star. Visit the wrong place and it tells
+  you which way to look. At historic places, guess its era before the reveal to win a star back.
+- **🎯 Bounty: track.** A "wanted" poster for an animal really recorded near you, and the
+  habitat it likes ("the nearest water is 240 m west"). Hunts there favour it; reach it or
+  photograph it. Rushing in makes it flee and costs a star.
+- **⏱ Race: beat the clock.** Get to the highest ground nearby (or a viewpoint or landmark)
+  inside par time, or before the real sunset when it's close. The minimap marks the finish.
+
+Finishing one turns over a **card**. Its rarity comes from real facts: a place's age, whether
+it is listed or has a Wikipedia article, how rarely the species is recorded locally, how far
+you climbed. The reward is shown on the board before you pick. Stars (1–3) build your **field
+rank**. You can **swap** one quest a day, and once all three are done you can deal three more.
+In **Roam** your cards are *echoes*: you keep them, but they earn no stars.
+
 ### 10. Set your home base
 
 While playing **Present**, tap **Set home base** to make your current real location your

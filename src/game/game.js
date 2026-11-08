@@ -66,6 +66,7 @@ export class Game {
     this.dataSaver = false;
     this.journal = null;   // set by the app (src/game/journal.js)
     this.features = {};    // beta-only experiments: { hunt, treasure }
+    this.quests = null;    // expeditions (beta, src/game/quests.js), set by the app
     this.hunt = null;      // active hunt (src/game/hunt.js)
     this.treasureHint = null; // nearest uncollected daily treasure { t, d, band }
     this._treasureMemo = new Map();
@@ -176,6 +177,7 @@ export class Game {
       this.checkDiscoveries(); this.checkCritters(); this.loadWildlife(); this.checkRock();
       if (this.hunt) this.stepHunt();
       if (this.features.treasure) this.checkTreasure();
+      if (this.features.quests) this.quests?.step();
       this.journal?.onMove(this.mode, this._walk, this.pos, this.world.groundAt(this.pos.lat, this.pos.lon));
       this._walk = 0;
     }
@@ -325,20 +327,23 @@ export class Game {
     if (!this.wild.species.length || this.critters.length >= 2) return;
     if (this.features.hunt && this.hunt) return; // one trail at a time
     const hab = wildHabitat(this.world.habitatAt(this.pos.lat, this.pos.lon));
-    const chance = hab === 'urban' ? 0.25 : 0.55;
+    const night = this.env.sun(this.pos.lat, this.pos.lon).alt < -6;
+    // an expedition bounty makes its species likelier where it belongs
+    const bias = this.features.quests ? this.quests?.encounterBias(hab, night) : null;
+    const chance = bias?.chance ?? (hab === 'urban' ? 0.25 : 0.55);
     const rand = Math.random;
     if (rand() > chance) return;
-    const night = this.env.sun(this.pos.lat, this.pos.lon).alt < -6;
     const pool = this.wild.species.filter((s) => fitsHabitat(s.group, hab, night));
     if (!pool.length) return;
     let total = 0;
     const w = pool.map((s) => (total += Math.pow(s.count, 0.6)));
     const pick = rand() * total;
-    const sp = pool[w.findIndex((v) => v >= pick)];
+    const sp = bias && rand() < bias.pick ? (pool.find((s) => s.id === bias.sp.id) || bias.sp) : pool[w.findIndex((v) => v >= pick)];
     // only animals leave signs and flee; plants and fungi are simply found nearby
     if (this.features.hunt && !['Plantae', 'Fungi'].includes(sp.group)) {
       this.hunt = startHunt(this.pos, sp, this.heading);
       const lbl = GROUP_STYLE[sp.group]?.label || 'creature';
+      if (bias && sp.id === bias.sp.id) return this.emit('hunt', `🎯 Fresh signs of ${/^[aeiou]/.test(lbl) ? 'an' : 'a'} ${lbl}. Could this be your bounty?`, { hunt: this.hunt, bounty: true });
       return this.emit('hunt', `Fresh signs of ${/^[aeiou]/.test(lbl) ? 'an' : 'a'} ${lbl} nearby`, { hunt: this.hunt });
     }
     // appear 15–35 m away, roughly ahead if we know the heading
@@ -358,7 +363,7 @@ export class Game {
     if (!ev) return;
     const drop = () => { this.critters = this.critters.filter((c) => c.id !== h.id); };
     if (ev === 'cold') { drop(); this.hunt = null; this.emit('hunt-cold', 'The trail went cold'); }
-    else if (ev === 'flee') { drop(); this.emit('hunt-flee', 'It heard you coming. Approach gently.'); }
+    else if (ev === 'flee') { drop(); this.quests?.onFlee(h.sp); this.emit('hunt-flee', 'It heard you coming. Approach gently.'); }
     else if (ev === 'reveal') {
       this.critters.push({ id: h.id, sp: h.sp, lat: h.lat, lon: h.lon, born: performance.now(), ttl: 150, hunted: true });
       this.emit('hunt-reveal', null, { hunt: h });
@@ -437,6 +442,7 @@ export class Game {
     const what = c.sp.name;
     if (res === 'new') this.profile.log(`${how === 'photo' ? 'Photographed' : 'Spotted'} ${what} [${grade}]`);
     this.emit('spotted', res === 'new' ? `New species: ${what}` : res === 'upgraded' ? `${what}: now ${grade.toUpperCase()}` : `Spotted ${what} again`, { critter: c, result: res, grade });
+    if (this.features.quests) this.quests?.onSpecies(c.sp, how);
   }
 
   // ---------------- beacons ----------------

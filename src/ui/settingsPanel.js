@@ -117,6 +117,7 @@ export function initSettingsPanel(ctx) {
       ['…found / fled / went cold', `${pct(s.huntCaught)} / ${pct(s.huntFled)} / ${pct(s.huntCold)}`],
       ['Treasure found once hot', pct(s.treasureFoundWhenHot)],
       ['Assignments done', s.tasksDone],
+      ...(s.questsStarted ? [['Expeditions started / finished', `${s.questsStarted} / ${s.questsDone}`]] : []),
     ];
     $('playtest-stats').innerHTML = rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
   }

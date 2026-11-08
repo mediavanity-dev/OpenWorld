@@ -127,6 +127,23 @@ try {
   if (r.result?.value !== 'ok') failures.push(`panel exercise failed: ${JSON.stringify(r)}`);
   await sleep(800);
 
+  // beta expeditions: the board deals quests from the loaded area, one can be accepted, and
+  // the card reveal renders (SMOKE_OPEN=quests or =reveal leaves one showing for the shot)
+  const qr = await send('Runtime.evaluate', { returnByValue: true, awaitPromise: true, expression: `(async () => {
+    const o = window.openworld, wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    if (!o.game.features.quests) return 'off';
+    for (let k = 0; k < 30 && !o.game.quests.s.offers.some(Boolean); k++) await wait(500);
+    const offers = o.game.quests.s.offers.filter(Boolean);
+    if (!offers.length) return 'no expeditions dealt';
+    o.ctx.expeditions.open('today'); await wait(300);
+    if (!document.querySelector('#quests-body .qcard')) return 'board did not render';
+    const want = ${JSON.stringify(process.env.SMOKE_OPEN || '')};
+    if (want === 'reveal') { const q = offers.find((x) => x.type !== 'bounty') || offers[0]; o.game.quests.accept(q.id); if (q.type === 'mystery') q.guessRight = true; o.game.quests.complete(q); await wait(2200); }
+    else if (want !== 'quests') o.ctx.expeditions.close();
+    return 'ok:' + offers.map((x) => x.type).join(','); })()` });
+  if (qr.result?.value && !String(qr.result.value).startsWith('ok') && qr.result.value !== 'off') failures.push(`expeditions: ${qr.result.value}`);
+  else if (qr.result?.value) console.log(`smoke: expeditions ${qr.result.value}`);
+
   // SMOKE_OPEN=journal:collections leaves that panel open for the screenshot
   if (process.env.SMOKE_OPEN?.startsWith('journal')) {
     const t = process.env.SMOKE_OPEN.split(':')[1] || 'overview';
