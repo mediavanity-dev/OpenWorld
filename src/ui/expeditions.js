@@ -21,6 +21,7 @@ const TYPE = {
   mystery: { glyph: '🔍', label: 'Mystery', verb: 'Deduce' },
   bounty: { glyph: '🎯', label: 'Bounty', verb: 'Track' },
   race: { glyph: '⏱', label: 'Race', verb: 'Beat the clock' },
+  ground: { glyph: '🧭', label: 'New ground', verb: 'Explore' },
 };
 const RARITY_LABEL = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' };
 const starsHtml = (n, of = 3) => `<span class="qstars">${'<i class="on">★</i>'.repeat(n)}${'<i>★</i>'.repeat(Math.max(0, of - n))}</span>`;
@@ -108,6 +109,12 @@ export function initExpeditions(ctx) {
   }
 
   function offerHtml(o, i, act) {
+    if (!o && q().empty()) {
+      const p = game.pos, osm = p ? `https://www.openstreetmap.org/#map=16/${p.lat.toFixed(4)}/${p.lon.toFixed(4)}` : 'https://www.openstreetmap.org/';
+      return `<article class="qcard empty"><div class="qtop"><span class="qtype">🗺 Not much mapped here yet</span></div>
+        <p class="qhook">Quests are built from open map and wildlife data, and there isn’t enough of it within reach right now${game.mode === 'home' ? ' (in Home, everything has to fit inside your home range)' : ''}.</p>
+        <p class="qhook">Try the other quests, walk somewhere new (the board re-deals after ${fmtDist(1500)}), or help put your area on the map: anyone can add places to <a href="${osm}" target="_blank" rel="noopener">OpenStreetMap</a>, and the game picks them up.</p></article>`;
+    }
     if (!o) return `<article class="qcard scouting"><div class="qtop"><span class="qtype">Scouting…</span></div><div class="qart shimmer"></div><p class="qhook">Reading the map, the wildlife records and the lie of the land around you.</p></article>`;
     const T = TYPE[o.type], isAct = act?.id === o.id, locked = act && !isAct;
     const meta = [];
@@ -136,8 +143,12 @@ export function initExpeditions(ctx) {
       }
       if (o.fled) meta.push(`Fled ${o.fled}×`);
       if (o.sp.credit) extra += `<p class="credit">Photo: ${esc(o.sp.credit)}</p>`;
+    } else if (o.type === 'ground') {
+      art = '<div class="qart ground"><span>🧭</span></div>';
+      hook = `<p class="qhook">Walk <b>${o.target} stretches of ground you’ve never walked</b>, in any direction. Each lit square on your minimap is one stretch (about ${fmtDist(150)} across).</p>
+        <p class="qhook">${isAct ? `Progress: <b>${o.prog || 0} of ${o.target}</b>. ` : ''}Par time <b>${mmss(o.par)}</b>.</p>`;
     } else {
-      art = `<div class="qart race ${o.sunset ? 'sunset' : ''}"><span>${o.sunset ? '🌅' : o.kind === 'summit' ? '⛰' : '🚩'}</span></div>`;
+      art = `<div class="qart race ${o.sunset ? 'sunset' : ''}"><span>${o.sunset ? '🌅' : o.kind === 'summit' ? '⛰' : o.kind === 'water' ? '🌊' : '🚩'}</span></div>`;
       const where = `${fmtDist(o.dist)} to the <b>${sectorOf(bearingTo(game.pos || o, o))}</b>`;
       hook = `<p class="qhook">${o.kind === 'summit' ? `The highest ground around is <b>${fmtElev(o.gain)}</b> above you, ${where}.` : `${where}.`}</p>
         <p class="qhook">${o.sunset ? `Sunset in <b>${Math.max(0, Math.round((o.sunsetAt - Date.now()) / 60000))} min</b>. Get there before it goes.` : `Par time <b>${mmss(o.par)}</b>. Beat it for three stars.`}</p>`;
@@ -145,9 +156,10 @@ export function initExpeditions(ctx) {
     }
     const why = !o.done && !isAct ? q().blocked(o) : null;
     if (why) meta.push(`<span class="warn">${esc(why)}</span>`);
+    if (o.long) meta.unshift('<span class="qlong">Long expedition: nothing closer fits, so it’s rarer</span>');
     const card = o.done ? q().s.cards.find((c) => c.id === o.id) : null;
     const btns = o.done ? `<span class="qdone">✓ Done${card ? ` ${starsHtml(card.grade === 'echo' ? 0 : card.stars)}` : ''}</span>`
-      : isAct ? `<button data-qabandon>Give up</button>${o.type !== 'bounty' ? '<button data-qcant title="Private, fenced off, across water…? Swap it, no stars lost">Can’t get there</button>' : ''}<button class="primary" data-qclose>${o.type === 'race' ? (o.startedAt ? 'Back to the race' : 'Start the clock') : o.type === 'bounty' ? 'Go track it' : 'Go find it'}</button>`
+      : isAct ? `<button data-qabandon>Give up</button>${o.type === 'mystery' || o.type === 'race' ? '<button data-qcant title="Private, fenced off, across water…? Swap it, no stars lost">Can’t get there</button>' : ''}<button class="primary" data-qclose>${o.type === 'race' ? (o.startedAt ? 'Back to the race' : 'Start the clock') : o.type === 'bounty' ? 'Go track it' : o.type === 'ground' ? 'Go explore' : 'Go find it'}</button>`
       : `${q().s.swaps > 0 && !locked ? `<button data-qswap="${i}" title="Swap for a different one (once a day)">↻ Swap${' '}<small>(1 left today)</small></button>` : ''}<button class="primary" data-qaccept="${esc(o.id)}" ${locked || why ? 'disabled' : ''}>${locked ? 'One at a time' : why ? 'Not here' : 'Accept'}</button>`;
     return `<article class="qcard ${o.type} r-${o.rarity} ${isAct ? 'active' : ''} ${o.done ? 'done' : ''}">
       <div class="qtop"><span class="qtype">${T.glyph} ${T.label} <small>${T.verb}</small></span><button class="qgem r-${o.rarity}" data-qabout title="What are cards? Tap to read">${RARITY_LABEL[o.rarity]} card ⓘ</button></div>
@@ -299,6 +311,10 @@ export function initExpeditions(ctx) {
       nm.textContent = open ? `${open} expedition${open > 1 ? 's' : ''} waiting` : allDone(s) ? 'All done! Deal three more' : 'Scouting the area…';
       nd.textContent = `${q().rank().name} · ${q().stars()}★ · tap to choose`;
       na.textContent = '✦';
+    } else if (o.type === 'ground') {
+      nm.textContent = o.title;
+      nd.textContent = `${o.prog || 0} of ${o.target} new stretches · any direction you haven’t walked`;
+      na.textContent = '🧭';
     } else if (o.type === 'mystery') {
       nm.textContent = `Who am I? “${o.riddle}”`;
       nd.textContent = `${o.band === 'hot' ? 'Very close now! · ' : o.band === 'warm' ? 'Getting warm · ' : ''}${o.sector} of where you started · ${o.used.length}/${o.clues.length} clues · worth ${'★'.repeat(Math.max(1, 3 - o.used.length))}`;
@@ -331,6 +347,7 @@ export function initExpeditions(ctx) {
       return `<span class="tk-quest race ${late ? 'late' : ''}">⏱ ${o.sunset ? `🌅 ${mmss((o.sunsetAt - Date.now()) / 1000)}` : mmss(t)}<i style="transform:rotate(${Math.round((bearingTo(game.pos, o) + yaw) / 5) * 5}deg)">↑</i></span>`;
     }
     if (o.type === 'mystery') return `<span class="tk-quest ${o.band || ''}">🔍 ${o.band === 'hot' ? 'Very close!' : o.band === 'warm' ? 'Getting warm' : o.sector}</span>`;
+    if (o.type === 'ground') return `<span class="tk-quest">🧭 ${o.prog || 0}/${o.target}</span>`;
     return `<span class="tk-quest">🎯 ${esc(o.sp.name)}</span>`;
   }
   // what the minimap should draw for the active quest
@@ -374,6 +391,8 @@ export function initExpeditions(ctx) {
     } else if (card.type === 'bounty') {
       facts.push(`<i>${esc(card.sci || '')}</i>`);
       facts.push(card.photo ? '📸 Photographed in the field' : 'Tracked down on foot');
+    } else if (card.type === 'ground') {
+      facts.push(`${card.target} stretches of new ground in ${mmss(card.secs)} · par ${mmss(card.par)}`);
     } else {
       facts.push(`Time ${mmss(card.secs)} · par ${mmss(card.par)}`);
       if (card.gain) facts.push(`Climbed ${fmtElev(card.gain)}${card.ground != null ? ` to ${fmtElev(card.ground)} above sea level` : ''}`);
@@ -433,6 +452,7 @@ export function initExpeditions(ctx) {
     else if (ev.type === 'quest-blocked') toast(ev.msg, 'error');
     else if (ev.type === 'quest-guess') { closeBoardQuietly(); buzz([20, 40, 20]); ctx.ambience.chime(7); guess(); }
     else if (ev.type === 'quest-clock') { const o = ev.quest; toast(o.sunset ? 'The race is on! Beat the sunset.' : `The race is on! Par ${mmss(o.par)}.`, 'quest'); buzz([20, 30, 60]); ctx.ambience.chime(5); }
+    else if (ev.type === 'quest-ground') { const o = ev.quest; toast(`🧭 New ground: ${o.prog} of ${o.target}`, 'quest'); buzz(15); ctx.hud.render(); }
     else if (ev.type === 'quest-wrong') { toast(ev.msg, 'quest'); buzz(25); }
     else if (ev.type === 'quest-habitat') { toast(`🎯 You’re in the ${ev.quest.sp.name}’s habitat. Field notes added: tap the Expedition box.`, 'quest'); buzz([20, 40, 20]); ctx.ambience.chime(4); }
     else if (ev.type === 'quest-warm') {

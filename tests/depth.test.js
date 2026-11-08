@@ -255,3 +255,71 @@ test('accepting a race: the clock waits while you read the card, and starts when
   assert.equal(events.filter((e) => e.type === 'quest-clock').length, 1);
   assert.equal(q.startClock(), false); // once
 });
+
+// ---------------------------------------------------------------- far from everything (no dead boards)
+import { makeBounty, makeGround, walkedCells, GROUND_TARGET } from '../src/game/quests.js';
+
+function farGame({ pois = [], habitat = () => 'farmland', ground = () => 10, species = [] } = {}) {
+  const world = {
+    *pois(lat, lon, r) { for (const poi of pois) if (haversine(lat, lon, poi.lat, poi.lon) <= r + 50) yield { poi, chunk: { markPoi() {}, setClosed() {} } }; },
+    groundAt: ground, habitatAt: habitat, isReadyAt: () => true, readyChunks: () => [], chunkAt: () => null, remote: new Map(),
+  };
+  const events = [];
+  const profile = new Profile({ key: `f.${Math.random()}`, lastKey: `f.l.${Math.random()}` });
+  const g = new Game(world, profile, { localNow: () => NOON, sun: () => ({ alt: 30 }), snapshot: () => ({}), tags: () => [] }, (e) => events.push(e));
+  g.dataSaver = true; g.features = { quests: true };
+  g.wild = { cell: 'x', loading: false, species };
+  const q = g.quests = new Quests(g, (e) => events.push(e));
+  g.enter('roam', { to: C });
+  return { g, q, events, profile };
+}
+
+test('far from everything: a mystery 1.5 km away becomes a rarer long expedition', () => {
+  const chapel = { ref: 'osm:node/50', name: 'Lonely Chapel', kind: 'amenity:place_of_worship', tags: null, hours: null, ...offsetGeo(C.lat, C.lon, 0, 1500) };
+  const { q } = farGame({ pois: [chapel] });
+  const m = q.make('mystery');
+  assert.equal(m.ref, chapel.ref);
+  assert.ok(m.long);
+  assert.equal(m.rarity, 'rare'); // uncommon, one step up for the long walk
+});
+
+test('far from everything: with no hill or landmark, the race goes to the water’s edge', () => {
+  const water = (lat) => (lat > C.lat + 0.003 ? 'water' : 'farmland'); // a lake ~330 m north
+  const { q } = farGame({ habitat: water });
+  const r = q.make('race');
+  assert.equal(r.kind, 'water');
+  assert.equal(r.title, 'Race to the water’s edge');
+});
+
+test('far from everything: plants and fungi can be wanted when no animal fits', () => {
+  const sp = [{ id: 9, name: 'Bluebell', sci: 'Hyacinthoides non-scripta', group: 'Plantae', count: 20, rarity: 'uncommon' }];
+  assert.equal(makeBounty(C, sp, {}, () => 'wood', rng(1)), null);
+  assert.equal(makeBounty(C, sp, {}, () => 'wood', rng(1), new Set(), () => true, true).sp.name, 'Bluebell');
+});
+
+test('New ground: walk stretches you have never walked; it fills empty boards', () => {
+  assert.equal(makeGround('present', 'Testville', 3), null); // not enough unwalked ground left
+  assert.equal(walkedCells({ a: 3, b: 2, c: 1 }, 'present'), 1);
+  assert.equal(walkedCells({ a: 3, b: 2, c: 1 }, 'home'), 2);
+  const { g, q, events, profile } = farGame(); // nothing at all around: no places, no water, flat, no wildlife
+  for (let k = 0; k < 40; k++) { q._fillT = 0; q.step(); }
+  const ground = q.s.offers.find((o) => o?.type === 'ground');
+  assert.ok(ground, 'a New ground quest fills in');
+  assert.equal(q.s.offers.filter((o) => o?.type === 'ground').length, 1); // only one
+  assert.ok(q.empty()); // the other slots say honestly that little is mapped here
+  profile.data.cells = {}; // (the journal makes this in the game)
+  q.accept(ground.id);
+  for (let k = 0; k < GROUND_TARGET; k++) { profile.data.cells[`newcell${k}`] = 1; q._groundT = 0; q.step(); }
+  assert.ok(events.some((e) => e.type === 'quest-done' && e.card.type === 'ground'));
+  void g;
+});
+
+test('re-dealing keeps the active quest in its own slot, whatever its kind', () => {
+  const { g, q } = farGame();
+  for (let k = 0; k < 40; k++) { q._fillT = 0; q.step(); }
+  const i = q.s.offers.findIndex((o) => o?.type === 'ground');
+  q.accept(q.s.offers[i].id);
+  q.deal('move');
+  assert.equal(q.s.offers[i]?.id, q.s.active);
+  void g;
+});

@@ -232,14 +232,14 @@ export const ERAS = [
  * @param {Set<string>} [avoid]
  * @param {(p: {lat:number, lon:number}) => boolean} [inside] only targets the player can reach in this mode
  */
-export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = new Set(), inside = (_p) => true) {
+export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = new Set(), inside = (_p) => true, range = [120, 800]) {
   const cands = [];
   for (const p of pois) {
     if (!p.name || avoid.has(p.ref) || closedToPublic(p)) continue;
     const grp = groupOf(p.kind, p.cls);
     if (BUSINESS.has(grp)) continue;
     const d = haversine(pos.lat, pos.lon, p.lat, p.lon);
-    if (d < 120 || d > 800 || !inside(p)) continue;
+    if (d < range[0] || d > range[1] || !inside(p)) continue;
     cands.push({ p, d, grp, brg: bearingTo(pos, p) });
   }
   if (!cands.length) return null;
@@ -254,7 +254,7 @@ export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = n
     if (c.p.tags?.heritage) s += 1.5;
     if (['history', 'worship', 'museum', 'sight', 'nature'].includes(c.grp) || isQuirk(c.p)) s += 1.5;
     if (c.alike >= 2 && c.alike <= 5) s += 1; // a little ambiguity makes it a puzzle
-    if (c.d > 600) s -= 1;
+    if (c.d > range[0] + (range[1] - range[0]) * 0.75) s -= 1;
     c.score = s;
   }
   cands.sort((a, b) => b.score - a.score);
@@ -304,8 +304,9 @@ const HAB_TEXT = { water: 'water', wood: 'woodland', wetland: 'wetland', scrub: 
  * Bounty: a locally recorded animal you haven't got yet, plus where it likes to be.
  * @param {any[]} species  this area's species list (src/data/wildlife.js)
  */
-export function makeBounty(pos, species, known, habitatAt, rand = Math.random, avoid = new Set(), inside = (_p) => true) {
-  const pool = species.filter((s) => !['Plantae', 'Fungi'].includes(s.group) && !avoid.has(s.id) && s.count >= 3);
+export function makeBounty(pos, species, known, habitatAt, rand = Math.random, avoid = new Set(), inside = (_p) => true, plants = false) {
+  const isPlant = (s) => ['Plantae', 'Fungi'].includes(s.group);
+  const pool = species.filter((s) => (plants ? isPlant(s) : !isPlant(s)) && !avoid.has(s.id) && s.count >= 3);
   if (!pool.length) return null;
   const scored = pool.map((s) => {
     let v = rand() * 2;
@@ -340,6 +341,8 @@ const LOOK = {
   Actinopterygii: { any: 'Look into clear, slow water from a bank or a bridge.' },
   Mollusca: { any: 'Check damp stones, walls and the water’s edge.' },
   Arachnida: { any: 'Look in webs along hedges and fences, and in sheltered corners.' },
+  Plantae: { any: 'Look along path edges, verges, walls and the margins of fields; flowers are easiest to spot in sun.' },
+  Fungi: { any: 'Look at the base of trees, on dead wood and in leaf litter, especially after rain in autumn.' },
 };
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -368,6 +371,24 @@ export function fieldNotes(sp, details, months, hab, month) {
   return notes;
 }
 
+// ---------------------------------------------------------------- New ground
+export const GROUND_TARGET = 8; // ~150 m stretches (geohash-7 cells) never walked before
+/** A "New ground" quest: walk stretches you've never walked, in any direction. */
+export function makeGround(mode, area = null, left = null) {
+  if (left != null && left < GROUND_TARGET) return null; // not enough unwalked ground left here
+  return {
+    type: 'ground', id: uid('g'), title: area ? `New ground in ${area}` : 'New ground', area,
+    target: GROUND_TARGET, par: parTime(GROUND_TARGET * 150, mode), rarity: 'uncommon',
+  };
+}
+// how many cells count as "walked" in this mode (Walk: on foot; Home: from home or on foot; Roam: any)
+export function walkedCells(cells, mode) {
+  const min = mode === 'present' ? 3 : mode === 'home' ? 2 : 1;
+  let n = 0;
+  for (const k in cells) if (cells[k] >= min) n++;
+  return n;
+}
+
 // time (ms from `now`) until the sun sets, if within `maxMin`; null otherwise
 export function sunsetIn(sunAlt, now = Date.now(), maxMin = 120) {
   if (sunAlt(now) <= -0.833) return null;
@@ -385,15 +406,16 @@ export function parTime(d, mode) { return Math.round((d * 1.4) / (PACE[mode] || 
  * @param {(lat: number, lon: number) => ({lat: number, lon: number} | null)} [snap] the nearest
  *   point on a public way (null: nothing walkable near); finishes are never off the paths
  */
-export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random, inside = (_p) => true, snap = (lat, lon) => ({ lat, lon })) {
+export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random, inside = (_p) => true, snap = (lat, lon) => ({ lat, lon }), { reach = 650, habitatAt = null } = {}) {
   const here = groundAt(pos.lat, pos.lon);
   let target = null, kind, gain = 0;
   if (here != null) {
     // the highest ground that a public path actually reaches
     const samples = [];
-    for (let e = -650; e <= 650; e += 30) for (let n = -650; n <= 650; n += 30) {
+    const step = reach > 1000 ? 60 : 30;
+    for (let e = -reach; e <= reach; e += step) for (let n = -reach; n <= reach; n += step) {
       const r = Math.hypot(e, n);
-      if (r < 150 || r > 650) continue;
+      if (r < 150 || r > reach) continue;
       const p = offsetGeo(pos.lat, pos.lon, e, n);
       if (!inside(p)) continue;
       const h = groundAt(p.lat, p.lon);
@@ -413,18 +435,31 @@ export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random
     for (const p of pois) {
       if (!p.name || closedToPublic(p)) continue;
       const d = haversine(pos.lat, pos.lon, p.lat, p.lon), grp = groupOf(p.kind, p.cls);
-      if (d < 200 || d > 750 || BUSINESS.has(grp) || !inside(p)) continue;
+      if (d < 200 || d > reach + 100 || BUSINESS.has(grp) || !inside(p)) continue;
       spots.push(p);
     }
     const view = spots.filter((p) => /viewpoint|peak|tower|lighthouse/.test(p.kind || ''));
-    for (const list of [view, spots]) {
+    const pickFrom = (list, k) => {
       for (let tries = 0; tries < 8 && list.length && !target; tries++) {
         const p = list[Math.floor(rand() * list.length)];
         const q = snap(p.lat, p.lon); // the finish line is on the path next to it
-        if (q) { target = { lat: q.lat, lon: q.lon, name: p.name, d: haversine(pos.lat, pos.lon, q.lat, q.lon) }; kind = list === view ? 'viewpoint' : 'dash'; }
+        if (q) { target = { lat: q.lat, lon: q.lon, name: p.name, d: haversine(pos.lat, pos.lon, q.lat, q.lon) }; kind = k; }
       }
-      if (target) break;
+    };
+    pickFrom(view, 'viewpoint');
+    // the water's edge: the nearest stream, pond, river or lake a public path reaches
+    if (!target && habitatAt) {
+      for (let r = 150; r <= reach && !target; r += 40) {
+        const n = Math.max(8, Math.round(r / 25));
+        for (let k = 0; k < n && !target; k++) {
+          const a = (k / n) * Math.PI * 2, p = offsetGeo(pos.lat, pos.lon, Math.sin(a) * r, Math.cos(a) * r);
+          if (habitatAt(p.lat, p.lon) !== 'water' || !inside(p)) continue;
+          const q = snap(p.lat, p.lon);
+          if (q) { target = { lat: q.lat, lon: q.lon, name: 'the water’s edge', d: haversine(pos.lat, pos.lon, q.lat, q.lon) }; kind = 'water'; }
+        }
+      }
     }
+    pickFrom(spots, 'dash');
     if (!target) return null;
   }
   const par = parTime(target.d, mode);
@@ -432,7 +467,7 @@ export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random
   const sunset = sunsetMs != null && sunsetMs > par * 1000 * 1.1 && sunsetMs < 100 * 60000;
   const name = target.name || null;
   const title = sunset ? (kind === 'summit' ? 'Beat the sunset to the high ground' : `Beat the sunset to ${name}`)
-    : kind === 'summit' ? 'Summit sprint' : kind === 'viewpoint' ? `Race to the view: ${name}` : `Dash to ${name}`;
+    : kind === 'summit' ? 'Summit sprint' : kind === 'viewpoint' ? `Race to the view: ${name}` : kind === 'water' ? 'Race to the water’s edge' : `Dash to ${name}`;
   return {
     type: 'race', id: uid('r'),
     title, kind, name, lat: target.lat, lon: target.lon, dist: roundTo(target.d, 10), gain,
@@ -446,6 +481,9 @@ const TYPES = ['mystery', 'bounty', 'race'];
 export const MYSTERY_WARM_M = 150, MYSTERY_HOT_M = 60; // closeness signals for a mystery
 const REDEAL_M = 1500;          // walk/roam this far from where the board was dealt and it re-deals
 const FILL_FALLBACK_S = 25;     // a slot that can't be filled (no wildlife data…) becomes another type
+const EMPTY_AFTER_S = 60;       // still nothing at all: say honestly that little is mapped here
+// what a slot tries next when its own kind can't be dealt here (always ending somewhere playable)
+const FALLBACK = { mystery: ['race', 'ground'], bounty: ['ground', 'race'], race: ['ground', 'mystery'] };
 
 export class Quests {
   /** @param {any} game  the Game (world, profile, env, pos, mode, wild) */
@@ -504,7 +542,7 @@ export class Quests {
   // Swap the active quest for another of the same kind, with no penalty, and remember the spot.
   cantReach() {
     const s = this.s, o = this.active();
-    if (!o || o.type === 'bounty') return null;
+    if (!o || (o.type !== 'mystery' && o.type !== 'race')) return null;
     (s.blocked ||= []).push({ ref: o.ref || null, lat: +o.lat.toFixed(5), lon: +o.lon.toFixed(5) });
     if (s.blocked.length > 300) s.blocked.splice(0, s.blocked.length - 300);
     const i = s.offers.indexOf(o);
@@ -543,12 +581,16 @@ export class Quests {
     s.date = this.date();
     s.mode = this.game.mode;
     s.origin = { lat: this.game.pos.lat, lon: this.game.pos.lon };
-    s.offers = TYPES.map((t) => (keep && keep.type === t ? keep : null));
+    const at = keep ? s.offers.findIndex((o) => o && o.id === keep.id) : -1; // the active quest keeps its slot
+    s.offers = TYPES.map((_, i) => (i === at ? keep : null));
     if (why !== 'move') s.swaps = 1;
     this._tries = 0;
     this._fillT = 0;
     this.profile.save();
   }
+
+  /** Nothing could be dealt for a while: little is mapped around here (the board says so). */
+  empty() { return this._tries * 2 > EMPTY_AFTER_S && this.s.offers.some((o) => !o); }
 
   // swap one offer for a fresh one of the same type (once a day)
   swap(i) {
@@ -562,17 +604,38 @@ export class Quests {
   }
 
   make(type, avoid = new Set()) {
+    const longer = (o) => { o.long = true; o.rarity = RARITIES[Math.min(4, RARITIES.indexOf(o.rarity) + 1)]; };
     const g = this.game, pos = g.pos, w = g.world;
     const pois = [...w.pois(pos.lat, pos.lon, 900)].map((x) => x.poi);
     for (const o of this.s.offers) if (o?.ref) avoid.add(o.ref);
     const inside = (p) => this.inside(p) && !this.isBlocked(p);
     // finish lines on public ways (where the map has path data; elsewhere the point stands)
     const snap = (lat, lon) => { const n = nearestPath(w, lat, lon, 60); return !n.known ? { lat, lon } : n.d <= 60 ? { lat: n.lat, lon: n.lon } : null; };
-    if (type === 'mystery') { const m = makeMystery(pos, pois, this.profile.data.discoveries, Math.random, avoid, (p) => inside(p) && walkableTo(w, p)); if (m) this.enrich(m); return m; }
-    if (type === 'bounty') return g.wild.species.length ? makeBounty(pos, g.wild.species, this.profile.data.species || {}, (a, b) => w.habitatAt(a, b), Math.random, avoid, inside) : null;
+    const near = (p) => inside(p) && walkableTo(w, p);
+    if (type === 'mystery') {
+      // nearby first; if nothing fits, a long expedition further out (rarer, it's a real walk)
+      let m = makeMystery(pos, pois, this.profile.data.discoveries, Math.random, avoid, near);
+      if (!m) { m = makeMystery(pos, [...w.pois(pos.lat, pos.lon, 2600)].map((x) => x.poi), this.profile.data.discoveries, Math.random, avoid, near, [800, 2500]); if (m) longer(m); }
+      if (m) this.enrich(m);
+      return m;
+    }
+    if (type === 'bounty') {
+      if (!g.wild.species.length) return null;
+      const bounty = (plants) => makeBounty(pos, g.wild.species, this.profile.data.species || {}, (a, b) => w.habitatAt(a, b), Math.random, avoid, inside, plants);
+      return bounty(false) || bounty(true); // animals first, then plants and fungi
+    }
     if (type === 'race') {
       const ss = sunsetIn((t) => g.env.sun(pos.lat, pos.lon, new Date(t)).alt);
-      return makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside, snap);
+      const habitatAt = (a, b) => w.habitatAt(a, b);
+      let r = makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside, snap, { habitatAt });
+      if (!r) { r = makeRace(pos, (a, b) => w.groundAt(a, b), [...w.pois(pos.lat, pos.lon, 1900)].map((x) => x.poi), g.mode, ss, Math.random, inside, snap, { reach: 1800, habitatAt }); if (r) longer(r); }
+      return r;
+    }
+    if (type === 'ground') {
+      if (this.s.offers.some((o) => o?.type === 'ground' && !o.done)) return null; // one at a time
+      const ch = w.chunkAt?.(pos.lat, pos.lon), a = ch && this.profile.data.areas?.[ch.key];
+      const done = g.mode === 'present' ? a?.foot : a?.home;
+      return makeGround(g.mode, a?.name || ch?.areaName || null, a?.walk ? a.walk - (done || 0) : null);
     }
     return null;
   }
@@ -601,6 +664,7 @@ export class Quests {
       o.sector = sectorOf(bearingTo(pos, o));
       o.dist = roundTo(haversine(pos.lat, pos.lon, o.lat, o.lon), 50);
     }
+    if (o.type === 'ground') { o.base = walkedCells(this.profile.data.cells || {}, g.mode); o.prog = 0; }
     o.from = { lat: +pos.lat.toFixed(5), lon: +pos.lon.toFixed(5) };
     s.active = o.id;
     // a race's clock starts when you head off (startClock), not while you read the card
@@ -689,6 +753,13 @@ export class Quests {
         const dd = haversine(poi.lat, poi.lon, o.lat, o.lon);
         this.emit('quest-wrong', `Not me! Look about ${roundTo(dd, 50)} m ${sectorOf(bearingTo(poi, o))} of ${poi.name}.`);
       }
+    } else if (o.type === 'ground') {
+      if (Date.now() - (this._groundT || 0) > 1500) {
+        this._groundT = Date.now();
+        const prog = Math.max(0, walkedCells(this.profile.data.cells || {}, g.mode) - (o.base ?? 0));
+        if (prog !== o.prog) { o.prog = prog; this.profile.save(); if (prog < o.target) this.emit('quest-ground', null, { quest: o }); }
+        if (prog >= o.target) this.complete(o);
+      }
     } else if (o.type === 'bounty') {
       if (!o.inHabitat) {
         const hab = wildHabitat(g.world.habitatAt(g.pos.lat, g.pos.lon));
@@ -726,7 +797,7 @@ export class Quests {
       if (o) return;
       let q = this.make(TYPES[i]);
       // can't fill this one (e.g. no wildlife data here): offer another kind after a while
-      if (!q && this._tries * 2 > FILL_FALLBACK_S) q = this.make(TYPES[i] === 'race' ? 'mystery' : TYPES[i] === 'bounty' ? 'race' : 'race');
+      if (!q && this._tries * 2 > FILL_FALLBACK_S) for (const t of FALLBACK[TYPES[i]]) { q = this.make(t); if (q) break; }
       if (q) { s.offers[i] = q; changed = true; }
     });
     if (changed) { this.profile.save(); this.emit('quest-dealt', null); }
@@ -778,6 +849,7 @@ export class Quests {
   starsFor(o, secs) {
     if (o.type === 'mystery') return Math.min(3, Math.max(1, 3 - o.used.length) + (o.guessRight ? 1 : 0));
     if (o.type === 'bounty') return Math.max(1, 3 - o.fled - (o.used?.length || 0));
+    if (o.type === 'ground') return secs <= o.par ? 3 : secs <= o.par * 1.5 ? 2 : 1;
     return secs <= o.par ? 3 : secs <= o.par * 1.5 ? 2 : 1;
   }
 
@@ -796,6 +868,7 @@ export class Quests {
       lat: +(o.lat ?? g.pos.lat).toFixed(5), lon: +(o.lon ?? g.pos.lon).toFixed(5),
       ...(o.type === 'mystery' ? { name: o.place.name, kind: o.place.kind, year: o.place.year, ref: o.ref, tags: o.place.tags ? { wikipedia: o.place.tags.wikipedia, wikidata: o.place.tags.wikidata } : null, clues: o.used.length, guessRight: o.guessRight ?? null } : {}),
       ...(o.type === 'bounty' ? { name: o.sp.name, sci: o.sp.sci, group: o.sp.group, spId: o.sp.id, img: o.sp.photo, credit: o.sp.credit, photo: !!extra.photo } : {}),
+      ...(o.type === 'ground' ? { name: o.area ? `New ground in ${o.area}` : 'New ground', target: o.target, par: o.par } : {}),
       ...(o.type === 'race' ? { name: o.kind === 'summit' ? 'High ground' : o.name, gain: o.gain, par: o.par, sunset: o.sunset, raceKind: o.kind, ground: g.world.groundAt(g.pos.lat, g.pos.lon) } : {}),
     };
     s.cards.unshift(card);
