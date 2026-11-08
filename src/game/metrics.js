@@ -16,7 +16,7 @@ export const CHASE_GOAL_S = 120; // the design target: something to chase within
 
 // game events counted per session (anything else is ignored)
 const COUNTED = new Set(['discover', 'hunt', 'hunt-reveal', 'hunt-flee', 'hunt-cold', 'hunt-caught', 'spotted', 'critter',
-  'treasure-hot', 'treasure', 'task', 'geocache', 'rock', 'beacon', 'rephoto', 'quest-start', 'quest-done', 'quest-wrong']);
+  'treasure-hot', 'treasure', 'task', 'geocache', 'rock', 'beacon', 'rephoto', 'quest-start', 'quest-done', 'quest-wrong', 'quest-abandon']);
 // events that mean "there's something to chase right now"
 const CHASE = new Set(['hunt', 'critter', 'treasure-hot', 'quest-start']);
 

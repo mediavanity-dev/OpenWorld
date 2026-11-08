@@ -11,6 +11,7 @@ import { fmtDist, fmtElev } from '../units.js';
 import { esc, safeUrl } from '../util/html.js';
 import { buzz } from '../sensors.js';
 import { toast } from './hud.js';
+import { closeCard } from './card.js';
 
 const $ = (id) => document.getElementById(id);
 const TYPE = {
@@ -20,28 +21,39 @@ const TYPE = {
 };
 const RARITY_LABEL = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' };
 const starsHtml = (n, of = 3) => `<span class="qstars">${'<i class="on">★</i>'.repeat(n)}${'<i>★</i>'.repeat(Math.max(0, of - n))}</span>`;
+const HOW = { present: 'Claimed in person', home: 'Played from home', echo: 'Echo (Roam): no stars' };
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, Math.round(s % 60))).padStart(2, '0')}`;
 
 export function initExpeditions(ctx) {
   const { game, profile } = ctx;
   let tab = 'today';
-  let onClose = null;
+  // things waiting for the board (or a reveal) to be out of the way: the tutorial, the Home hint
+  const queue = new Map();
+  let startPending = false;
 
   const q = () => game.quests;
   const on = () => !!game.features.quests && !!q();
 
   // ---------------------------------------------------------------- board
+  let intro = false; // show the welcome blurb (the first time the board is opened)
   function open(which) {
     if (!on()) return;
     if (which) tab = which;
+    const s = q().s;
+    if (!s.seen) { s.seen = true; intro = true; tab = 'today'; profile.save(); ctx.hud.render(); }
     $('quests').hidden = false;
     render();
   }
   function close() {
     $('quests').hidden = true;
-    const f = onClose; onClose = null; f?.();
+    intro = false;
+    flush();
   }
   function isOpen() { return !$('quests').hidden; }
+  const busy = () => startPending || isOpen() || !$('reveal').hidden;
+  function flush() { if (busy()) return; const fs = [...queue.values()]; queue.clear(); for (const f of fs) f(); }
+  // run fn once the board and any reveal are closed (now, if they are); one per key
+  function whenClear(key, fn) { if (on() && busy()) queue.set(key, fn); else fn(); }
 
   function header() {
     const r = q().rank(), cards = q().s.cards.length;
@@ -61,7 +73,22 @@ export function initExpeditions(ctx) {
     let body;
     if (tab === 'today') {
       const act = q().active();
-      body = `<p class="qintro">${act ? 'On an expedition. Tap it for clues and progress.' : 'Pick one. Each is built from real places, wildlife and terrain around you.'}${game.mode === 'roam' ? ' <span class="echo-note">Roam: cards are echoes (no stars) until you play for real.</span>' : ''}</p>
+      const td = q().today();
+      const ip = game.mode === 'present' && game.fix?.source === 'ip';
+      body = `${intro ? `<div class="qwelcome"><h3>✦ Welcome to Expeditions</h3>
+          <p>Every day, three quests are dealt from the real world around you: a <b>🔍 mystery place</b> to work out from a riddle, a <b>🎯 wild animal</b> people have really seen here to track down, and a <b>⏱ race</b> to the high ground or against the sunset.</p>
+          <p>Pick one and follow it on the map. Finish it to win a <b>card</b>: the rarer the real thing (an old church, a shy animal, a big climb), the rarer the card. Stars raise your rank.</p>
+          <button class="primary" data-qintro>Got it, show me the quests</button></div>` : ''}
+        ${ip ? `<div class="qwarn"><b>You can’t move on an internet location.</b> It only knows your town, roughly. Set a home base to play expeditions from this computer, or open the game on your phone.<button class="primary" data-qhome>Set my home base</button></div>` : ''}
+        <p class="qintro">${act ? 'On an expedition. Its card glows below; tap <b>Go!</b> to head out.' : 'Pick one. Each is built from real places, wildlife and terrain around you.'}
+          <span class="qtoday">Today: ${td.done} done${td.stars ? ` · +${td.stars}★` : ''}</span>
+          ${game.mode === 'roam' ? '<span class="echo-note">Roam: cards are echoes (no stars) until you play for real.</span>' : game.mode === 'home' ? '<span class="muted">Home: every goal is inside your home range.</span>' : ''}</p>
+        ${intro ? '' : `<details class="qhow"><summary>How expeditions work</summary>
+          <p>🔍 <b>Mystery</b>: a riddle about a real place nearby. Work out which one and go there. Stuck? Buy a clue, but each costs a star. At old places, guess its age at the end to win a star back.</p>
+          <p>🎯 <b>Bounty</b>: an animal people have really recorded around here. Head for the habitat it likes, follow its signs (🐾) and approach gently.</p>
+          <p>⏱ <b>Race</b>: reach the high ground or a landmark inside par time, or before the real sunset.</p>
+          <p>Every finish turns over a <b>card</b>. Its rarity comes from real facts (how old a place is, how rarely an animal is seen, how far you climbed) and is shown before you choose. Stars raise your rank. Only real play (Present or Home) earns stars. Everything is kept in <b>Your cards</b>, your journal and its map.</p>
+        </details>`}
         <div class="qdeck">${s.offers.map((o, i) => offerHtml(o, i, act)).join('')}</div>
         ${allDone(s) ? '<button class="primary qmore" data-qmore>Deal three more</button>' : ''}`;
     } else body = cardsHtml();
@@ -78,7 +105,7 @@ export function initExpeditions(ctx) {
     if (o.type === 'mystery') {
       const col = groupInfo(o.place.kind, o.place.cls).color;
       art = `<div class="qart mystery" style="--c:${col}"><span>?</span></div>`;
-      hook = `<p class="qriddle">“${esc(o.riddle)}”</p><p class="qhook">Somewhere to the <b>${o.sector}</b>, about ${fmtDist(o.dist)} away.${o.alike >= 2 ? ` One of ${o.alike} places like it in that direction.` : ''}</p>`;
+      hook = `<p class="qriddle">“${esc(o.riddle)}”</p><p class="qhook">${isAct ? 'From where you started: to' : 'Somewhere to'} the <b>${o.sector}</b>, about ${fmtDist(o.dist)} away.${o.alike >= 2 ? ` One of ${o.alike} places like it in that direction.` : ''}</p>`;
       meta.push(`${o.clues.length} clues to buy · each costs ★`);
       if (isAct) extra = cluesHtml(o);
     } else if (o.type === 'bounty') {
@@ -96,9 +123,12 @@ export function initExpeditions(ctx) {
         <p class="qhook">${o.sunset ? `Sunset in <b>${Math.max(0, Math.round((o.sunsetAt - Date.now()) / 60000))} min</b>. Get there before it goes.` : `Par time <b>${mmss(o.par)}</b>. Beat it for three stars.`}</p>`;
       if (isAct && o.startedAt) meta.push(`Clock: ${mmss((Date.now() - o.startedAt) / 1000)} / ${mmss(o.par)}`);
     }
-    const btns = o.done ? '<span class="qdone">✓ Done</span>'
+    const why = !o.done && !isAct ? q().blocked(o) : null;
+    if (why) meta.push(`<span class="warn">${esc(why)}</span>`);
+    const card = o.done ? q().s.cards.find((c) => c.id === o.id) : null;
+    const btns = o.done ? `<span class="qdone">✓ Done${card ? ` ${starsHtml(card.grade === 'echo' ? 0 : card.stars)}` : ''}</span>`
       : isAct ? '<button data-qabandon>Give up</button><button class="primary" data-qclose>Go!</button>'
-      : `${q().s.swaps > 0 && !locked ? `<button data-qswap="${i}" title="Swap for a different one (once a day)">↻ Swap</button>` : ''}<button class="primary" data-qaccept="${esc(o.id)}" ${locked ? 'disabled' : ''}>${locked ? 'One at a time' : 'Accept'}</button>`;
+      : `${q().s.swaps > 0 && !locked ? `<button data-qswap="${i}" title="Swap for a different one (once a day)">↻ Swap${' '}<small>(1 left today)</small></button>` : ''}<button class="primary" data-qaccept="${esc(o.id)}" ${locked || why ? 'disabled' : ''}>${locked ? 'One at a time' : why ? 'Not here' : 'Accept'}</button>`;
     return `<article class="qcard ${o.type} r-${o.rarity} ${isAct ? 'active' : ''} ${o.done ? 'done' : ''}">
       <div class="qtop"><span class="qtype">${T.glyph} ${T.label} <small>${T.verb}</small></span><span class="qgem r-${o.rarity}" title="Reward">${RARITY_LABEL[o.rarity]} card</span></div>
       ${art}<h3>${esc(o.title)}</h3>${hook}
@@ -119,7 +149,9 @@ export function initExpeditions(ctx) {
     if (!cards.length) return '<p class="qintro">No cards yet. Finish an expedition to win your first one.</p>';
     const byR = {};
     for (const c of cards) byR[c.rarity] = (byR[c.rarity] || 0) + 1;
-    return `<p class="qintro">${RARITIES.slice().reverse().filter((r) => byR[r]).map((r) => `<span class="qgem r-${r}">${byR[r]} ${RARITY_LABEL[r]}</span>`).join(' ')}</p>
+    const n = (t) => cards.filter((c) => c.type === t).length;
+    return `<p class="qintro">${cards.length} cards · ${n('mystery')} 🔍 places · ${n('bounty')} 🎯 animals · ${n('race')} ⏱ races</p>
+      <p class="qintro">${RARITIES.slice().reverse().filter((r) => byR[r]).map((r) => `<span class="qgem r-${r}">${byR[r]} ${RARITY_LABEL[r]}</span>`).join(' ')}</p>
       <div class="qgrid">${cards.map((c, i) => `<button class="qmini r-${c.rarity} ${c.grade === 'echo' ? 'echo' : ''}" data-qcard="${i}">
         <span class="qmini-t">${TYPE[c.type].glyph}</span><b>${esc(c.name || '')}</b>${starsHtml(c.stars)}<small>${esc(c.date)}</small></button>`).join('')}</div>`;
   }
@@ -130,12 +162,14 @@ export function initExpeditions(ctx) {
     const b = t.closest('button');
     if (!b) return;
     if (b.dataset.qtab) { tab = b.dataset.qtab; render(); }
+    else if (b.dataset.qintro !== undefined) { intro = false; render(); $('quests-body').scrollTop = 0; }
+    else if (b.dataset.qhome !== undefined) { close(); ctx.homeSetup?.open({ onSet: () => ctx.hud.render() }); }
     else if (b.dataset.qaccept) {
-      q().accept(b.dataset.qaccept);
-      buzz([20, 30, 20]); ctx.ambience.chime(4);
+      const o = q().accept(b.dataset.qaccept);
       render();
-      const o = q().active();
-      if (o?.type !== 'mystery') setTimeout(close, 450); // mysteries stay open so you can read the riddle
+      if (!o) return;
+      buzz([20, 30, 20]); ctx.ambience.chime(4);
+      if (o.type !== 'mystery') setTimeout(close, 450); // mysteries stay open so you can read the riddle and clues
     } else if (b.dataset.qswap) { if (!q().swap(+b.dataset.qswap)) toast('Nothing else to swap in around here right now.'); render(); }
     else if (b.dataset.qabandon) { if (confirm('Give up this expedition? It goes back on the board.')) { q().abandon(); render(); } }
     else if (b.dataset.qclue) { const c = q().buyClue(b.dataset.qclue); if (c) { buzz(15); ctx.ambience.chime(2); } render(); }
@@ -151,9 +185,16 @@ export function initExpeditions(ctx) {
     const o = q().active(), s = q().s;
     const nm = $('n-name'), nd = $('n-dist'), na = $('n-arrow'), lbl = document.querySelector('#nearest .n-label');
     $('nearest').classList.add('quest');
+    $('nearest').classList.toggle('qnew', !s.seen);
     $('nearest').classList.remove('done');
     if (lbl) lbl.textContent = 'Expedition';
     let arrow = null;
+    if (!s.seen) {
+      nm.textContent = 'New: Expeditions';
+      nd.textContent = 'Quests from the real world around you. Tap to see them!';
+      na.textContent = '✦'; na.style.transform = '';
+      return true;
+    }
     if (!o) {
       const open = s.offers.filter((x) => x && !x.done).length;
       nm.textContent = open ? `${open} expedition${open > 1 ? 's' : ''} waiting` : allDone(s) ? 'All done! Deal three more' : 'Scouting the area…';
@@ -161,7 +202,7 @@ export function initExpeditions(ctx) {
       na.textContent = '✦';
     } else if (o.type === 'mystery') {
       nm.textContent = `Who am I? “${o.riddle}”`;
-      nd.textContent = `${o.sector} · ${o.used.length}/${o.clues.length} clues · worth ${'★'.repeat(Math.max(1, 3 - o.used.length))}`;
+      nd.textContent = `${o.sector} of where you started · ${o.used.length}/${o.clues.length} clues · worth ${'★'.repeat(Math.max(1, 3 - o.used.length))}`;
       na.textContent = '🔍';
     } else if (o.type === 'bounty') {
       nm.textContent = `Wanted: ${o.sp.name}`;
@@ -182,6 +223,7 @@ export function initExpeditions(ctx) {
   function chip() {
     if (!on()) return '';
     const o = q().active();
+    if (!q().s.seen) return isOpen() ? '' : '<span class="tk-quest idle new">✦ Expeditions: tap me</span>';
     if (!o) return q().s.offers.some((x) => x && !x.done) && !isOpen() ? '<span class="tk-quest idle">✦ Expeditions</span>' : '';
     const yaw = (ctx.controls.yaw * 180) / Math.PI;
     if (o.type === 'race' && game.pos) {
@@ -239,6 +281,7 @@ export function initExpeditions(ctx) {
       if (card.sunset) facts.push('🌅 Made it before sunset');
     }
     if (card.grade === 'echo') facts.push('<span class="echo-note">Echo: found in Roam. Do it for real to earn stars.</span>');
+    facts.push(`<span class="muted">📍 ${card.area ? `${esc(card.area)} · ` : ''}${esc(card.date)} · ${HOW[card.grade] || ''}</span>`);
     const front = (wiki) => `
       <div class="rv-face rv-front r-${card.rarity}">
         <div class="rv-top"><span>${T.glyph} ${T.label}</span><span class="qgem r-${card.rarity}">${RARITY_LABEL[card.rarity]}</span></div>
@@ -270,7 +313,7 @@ export function initExpeditions(ctx) {
       const b = e.target.closest('[data-rv]');
       if (!b) return;
       box.hidden = true; box.onclick = null;
-      if (b.dataset.rv === 'board') { q().more(); open('today'); }
+      if (b.dataset.rv === 'board') { q().more(); open('today'); } else flush();
     };
     // the story behind a place, when it has one
     if (card.type === 'mystery' && card.tags && (card.tags.wikipedia || card.tags.wikidata)) {
@@ -285,7 +328,8 @@ export function initExpeditions(ctx) {
 
   // ---------------------------------------------------------------- events from the rules
   function onEvent(ev) {
-    if (ev.type === 'quest-done') { closeBoardQuietly(); reveal(ev.card, ev); ctx.hud.render(); }
+    if (ev.type === 'quest-done') { closeBoardQuietly(); closeCard(); reveal(ev.card, ev); ctx.hud.render(); }
+    else if (ev.type === 'quest-blocked') toast(ev.msg, 'error');
     else if (ev.type === 'quest-guess') { closeBoardQuietly(); buzz([20, 40, 20]); ctx.ambience.chime(7); guess(); }
     else if (ev.type === 'quest-wrong') { toast(ev.msg, 'quest'); buzz(25); }
     else if (ev.type === 'quest-info' || ev.type === 'quest-redeal') toast(ev.msg, 'quest');
@@ -298,18 +342,19 @@ export function initExpeditions(ctx) {
   }
   function closeBoardQuietly() { $('quests').hidden = true; }
 
-  // show the board when the game starts (then run `after`, e.g. the first-run tutorial)
+  // show the board when the game first starts (then run `after`, e.g. the first-run tutorial)
   let shown = false;
   function openOnStart(after) {
-    if (!on()) return false;
-    if (shown) { if (onClose) { onClose = after || null; return true; } return false; } // still waiting for the first close
-    shown = true;
-    onClose = after || null;
-    setTimeout(() => open('today'), 500);
+    if (!on() || !q().s.seen) return false; // new players: it glows until they open it
+    if (!shown) {
+      shown = true; startPending = true;
+      setTimeout(() => { startPending = false; open('today'); }, 500);
+    }
+    if (after) whenClear('start', after);
     return true;
   }
 
   setInterval(() => { if (isOpen() && tab === 'today') render(); }, 1000); // clocks, scouting
 
-  return { open, close, render, hud, chip, minimap, onEvent, openOnStart, isOpen };
+  return { open, close, render, hud, chip, minimap, onEvent, openOnStart, isOpen, whenClear };
 }

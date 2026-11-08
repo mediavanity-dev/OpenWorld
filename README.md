@@ -40,6 +40,9 @@ version. Now in the beta: **Then & now**, lining up old photos of historic place
 **Expeditions**: a board of three quests dealt from what's around you (a riddle about an
 unnamed real place, a bounty on a locally recorded animal, a race to the high ground or
 against the real sunset). Each one wins a collectible card whose rarity comes from real facts.
+The beta also skips the start screen for returning players (phones start where you are,
+computers at your home base) and lets a computer set its home base by Wi-Fi location or by a
+typed address near you.
 
 ## For developers
 

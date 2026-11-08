@@ -30,6 +30,7 @@ export function initJournal(c) {
     const sp = e.target.closest('[data-species]');
     if (sp) ctx.onSpecies?.(sp.dataset.species);
     if (e.target.id === 'j-share') shareCard();
+    if (e.target.closest('[data-open-quests]')) { closeJournal(); ctx.onQuests?.(); }
   });
 }
 export function openJournal(which) { if (which) tab = which; $('journal').hidden = false; render(true); }
@@ -70,6 +71,19 @@ function render(toTop = false) {
   if (tab === 'map') drawMap($('j-map'), profile, mapRadius);
 }
 
+// beta: expeditions take the place of the daily assignment (tap to open the board)
+const RCOL = { common: '#9aa4ae', uncommon: '#5fd08a', rare: '#4f9dff', epic: '#c07aff', legendary: '#ffb84d' };
+function expeditionBox() {
+  const q = ctx.game.quests;
+  if (!ctx.game.features.quests || !q) return '';
+  const r = q.rank(), td = q.today(), a = q.active(), cards = q.s.cards;
+  const best = cards.slice().sort((x, y) => Object.keys(RCOL).indexOf(y.rarity) - Object.keys(RCOL).indexOf(x.rarity))[0];
+  return `<button class="task quest-task" data-open-quests>
+    <span>Expeditions · rank ${r.level}, ${esc(r.name)} · ${r.stars}★${r.next ? ` (${r.next - r.stars} to the next rank)` : ''}</span>
+    <b>${a ? `On the go: ${esc(a.title)}` : `${td.done} finished today${td.stars ? `, +${td.stars}★` : ''}`}</b>
+    <small>${cards.length} cards${best ? ` · best: <span style="color:${RCOL[best.rarity]}">${esc(best.name || '')} (${best.rarity})</span>` : ''} · tap for the board</small></button>`;
+}
+
 function stat(n, label, color) { return `<div class="jstat"><b style="color:${color || 'inherit'}">${n}</b><span>${label}</span></div>`; }
 
 function overview(profile) {
@@ -87,7 +101,7 @@ function overview(profile) {
   const max = Math.max(1, ...days.map((x) => x.v.m));
   const bars = days.map((x) => `<div class="bar" title="${esc(x.key)}: ${fmtDist(x.v.m)}, ${x.v.finds} finds, ${x.v.species} species"><i style="height:${Math.round((x.v.m / max) * 100)}%"></i><span>${'SMTWTFS'[new Date(x.key + 'T12:00:00Z').getUTCDay()]}</span></div>`).join('');
   return `
-    <div class="task ${t.done ? 'done' : ''}"><span>Today's field assignment</span><b>${esc(T.text)}</b><small>${t.done ? 'Complete ✓' : prog} · Present or Home mode</small></div>
+    ${expeditionBox() || `<div class="task ${t.done ? 'done' : ''}"><span>Today's field assignment</span><b>${esc(T.text)}</b><small>${t.done ? 'Complete ✓' : prog} · Present or Home mode</small></div>`}
     <div class="jgrid">
       ${stat(s.present, 'claimed', '#ff7a3d')}${stat(s.home, 'found from home', '#3db8ff')}${stat(s.echo, 'echoes', '#b07aff')}
       ${stat(s.species, 'species', '#5fd08a')}${stat(s.rocks, 'rock units', '#c9a27a')}${stat(s.beacons, 'beacons', '#ffd36b')}
@@ -172,7 +186,7 @@ function map() {
   const r = [[1000, '1 km'], [5000, '5 km'], [25000, '25 km'], [200000, '200 km']];
   return `<div class="row">${r.map(([v, l]) => `<button data-radius="${v}" class="${v === mapRadius ? 'active' : ''}">${l}</button>`).join('')}</div>
     <canvas id="j-map" class="jmap"></canvas>
-    <p class="credit"><i class="dot" style="background:#e1ebd2"></i>explored on foot <i class="dot" style="background:#78c8ff"></i>from home <i class="dot" style="background:#b07aff"></i>virtual · dots: discoveries</p>`;
+    <p class="credit"><i class="dot" style="background:#e1ebd2"></i>explored on foot <i class="dot" style="background:#78c8ff"></i>from home <i class="dot" style="background:#b07aff"></i>virtual · dots: discoveries${ctx.game.quests?.s.cards.length ? ' · ◆ expedition cards' : ''}</p>`;
 }
 
 // ---------- map drawing (north-up), shared with the share card ----------
@@ -202,6 +216,13 @@ function drawMap(canvas, profile, radius, size) {
     if (px < 0 || py < 0 || px > W || py > W) continue;
     g.fillStyle = GRADE_DOT[x.grade];
     g.beginPath(); g.arc(px, py, Math.max(1.5, W / 220), 0, Math.PI * 2); g.fill();
+  }
+  for (const c of d.quests?.cards || []) {
+    if (c.lat == null) continue;
+    const [px, py] = P(c.lat, c.lon), r = Math.max(3, W / 110);
+    if (px < 0 || py < 0 || px > W || py > W) continue;
+    g.fillStyle = RCOL[c.rarity] || '#ffd36b'; g.strokeStyle = '#12161c'; g.lineWidth = Math.max(1, W / 400);
+    g.beginPath(); g.moveTo(px, py - r * 1.4); g.lineTo(px + r, py); g.lineTo(px, py + r * 1.4); g.lineTo(px - r, py); g.closePath(); g.fill(); g.stroke();
   }
   if (d.home) { const [hx, hy] = P(d.home.lat, d.home.lon); g.strokeStyle = '#3db8ff'; g.lineWidth = W / 300; g.strokeRect(hx - W / 120, hy - W / 120, W / 60, W / 60); }
   g.fillStyle = '#ff7a3d'; g.beginPath(); g.arc(W / 2, W / 2, W / 110, 0, Math.PI * 2); g.fill();

@@ -511,3 +511,43 @@ body.ar .rephoto-panel:not([hidden]) { display: grid; gap: 6px; position: fixed;
 .reveal .link { background: none; border: none; color: var(--muted); text-decoration: underline; }
 body.reduce-motion .qcard, body.reduce-motion .qart span, body.reduce-motion .tk-quest.idle, body.reduce-motion .rv-stars i.on, body.reduce-motion .rv-up { animation: none; }
 body.reduce-motion .rv-face { transition: none; }
+
+/* expeditions: progress, the explanation, and why a quest can't be played here */
+.qtoday { color: var(--accent); font-weight: 600; }
+.qhow { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--line); }
+.qhow summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.qhow p { margin: 6px 0; color: #d9dee4; font-size: 12.5px; }
+.qwarn { display: grid; gap: 8px; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,140,100,0.55); background: rgba(255,122,61,0.1); }
+.qwarn button { justify-self: start; background: var(--accent); color: #1c1606; }
+.qmeta .warn { color: #ffb4a0; }
+.qbtns small { color: var(--muted); font-size: 10.5px; }
+.task.quest-task { width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.task.quest-task:hover { background: rgba(255,211,107,0.13); }
+
+/* home base setup */
+.hs-reason { margin: 0 0 8px; padding: 8px 12px; border-radius: 10px; background: rgba(61,184,255,0.1); border: 1px solid rgba(61,184,255,0.4); }
+.hs-big { width: 100%; min-height: 46px; margin: 4px 0; }
+#homesetup .row { margin-top: 8px; }
+.hs-confirm { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(61,184,255,0.08); border: 1px solid rgba(61,184,255,0.35); }
+.hs-confirm p { margin: 0 0 8px; }
+.hs-confirm .hs-big { background: var(--home); color: #04202f; }
+
+/* expeditions never opened yet: glow conspicuously until the player taps it */
+.nearest.quest.qnew { border-color: #ffd36b; background: linear-gradient(90deg, rgba(255,211,107,0.32), rgba(255,184,77,0.12));
+  animation: qnewGlow 1.3s ease-in-out infinite; }
+.nearest.quest.qnew #n-arrow { color: #ffe39b; animation: qnewSpin 2.6s linear infinite; }
+.nearest.quest.qnew b { color: #fff3cf; font-weight: 700; }
+@keyframes qnewGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,211,107,0.75), 0 0 10px rgba(255,211,107,0.4); }
+  50% { box-shadow: 0 0 0 7px rgba(255,211,107,0), 0 0 26px rgba(255,211,107,0.85); } }
+@keyframes qnewSpin { to { transform: rotate(360deg); } }
+.tracker .tk-quest.new { padding: 2px 10px; border-radius: 999px; color: #1c1606; font-weight: 700; background: linear-gradient(90deg, #ffe39b, #ffb84d);
+  animation: qnewGlow 1.3s ease-in-out infinite; }
+.tracker:has(.tk-quest.new) { opacity: 1; pointer-events: auto; cursor: pointer; }
+body.reduce-motion .nearest.quest.qnew, body.reduce-motion .nearest.quest.qnew #n-arrow, body.reduce-motion .tracker .tk-quest.new { animation: none; box-shadow: 0 0 0 3px rgba(255,211,107,0.8); }
+
+/* the first time the board opens: what this is and how it's played */
+.qwelcome { margin: 0 0 12px; padding: 14px; border-radius: 14px; border: 1px solid rgba(255,211,107,0.55);
+  background: linear-gradient(160deg, rgba(255,211,107,0.18), rgba(192,122,255,0.10)); animation: qdeal 0.45s cubic-bezier(.2,.8,.2,1) both; }
+.qwelcome h3 { margin: 0 0 6px; font-size: 17px; color: #ffe39b; }
+.qwelcome p { margin: 6px 0; color: #e8ecf0; }
+.qwelcome button { width: 100%; min-height: 44px; margin-top: 6px; background: var(--accent); color: #1c1606; }

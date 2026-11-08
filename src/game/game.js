@@ -21,6 +21,7 @@ export const RULES = {
   LEASH_M: 600,             // home-base free movement radius
   DISCOVER_M: 30,           // how close to a place counts as "visited"
   HOME_COOLDOWN_DAYS: 30,   // a home base is (near) permanent
+  HOME_IP_M: 50000,         // a typed home address must be this close to the internet (IP) location
   BEACON_PLACE_M: 25,       // beacons latch onto a named place within this distance...
   BEACON_BUILDING_M: 35,    // ...or else the nearest building
   WALK: 6, RUN: 20, ROAM_FAST: 90,  // m/s (game-time, not real walking)
@@ -124,15 +125,50 @@ export class Game {
     return true;
   }
 
+  // days until the home base may move again (0 = now)
+  homeLockedDays() {
+    const h = this.profile.data.home;
+    if (!h || DEV) return 0;
+    const days = (Date.now() - Date.parse(h.setAt)) / 86400000;
+    return days < RULES.HOME_COOLDOWN_DAYS ? Math.ceil(RULES.HOME_COOLDOWN_DAYS - days) : 0;
+  }
+
+  // Can a home base go at `pt`, given a real fix of where the device is? A precise fix allows
+  // a small refinement; an internet (IP) fix is only city-level, so a typed address may be
+  // anywhere within HOME_IP_M of it. Returns null if fine, else the reason.
+  homeCheck(pt, fix) {
+    if (!fix) return 'We need to know roughly where you are first.';
+    const locked = this.homeLockedDays();
+    if (locked) return `Home base is permanent: it can move again in ${locked} days.`;
+    const d = haversine(fix.lat, fix.lon, pt.lat, pt.lon);
+    const limit = fix.source === 'ip' ? RULES.HOME_IP_M : Math.max(300, fix.accuracy * 3);
+    if (d > limit) return `That's ${d >= 2000 ? `${Math.round(d / 1000)} km` : `${Math.round(d)} m`} from where your ${fix.source === 'ip' ? 'internet connection' : 'device'} places you. A home base has to be near where you really are.`;
+    return null;
+  }
+
+  // Set the home base at a chosen point (a typed address, or a device fix), checked against a real fix.
+  setHomeAt(pt, fix, { via = 'fix', place = null } = {}) {
+    const why = this.homeCheck(pt, fix);
+    if (why) return this.emit('error', why);
+    const p = this.profile.data;
+    p.home = {
+      lat: pt.lat, lon: pt.lon,
+      source: via === 'address' ? 'address' : fix.source,
+      accuracy: via === 'address' ? 50 : Math.round(fix.accuracy),
+      trust: via === 'address' ? 'address' : trustOf(fix),
+      place: place || fix.place || null, setAt: new Date().toISOString(),
+    };
+    this.profile.log(`Home base set (${p.home.trust}${via === 'address' ? '' : `, ±${p.home.accuracy} m`})`);
+    this.profile.save();
+    this.emit('home', 'Home base set. You can now play Home mode from anywhere.');
+    return true;
+  }
+
   setHome() {
     const p = this.profile.data;
     if (this.mode !== 'present' || !this.fix) return this.emit('error', 'A home base can only be set while Present (from a real location fix).');
-    if (p.home && !DEV) {
-      const days = (Date.now() - Date.parse(p.home.setAt)) / 86400000;
-      if (days < RULES.HOME_COOLDOWN_DAYS) {
-        return this.emit('error', `Home base is permanent: it can move again in ${Math.ceil(RULES.HOME_COOLDOWN_DAYS - days)} days.`);
-      }
-    }
+    const locked = this.homeLockedDays();
+    if (locked) return this.emit('error', `Home base is permanent: it can move again in ${locked} days.`);
     p.home = {
       lat: this.fix.lat, lon: this.fix.lon,
       source: this.fix.source, accuracy: Math.round(this.fix.accuracy), trust: trustOf(this.fix),
