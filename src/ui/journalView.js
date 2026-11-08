@@ -9,6 +9,7 @@ import { ageText } from '../data/science.js';
 import { fmtDist, fmtElev } from '../units.js';
 import { esc, safeUrl } from '../util/html.js';
 import { SHOW_BEACONS } from '../channel.js';
+import { WALK, FOUND } from '../names.js';
 
 const $ = (id) => document.getElementById(id);
 const KIND_LABEL = { tourism: 'Sights', historic: 'History', amenity: 'Cafés, culture & services', shop: 'Shops', leisure: 'Parks & sport', natural: 'Nature', transport: 'Stations' };
@@ -102,9 +103,9 @@ function overview(profile) {
   const max = Math.max(1, ...days.map((x) => x.v.m));
   const bars = days.map((x) => `<div class="bar" title="${esc(x.key)}: ${fmtDist(x.v.m)}, ${x.v.finds} finds, ${x.v.species} species"><i style="height:${Math.round((x.v.m / max) * 100)}%"></i><span>${'SMTWTFS'[new Date(x.key + 'T12:00:00Z').getUTCDay()]}</span></div>`).join('');
   return `
-    ${expeditionBox() || `<div class="task ${t.done ? 'done' : ''}"><span>Today's field assignment</span><b>${esc(T.text)}</b><small>${t.done ? 'Complete ✓' : prog} · Present or Home mode</small></div>`}
+    ${expeditionBox() || `<div class="task ${t.done ? 'done' : ''}"><span>Today's field assignment</span><b>${esc(T.text)}</b><small>${t.done ? 'Complete ✓' : prog} · ${WALK} or Home mode</small></div>`}
     <div class="jgrid">
-      ${stat(s.present, 'claimed', '#ff7a3d')}${stat(s.home, 'found from home', '#3db8ff')}${stat(s.echo, 'echoes', '#b07aff')}
+      ${stat(s.present, FOUND, '#ff7a3d')}${stat(s.home, 'found from home', '#3db8ff')}${stat(s.echo, 'echoes', '#b07aff')}
       ${stat(s.species, 'species', '#5fd08a')}${stat(s.rocks, 'rock units', '#c9a27a')}${SHOW_BEACONS ? stat(s.beacons, 'beacons', '#ffd36b') : ''}
     </div>
     <div class="jgrid">
@@ -153,17 +154,17 @@ function records(profile) {
   return `
     ${row('Highest point stood on', r.highest ? `${fmtElev(r.highest.m)} <small>(${esc(r.highest.date)})</small>` : null)}
     ${row('Longest day on foot', r.longestDay ? `${fmtDist(r.longestDay.m)} <small>(${esc(r.longestDay.date)})</small>` : null)}
-    ${row('Oldest place claimed', r.oldestPlace ? `${esc(r.oldestPlace.name)} <small>(${r.oldestPlace.year})</small>` : null)}
+    ${row(`Oldest place ${FOUND}`, r.oldestPlace ? `${esc(r.oldestPlace.name)} <small>(${r.oldestPlace.year})</small>` : null)}
     ${row('Rarest species seen', r.rarestSpecies ? `${esc(r.rarestSpecies.name)} <small>(${r.rarestSpecies.count} local records)</small>` : null)}
     ${row('Furthest north', r.north ? `${esc(r.north.name)} <small>${r.north.lat}°</small>` : null)}
     ${row('Furthest south', r.south ? `${esc(r.south.name)} <small>${r.south.lat}°</small>` : null)}
     ${row('Peaks reached', s.peaks || null)}
     ${(() => { const h = Object.values(profile.data.geocaches || {}).sort((a, b) => ((b.difficulty || 0) + (b.terrain || 0)) - ((a.difficulty || 0) + (a.terrain || 0)))[0]; return h ? row('Hardest geocache', `${esc(h.name)} <small>(D${h.difficulty}/T${h.terrain})</small>`) : ''; })()}
     ${row('First claim', r.firstClaim ? `${esc(r.firstClaim.name)} <small>(${esc(r.firstClaim.date)})</small>` : null)}
-    ${row('Walked (Present)', fmtDist(profile.data.stats.meters.present || 0))}
+    ${row(`Walked (${WALK})`, fmtDist(profile.data.stats.meters.present || 0))}
     ${row('Walked (Home)', fmtDist(profile.data.stats.meters.home || 0))}
     ${row('Travelled virtually (Roam)', fmtDist(profile.data.stats.meters.roam || 0))}
-    <p class="credit">Records only count real visits (Present or Home), never Roam.</p>`;
+    <p class="credit">Records only count real visits (${WALK} or Home), never Roam.</p>`;
 }
 
 function areas(profile) {
@@ -183,7 +184,7 @@ function areas(profile) {
   const score = explorerScore(d.areas);
   const deep = list.filter((x) => x.foot >= 0.5).length;
   const head = `<div class="depth-head"><div><b>${score}</b><span>explorer score</span></div><div><b>${deep}</b><span>areas surveyed (50%+)</span></div>
-    <p class="credit">Depth beats distance. Each area scores by how much of its streets and paths you've walked for real, squared, so knowing your own neighbourhood counts far more than passing through many places. Only walking or running counts (Present, up to 10 mph); Home progress shows separately.</p>
+    <p class="credit">Depth beats distance. Each area scores by how much of its streets and paths you've walked for real, squared, so knowing your own neighbourhood counts far more than passing through many places. Only walking or running counts (${WALK}, up to 10 mph); Home progress shows separately.</p>
     <p class="credit tiers">${DEPTH_TIERS.slice().reverse().filter(([t]) => t > 0).map(([t, n]) => `<span>${n} ${Math.round(t * 100)}%</span>`).join(' · ')}</p></div>`;
   if (!list.length) return head + '<p class="credit">Your areas appear here as you walk and discover places. Each area is about 1.5 km across.</p>';
   return head + list.map((x) => `<div class="area depth">
@@ -254,7 +255,7 @@ async function shareCard() {
   g.fillStyle = grad; g.fillRect(0, 0, W, H);
   g.fillStyle = '#eef1f4'; g.font = 'bold 64px system-ui, sans-serif'; g.fillText('OpenWorld field journal', 70, 120);
   g.fillStyle = '#a5adb7'; g.font = '34px system-ui, sans-serif'; g.fillText(new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }), 70, 175);
-  const cells = [[s.present, 'places claimed', '#ff7a3d'], [s.species, 'species', '#5fd08a'], [s.rocks, 'rock units', '#c9a27a'], [s.exploredKm2.toFixed(1), 'km² explored', '#e1ebd2'], [fmtDist(s.walked), 'walked', '#78c8ff'], [s.daysActive, 'days out', '#ffd36b']];
+  const cells = [[s.present, `places ${FOUND}`, '#ff7a3d'], [s.species, 'species', '#5fd08a'], [s.rocks, 'rock units', '#c9a27a'], [s.exploredKm2.toFixed(1), 'km² explored', '#e1ebd2'], [fmtDist(s.walked), 'walked', '#78c8ff'], [s.daysActive, 'days out', '#ffd36b']];
   cells.forEach(([n, l, col], i) => {
     const x = 70 + (i % 3) * 320, y = 270 + Math.floor(i / 3) * 170;
     g.fillStyle = col; g.font = 'bold 76px system-ui, sans-serif'; g.fillText(String(n), x, y);

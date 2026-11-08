@@ -12,6 +12,7 @@ import { esc, safeUrl } from '../util/html.js';
 import { buzz } from '../sensors.js';
 import { toast } from './hud.js';
 import { closeCard } from './card.js';
+import { WALK, FOUND } from '../names.js';
 import { summaryOf, encode, decode, standings } from '../game/league.js';
 import { explorerScore } from '../game/journal.js';
 
@@ -23,7 +24,7 @@ const TYPE = {
 };
 const RARITY_LABEL = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' };
 const starsHtml = (n, of = 3) => `<span class="qstars">${'<i class="on">★</i>'.repeat(n)}${'<i>★</i>'.repeat(Math.max(0, of - n))}</span>`;
-const HOW = { present: 'Claimed in person', home: 'Played from home', echo: 'Echo (Roam): no stars' };
+const HOW = { present: `${FOUND[0].toUpperCase() + FOUND.slice(1)} in person`, home: 'Played from home', echo: 'Echo (Roam): no stars' };
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, Math.round(s % 60))).padStart(2, '0')}`;
 
 export function initExpeditions(ctx) {
@@ -89,7 +90,7 @@ export function initExpeditions(ctx) {
           <p>🔍 <b>Mystery</b>: a riddle about a real place nearby. Work out which one and go there. Stuck? Buy a clue, but each costs a star. At old places, guess its age at the end to win a star back.</p>
           <p>🎯 <b>Bounty</b>: an animal people have really recorded around here. Head for the habitat it likes, follow its signs (🐾) and approach gently.</p>
           <p>⏱ <b>Race</b>: reach the high ground or a landmark inside par time, or before the real sunset.</p>
-          <p>Every finish turns over a <b>card</b>. Its rarity comes from real facts (how old a place is, how rarely an animal is seen, how far you climbed) and is shown before you choose. Stars raise your rank. Only real play (Present or Home) earns stars. Everything is kept in <b>Your cards</b>, your journal and its map.</p>
+          <p>Every finish turns over a <b>card</b>. Its rarity comes from real facts (how old a place is, how rarely an animal is seen, how far you climbed) and is shown before you choose. Stars raise your rank. Only real play (${WALK} or Home) earns stars. Everything is kept in <b>Your cards</b>, your journal and its map.</p>
         </details>`}
         <div class="qdeck">${s.offers.map((o, i) => offerHtml(o, i, act)).join('')}</div>
         ${allDone(s) ? '<button class="primary qmore" data-qmore>Deal three more</button>' : ''}`;

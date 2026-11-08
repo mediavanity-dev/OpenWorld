@@ -44,6 +44,7 @@ import { initMarkers } from './render/markers.js';
 import { initCritters } from './render/critters.js';
 import { initEffects } from './render/effects.js';
 import { Ambience } from './audio.js';
+import { WALK, renameStaticText } from './names.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -117,6 +118,7 @@ function applyFeatures() {
 }
 applyFeatures();
 if (BETA) document.body.classList.add('beta');
+renameStaticText(); // beta: plainer names (Walk / walked) in the page's fixed text
 if (!SHOW_BEACONS) document.body.classList.add('no-beacons'); // hidden until shared content (BACKLOG 1)
 
 // saving problems are the one thing a player must hear about
@@ -385,7 +387,7 @@ function startWatching() {
   let warned = false;
   stopWatch = watchDevice((f) => { game.setFix(f); warned = false; }, (e) => {
     console.warn(e);
-    if (!warned) { warned = true; toast(`Lost your device location (${e.message || 'permission or signal'}). Present mode will resume when it returns.`, 'error'); }
+    if (!warned) { warned = true; toast(`Lost your device location (${e.message || 'permission or signal'}). ${WALK} mode will resume when it returns.`, 'error'); }
   });
 }
 
@@ -426,8 +428,8 @@ const locateDevice = (msgEl) => locate(deviceFix, (e) => (BETA ? `Couldn’t get
 // pointed to a home base (that's how to play from a computer); phones to the location setting.
 async function presentNow(msgEl) {
   if (await locateDevice(msgEl)) return begin('present');
-  if (!isTouch) return ctx.homeSetup.open({ reason: '<b>Present needs this device’s real location</b>, and it couldn’t be found. To play from a computer, set a home base and play <b>Home</b>.', onSet: () => homeWasSet(true) });
-  toast('Present needs your location. Allow location for this site in your browser settings, then try again.', 'error');
+  if (!isTouch) return ctx.homeSetup.open({ reason: `<b>${WALK} needs this device’s real location</b>, and it couldn’t be found. To play from a computer, set a home base and play <b>Home</b>.`, onSet: () => homeWasSet(true) });
+  toast(`${WALK} needs your location. Allow location for this site in your browser settings, then try again.`, 'error');
   return false;
 }
 const locateIp = (msgEl) => locate(ipFix, (e) => e.message, msgEl, 'Looking up your internet connection’s location…');
@@ -474,8 +476,8 @@ function enterHome() {
   if (!profile.data.home) {
     if (BETA) return ctx.homeSetup.open({ reason: `<b>Home needs a home base first.</b> Set one and you can wander ${range} around it from anywhere.`, onSet: () => homeWasSet(true) });
     const shown = game.mode && showHint({ target: () => document.querySelector('.tabs button[data-mode="present"]'), timeout: 12000,
-      text: `<b>Set a home base first.</b> Go <b>Present</b> (where you really are) and tap <b>Set home base</b>. After that, Home lets you wander ${range} around it from anywhere.` });
-    if (!shown) toast(`No home base yet. Go Present and set one; then Home lets you wander ${range} around it from anywhere.`, 'error');
+      text: `<b>Set a home base first.</b> Go <b>${WALK}</b> (where you really are) and tap <b>Set home base</b>. After that, Home lets you wander ${range} around it from anywhere.` });
+    if (!shown) toast(`No home base yet. Go ${WALK} and set one; then Home lets you wander ${range} around it from anywhere.`, 'error');
     return;
   }
   if (!begin('home')) return;

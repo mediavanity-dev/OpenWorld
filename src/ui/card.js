@@ -8,9 +8,10 @@ import { fmtDist, fmtElev, fmtTemp, fmtTempDelta } from '../units.js';
 import { groupInfo, iconIndex, atlasCss } from '../world/icons.js';
 import { sizeLabel } from '../data/geocaching.js';
 import { esc, safeUrl } from '../util/html.js';
+import { FOUND } from '../names.js';
 
 const $ = (id) => document.getElementById(id);
-const GRADE_TEXT = { present: 'Claimed', home: 'Found from home', echo: 'Echo (seen virtually)' };
+const GRADE_TEXT = { present: FOUND[0].toUpperCase() + FOUND.slice(1), home: 'Found from home', echo: 'Echo (seen virtually)' };
 let closeTimer = null;
 let current = null;
 

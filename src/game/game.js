@@ -14,6 +14,7 @@ import { rockAt, ageText } from '../data/science.js';
 import { startHunt, stepHunt } from './hunt.js';
 import { treasuresFor, bandOf, PER_AREA } from './treasure.js';
 import { TASKS, taskMatches } from './journal.js';
+import { WALK, GRADE_WORD } from '../names.js';
 
 const DEV = typeof location !== 'undefined' && new URLSearchParams(location.search).has('dev');
 
@@ -33,8 +34,8 @@ export const RULES = {
 
 export const MODES = {
   present: {
-    label: 'Present',
-    desc: 'You are where your device physically is. You move by moving in real life. Discoveries are CLAIMED.',
+    label: WALK,
+    desc: `You are where your device physically is. You move by moving in real life. Discoveries count as ${GRADE_WORD.present.toUpperCase()}.`,
     canMove: false, grade: 'present', beacons: true,
   },
   home: {
@@ -106,10 +107,10 @@ export class Game {
   enter(mode, opts = {}) {
     const home = this.profile.data.home;
     if (mode === 'present') {
-      if (!this.fix) return this.emit('error', 'Present mode needs a location fix first.');
+      if (!this.fix) return this.emit('error', `${WALK} mode needs a location fix first.`);
       this.pos = { lat: this.fix.lat, lon: this.fix.lon };
     } else if (mode === 'home') {
-      if (!home) return this.emit('error', 'No home base yet. Go Present and set one.');
+      if (!home) return this.emit('error', `No home base yet. Go ${WALK} and set one.`);
       this.pos = { lat: home.lat, lon: home.lon };
     } else if (mode === 'roam') {
       const t = opts.to || this.pos;
@@ -167,7 +168,7 @@ export class Game {
 
   setHome() {
     const p = this.profile.data;
-    if (this.mode !== 'present' || !this.fix) return this.emit('error', 'A home base can only be set while Present (from a real location fix).');
+    if (this.mode !== 'present' || !this.fix) return this.emit('error', `A home base can only be set while in ${WALK} (from a real location fix).`);
     const locked = this.homeLockedDays();
     if (locked) return this.emit('error', `Home base is permanent: it can move again in ${locked} days.`);
     p.home = {
@@ -234,7 +235,7 @@ export class Game {
     if (d <= RULES.LEASH_M) return next;
     const o = offsetMeters(h.lat, h.lon, next.lat, next.lon);
     const k = RULES.LEASH_M / d;
-    if (!this._leashWarned) { this._leashWarned = true; this.emit('info', 'Edge of your home range. Go Present or Roam to go further.'); setTimeout(() => (this._leashWarned = false), 8000); }
+    if (!this._leashWarned) { this._leashWarned = true; this.emit('info', `Edge of your home range. Go ${WALK} or Roam to go further.`); setTimeout(() => (this._leashWarned = false), 8000); }
     return offsetGeo(h.lat, h.lon, o.x * k, -o.z * k);
   }
 
@@ -289,7 +290,7 @@ export class Game {
           this.emit('discover', `${grade === 'echo' ? 'Echo of' : 'Discovered'} ${poi.name}`, { grade, poi, result });
         } else if (result === 'upgraded') {
           this.profile.log(`${poi.name} upgraded to ${grade}`);
-          this.emit('discover', `${poi.name}: now ${grade.toUpperCase()}`, { grade, poi, result });
+          this.emit('discover', `${poi.name}: now ${GRADE_WORD[grade].toUpperCase()}`, { grade, poi, result });
         } else if (newTags.length) {
           this.profile.log(`${poi.name} seen: ${newTags.join(', ')}`);
           this.emit('discover', `${poi.name}, seen in new conditions: ${newTags.join(', ')}`, { grade, poi, result, tags: newTags });
@@ -481,13 +482,13 @@ export class Game {
     this.journal?.onSpecies(c.sp, grade, res, how);
     const what = c.sp.name;
     if (res === 'new') this.profile.log(`${how === 'photo' ? 'Photographed' : 'Spotted'} ${what} [${grade}]`);
-    this.emit('spotted', res === 'new' ? `New species: ${what}` : res === 'upgraded' ? `${what}: now ${grade.toUpperCase()}` : `Spotted ${what} again`, { critter: c, result: res, grade });
+    this.emit('spotted', res === 'new' ? `New species: ${what}` : res === 'upgraded' ? `${what}: now ${GRADE_WORD[grade].toUpperCase()}` : `Spotted ${what} again`, { critter: c, result: res, grade });
     if (this.features.quests) this.quests?.onSpecies(c.sp, how);
   }
 
   // ---------------- beacons ----------------
   placeBeacon(label) {
-    if (!MODES[this.mode]?.beacons) return this.emit('error', 'Beacons can only be placed where you really are (Present or Home).');
+    if (!MODES[this.mode]?.beacons) return this.emit('error', `Beacons can only be placed where you really are (${WALK} or Home).`);
     const { lat, lon } = this.pos;
     let best = null;
     for (const { poi, chunk } of this.world.pois(lat, lon, RULES.BEACON_PLACE_M)) {
