@@ -29,7 +29,7 @@ export class Minimap {
   }
 
   // bearing: degrees clockwise from north that should point "up"
-  draw({ pos, bearing = 0, cells = {}, pois = [], critters = [], home = null, discovered = {}, hunt = null, treasure = null, t = 0 }) {
+  draw({ pos, bearing = 0, cells = {}, pois = [], critters = [], home = null, discovered = {}, hunt = null, treasure = null, quest = null, t = 0 }) {
     this.resize();
     const { g, c } = this;
     const W = c.width, R = W / 2, k = (R - 3) / this.radius;
@@ -98,6 +98,23 @@ export class Minimap {
         gr.addColorStop(0, 'rgba(255,230,150,1)'); gr.addColorStop(1, 'rgba(255,211,107,0)');
         g.fillStyle = gr; g.beginPath(); g.arc(x, y, dot * 4 * pulse, 0, Math.PI * 2); g.fill();
       }
+    }
+
+    // beta expeditions: a mystery's search circle, a race's finish flag, a bounty's habitat
+    if (quest?.zone) {
+      const [x, y] = P(quest.zone.lat, quest.zone.lon), r = Math.max(dot * 4, quest.zone.r * k);
+      g.setLineDash([W / 40, W / 60]); g.strokeStyle = 'rgba(255,211,107,0.9)'; g.lineWidth = Math.max(1.5, W / 70);
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+      g.fillStyle = 'rgba(255,211,107,0.12)'; g.fill();
+    }
+    for (const [pt, col] of [[quest?.target, '#ffd36b'], [quest?.habitat, '#5fd08a']]) {
+      if (!pt) continue;
+      let [x, y] = P(pt.lat, pt.lon);
+      const dx = x - R, dy = y - R, len = Math.hypot(dx, dy), max = R - dot * 3;
+      if (len > max) { x = R + (dx / len) * max; y = R + (dy / len) * max; } // pinned to the rim when off the map
+      const pulse = 1 + 0.2 * Math.sin(t / 350);
+      g.fillStyle = col; g.strokeStyle = 'rgba(16,20,26,0.9)'; g.lineWidth = Math.max(1, W / 120);
+      g.beginPath(); g.moveTo(x, y - dot * 2.6 * pulse); g.lineTo(x + dot * 1.8 * pulse, y); g.lineTo(x, y + dot * 2.6 * pulse); g.lineTo(x - dot * 1.8 * pulse, y); g.closePath(); g.fill(); g.stroke();
     }
 
     // you

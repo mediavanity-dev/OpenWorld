@@ -11,6 +11,7 @@ import { Profile } from './game/profile.js';
 import { Game, MODES, RULES } from './game/game.js';
 import { Environment } from './game/environment.js';
 import { Journal } from './game/journal.js';
+import { Quests } from './game/quests.js';
 import { Metrics } from './game/metrics.js';
 import { deviceFix, ipFix, watchDevice } from './game/locator.js';
 import { GROUP_STYLE } from './data/wildlife.js';
@@ -36,6 +37,7 @@ import { initLabels } from './ui/labels.js';
 import { initArMode } from './ui/arMode.js';
 import { initSettingsPanel } from './ui/settingsPanel.js';
 import { initRephoto } from './ui/rephoto.js';
+import { initExpeditions } from './ui/expeditions.js';
 import { initAvatar } from './render/avatar.js';
 import { initMarkers } from './render/markers.js';
 import { initCritters } from './render/critters.js';
@@ -65,6 +67,7 @@ const metrics = new Metrics();
 const game = new Game(world, profile, environment, onGameEvent);
 const journal = new Journal(profile, environment, (ev) => onGameEvent(ev));
 game.journal = journal;
+game.quests = new Quests(game, (ev) => onGameEvent(ev));
 game.dataSaver = settings.dataSaver;
 
 const ctx = {
@@ -88,6 +91,7 @@ ctx.arMode = initArMode(ctx);
 ctx.labels = initLabels(ctx);
 ctx.rephoto = initRephoto(ctx);
 ctx.settingsPanel = initSettingsPanel(ctx);
+ctx.expeditions = initExpeditions(ctx);
 ctx.minimap = new Minimap($('minimap'), { onTap: () => openJournal('map') });
 const { controls, hud, avatar, markers, critters, effects, arMode, labels, ambience, sky } = ctx;
 
@@ -105,6 +109,8 @@ function applyFeatures() {
   game.features = {};
   for (const k of Object.keys(FEATURES)) if (featureAvailable(k)) game.features[k] = settings.features?.[k] !== false;
   if (!game.features.hunt) game.hunt = null;
+  if (!game.features.quests) ctx.expeditions?.close();
+  ctx.hud?.render();
 }
 applyFeatures();
 if (BETA) document.body.classList.add('beta');
@@ -302,7 +308,7 @@ function frame(now) {
   if (miniT > 0.25 && game.pos && !$('hud').hidden) {
     miniT = 0;
     const bearing = arMode.active ? arMode.heading() : (-controls.yaw * 180) / Math.PI;
-    ctx.minimap.draw({ pos: game.pos, bearing, cells: profile.data.cells, pois: [...world.pois(game.pos.lat, game.pos.lon, 600)].map((x) => x.poi), critters: game.critters, home: profile.data.home, discovered: profile.data.discoveries, hunt: game.hunt, treasure: game.treasureHint, t: now });
+    ctx.minimap.draw({ pos: game.pos, bearing, cells: profile.data.cells, pois: [...world.pois(game.pos.lat, game.pos.lon, 600)].map((x) => x.poi), critters: game.critters, home: profile.data.home, discovered: profile.data.discoveries, hunt: game.hunt, treasure: game.treasureHint, quest: ctx.expeditions.minimap(), t: now });
     hud.tracker();
   }
   ambT += rdt;
@@ -350,6 +356,7 @@ function onGameEvent(ev) {
   else if (ev.type === 'geocache') { toast(ev.msg, 'gold'); buzz([30, 40, 30]); ambience.chime(6); hud.render(); }
   else if (ev.type === 'treasure') { toast(ev.msg, 'gold'); buzz([30, 40, 60]); ambience.chime(9); hud.render(); }
   else if (ev.type === 'rephoto') { toast(ev.msg, 'gold'); buzz([30, 40, 60]); ambience.chime(8); hud.render(); }
+  else if (ev.type.startsWith('quest')) ctx.expeditions.onEvent(ev);
   else if (ev.msg) toast(ev.msg);
 }
 
@@ -388,7 +395,9 @@ function begin(mode, opts) {
     avatar.style();
     environment.refresh(game.pos.lat, game.pos.lon);
     hud.render();
-    if (!tutorialDone()) setTimeout(startTutorial, 900);
+    // beta: deal the expedition board straight away (the tiny tutorial waits until it's closed)
+    const after = () => { if (!tutorialDone()) setTimeout(startTutorial, 400); };
+    if (!ctx.expeditions.openOnStart(after)) after();
     return true;
   }
   return false;
@@ -478,7 +487,7 @@ addEventListener('resize', placeToasts);
 if ('ResizeObserver' in window) new ResizeObserver(([e]) => document.documentElement.style.setProperty('--panel-h', `${Math.round(e.target.offsetHeight)}px`)).observe($('right'));
 setCollapsed(isTouch);
 $('more').onclick = () => setCollapsed(!left.classList.contains('collapsed'));
-$('nearest').onclick = () => { if (game.taskTarget && !journal.task().done) openPlace(game.taskTarget.poi); else openJournal('overview'); };
+$('nearest').onclick = () => { if (game.features.quests) return ctx.expeditions.open(); if (game.taskTarget && !journal.task().done) openPlace(game.taskTarget.poi); else openJournal('overview'); };
 $('b-locate').onclick = async () => { if (await locateDevice()) { if (game.mode === 'present') begin('present'); else toast('Device fix updated: ' + fixText(game.fix)); } };
 $('b-ip').onclick = async () => { if (await locateIp()) { if (game.mode === 'present') begin('present'); else toast('Fix updated: ' + fixText(game.fix)); } };
 $('b-sethome').onclick = () => {
@@ -526,12 +535,13 @@ function startTutorial() {
   // deliberately tiny: show the eye, then one pointer, then never again
   const steps = [];
   if (document.body.classList.contains('clean')) steps.push({ target: () => $('ui-toggle'), text: '<b>Tap to show the menus.</b>', waitFor: 'click' });
-  steps.push({ target: () => $('nearest'), text: `Today's field assignment: follow its arrow. Tap any icon for details. ${isTouch ? 'Pinch to zoom.' : 'Scroll to zoom.'} More in Settings → Help.` });
+  const first = game.features.quests ? 'Your expedition lives here: tap it for clues, progress and the board.' : "Today's field assignment: follow its arrow.";
+  steps.push({ target: () => $('nearest'), text: `${first} Tap any icon for details. ${isTouch ? 'Pinch to zoom.' : 'Scroll to zoom.'} More in Settings → Help.` });
   runTutorial(steps);
 }
 $('ui-toggle').onclick = () => setClean(!document.body.classList.contains('clean'));
 $('recenter').onclick = () => controls.recenter();
-$('tracker').addEventListener('click', () => { if (game.taskTarget && !journal.task().done) openPlace(game.taskTarget.poi); });
+$('tracker').addEventListener('click', () => { if (game.features.quests && ctx.expeditions.chip()) return ctx.expeditions.open(); if (game.taskTarget && !journal.task().done) openPlace(game.taskTarget.poi); });
 
 // deep link: ?at=lat,lon starts directly in Roam there
 const at = new URLSearchParams(location.search).get('at');

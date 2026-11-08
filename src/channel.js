@@ -21,5 +21,6 @@ export const FEATURES = {
   treasure: { label: 'Daily treasure: golden finds hidden each day', stable: true },
   geocaching: { label: 'Geocaches from Opencaching', stable: true, needsKeys: true },
   rephoto: { label: 'Rephotography: line up old photos of a place in the camera', stable: false },
+  quests: { label: 'Expeditions: daily mysteries, bounties and races that win collectible cards', stable: false },
 };
 export const featureAvailable = (k) => (BETA || !!FEATURES[k]?.stable) && (!FEATURES[k]?.needsKeys || Object.values(OKAPI_KEYS).some((v) => (v || '').trim()));

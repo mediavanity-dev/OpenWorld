@@ -36,7 +36,10 @@ Settings → *Help & about*.
 **https://mediavanity-dev.github.io/OpenWorld/beta/** is where new ideas are tried first. It
 has its own separate journal (copy your main one in from Settings if you like) and a small
 BETA marker. The hunt and daily treasure started there and have now graduated to the main
-version. Now in the beta: **Then & now**, lining up old photos of historic places in the camera.
+version. Now in the beta: **Then & now**, lining up old photos of historic places in the camera, and
+**Expeditions**: a board of three quests dealt from what's around you (a riddle about an
+unnamed real place, a bounty on a locally recorded animal, a race to the high ground or
+against the real sunset). Each one wins a collectible card whose rarity comes from real facts.
 
 ## For developers
 
