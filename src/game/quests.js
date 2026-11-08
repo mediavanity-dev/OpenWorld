@@ -28,6 +28,11 @@ import { taxonDetails, seasonality, lastSightings } from '../data/science.js';
 export const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 const bump = (r, n = 1) => RARITIES[Math.max(0, Math.min(RARITIES.length - 1, RARITIES.indexOf(r) + n))];
 
+// Rarer cards raise your rank faster: a bonus on top of the stars you earned (real play only).
+export const RARITY_BONUS = { common: 0, uncommon: 0, rare: 1, epic: 2, legendary: 3 };
+/** What a card adds to your rank: its stars plus its rarity bonus (echoes: nothing). */
+export const cardPoints = (c) => (c.grade === 'echo' ? 0 : c.stars + (RARITY_BONUS[c.rarity] || 0));
+
 /** @type {[number, string][]} */
 export const RANKS = [
   [0, 'Wanderer'], [5, 'Scout'], [15, 'Pathfinder'], [30, 'Tracker'], [50, 'Ranger'],
@@ -488,7 +493,7 @@ export class Quests {
     this._wrong.clear();
   }
   date() { return this.game.env.localNow().toISOString().slice(0, 10); }
-  stars() { return this.s.cards.reduce((a, c) => a + (c.grade === 'echo' ? 0 : c.stars), 0); }
+  stars() { return this.s.cards.reduce((a, c) => a + cardPoints(c), 0); }
   rank() { return rankOf(this.stars()); }
   active() { return this.s.offers.find((o) => o && o.id === this.s.active) || null; }
 
@@ -529,7 +534,7 @@ export class Quests {
   // today's progress: cards won and (real) stars earned
   today() {
     const d = this.date(), cs = this.s.cards.filter((c) => c.date === d);
-    return { done: cs.length, stars: cs.reduce((a, c) => a + (c.grade === 'echo' ? 0 : c.stars), 0) };
+    return { done: cs.length, stars: cs.reduce((a, c) => a + cardPoints(c), 0) };
   }
 
   /** @param {'' | 'move'} [why] 'move': re-dealt for a new area (keeps today's swap) */
@@ -598,13 +603,24 @@ export class Quests {
     }
     o.from = { lat: +pos.lat.toFixed(5), lon: +pos.lon.toFixed(5) };
     s.active = o.id;
-    o.startedAt = Date.now();
+    // a race's clock starts when you head off (startClock), not while you read the card
+    o.startedAt = o.type === 'race' ? null : Date.now();
     this._wrong.clear();
     this.profile.log(`Expedition started: ${o.title}`);
     this.profile.save();
     this.emit('quest-start', null, { quest: o });
     return o;
   }
+  // Start a race's clock (when the board closes after accepting). Returns true if it started.
+  startClock() {
+    const o = this.active();
+    if (!o || o.type !== 'race' || o.startedAt) return false;
+    o.startedAt = Date.now();
+    this.profile.save();
+    this.emit('quest-clock', null, { quest: o });
+    return true;
+  }
+
   abandon() {
     const o = this.active();
     if (!o) return;
@@ -685,6 +701,8 @@ export class Quests {
         }
       }
     } else if (o.type === 'race') {
+      // the clock starts on leaving the board; and in any case once you've set off
+      if (!o.startedAt && o.from && haversine(g.pos.lat, g.pos.lon, o.from.lat, o.from.lon) > 15) this.startClock();
       if (o.sunset && Date.now() > o.sunsetAt) {
         o.sunset = false; o.rarity = rarityOfRace(o.gain, false);
         this.profile.save();

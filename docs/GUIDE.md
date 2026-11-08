@@ -239,8 +239,11 @@ opens by itself when you start. Pick a quest; tap the box (or the pill) to come 
 
 Finishing one turns over a **card**. Its rarity comes from real facts: a place's age, whether
 it is listed or has a Wikipedia article, how rarely the species is recorded locally, how far
-you climbed. The reward is shown on the board before you pick. Stars (1–3) build your **field
-rank**. You can **swap** one quest a day, and once all three are done you can deal three more.
+you climbed. The reward is shown on the board before you pick (tap it to read about cards).
+Stars (1–3) are for how well you did; with a rarity bonus (Rare +1, Epic +2, Legendary +3) they
+build your **field rank**. After accepting, the board stays open on that quest so you can read
+it: a mystery's clues wait behind **Get a clue**, and a race's clock starts when you head off.
+You can **swap** one quest a day, and once all three are done you can deal three more.
 In **Roam** your cards are *echoes*: you keep them, but they earn no stars.
 In **Home**, every quest is inside your home range. Directions for a mystery are given from where
 you accept it, and a race's clock is set from where you start. Your cards (with where and when you

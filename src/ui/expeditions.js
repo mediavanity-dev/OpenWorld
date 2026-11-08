@@ -2,7 +2,7 @@
 // the HUD and tracker pill, the age guess at the end of a mystery, the card reveal, and the
 // card collection. Game rules live in src/game/quests.js.
 
-import { ERAS, RARITIES, allDone, bearingTo, sectorOf } from '../game/quests.js';
+import { ERAS, RARITIES, RARITY_BONUS, allDone, bearingTo, sectorOf } from '../game/quests.js';
 import { GROUP_STYLE } from '../data/wildlife.js';
 import { wikiSummary } from '../data/wiki.js';
 import { groupInfo } from '../world/icons.js';
@@ -39,6 +39,8 @@ export function initExpeditions(ctx) {
 
   // ---------------------------------------------------------------- board
   let intro = false; // show the welcome blurb (the first time the board is opened)
+  let howOpen = false; // "How expeditions work" opened from a rarity badge
+  let cluesOpen = null; // the mystery whose clue choices are showing (they stay tucked away until asked for)
   function open(which) {
     if (!on()) return;
     if (which) tab = which;
@@ -49,6 +51,8 @@ export function initExpeditions(ctx) {
   }
   function close() {
     $('quests').hidden = true;
+    howOpen = false;
+    if (on()) q().startClock();
     intro = false;
     flush();
   }
@@ -86,11 +90,14 @@ export function initExpeditions(ctx) {
         <p class="qintro">${act ? 'On an expedition. Its card glows below; tap <b>Go!</b> to head out.' : 'Pick one. Each is built from real places, wildlife and terrain around you.'}
           <span class="qtoday">Today: ${td.done} done${td.stars ? ` · +${td.stars}★` : ''}</span>
           ${game.mode === 'roam' ? '<span class="echo-note">Roam: cards are echoes (no stars) until you play for real.</span>' : game.mode === 'home' ? '<span class="muted">Home: every goal is inside your home range.</span>' : ''}</p>
-        ${intro ? '' : `<details class="qhow"><summary>How expeditions work</summary>
+        ${intro ? '' : `<details class="qhow" ${howOpen ? 'open' : ''}><summary>How expeditions work</summary>
           <p>🔍 <b>Mystery</b>: a riddle about a real place nearby. Work out which one and go there. Stuck? Buy a clue, but each costs a star. At old places, guess its age at the end to win a star back.</p>
           <p>🎯 <b>Bounty</b>: an animal people have really recorded around here. Head for the habitat it likes, follow its signs (🐾) and approach gently.</p>
           <p>⏱ <b>Race</b>: reach the high ground or a landmark inside par time, or before the real sunset.</p>
-          <p>Every finish turns over a <b>card</b>. Its rarity comes from real facts (how old a place is, how rarely an animal is seen, how far you climbed) and is shown before you choose. Stars raise your rank. Only real play (${WALK} or Home) earns stars. Everything is kept in <b>Your cards</b>, your journal and its map.</p>
+          <p id="qhow-cards"><b>Cards.</b> Every finish turns over a card for the real thing you found: the place, the animal or the climb, with its story. They're your field collection, kept in <b>Your cards</b> and shown as ◆ on your journal map.</p>
+          <p><b>Rarity comes from the real world, not luck:</b> ${RARITIES.map((r) => `<span class="qgem r-${r}">${RARITY_LABEL[r]}</span>`).join(' ')}. Old places rate higher (over 120 years Rare, 250 Epic, 500 Legendary), as do listed buildings and places with an encyclopedia entry, animals rarely recorded around here, big climbs and beating the sunset. You see it before you choose.</p>
+          <p><b>Why collect them:</b> rarer cards raise your rank faster (on top of your stars: Rare +1, Epic +2, Legendary +3), they count in the Rare+ column when you compare with friends, and together they're a record of the most remarkable real things around you.</p>
+          <p><b>Stars</b> (1 to 3) are for how well you did: fewer clues, a careful approach, beating par. Only real play (${WALK} or Home) counts; echo cards from Roam are kept but earn nothing.</p>
         </details>`}
         <div class="qdeck">${s.offers.map((o, i) => offerHtml(o, i, act)).join('')}</div>
         ${allDone(s) ? '<button class="primary qmore" data-qmore>Deal three more</button>' : ''}`;
@@ -109,7 +116,7 @@ export function initExpeditions(ctx) {
       const col = groupInfo(o.place.kind, o.place.cls).color;
       art = `<div class="qart mystery" style="--c:${col}"><span>?</span></div>`;
       hook = `<p class="qriddle">“${esc(o.riddle)}”${o.fact ? `<span class="qfact">${esc(o.fact)}</span>` : ''}</p><p class="qhook">${isAct ? 'From where you started: to' : 'Somewhere to'} the <b>${o.sector}</b>, about ${fmtDist(o.dist)} away.${o.alike >= 2 ? ` One of ${o.alike} places like it in that direction.` : ''}</p>`;
-      meta.push(`${o.clues.length} clues to buy · each costs ★`);
+      if (!isAct) meta.push(`${o.clues.length} clues to buy · each costs ★`);
       if (isAct) extra = cluesHtml(o);
     } else if (o.type === 'bounty') {
       art = `<div class="qart bounty">${o.sp.photo && safeUrl(o.sp.photo) ? `<img src="${esc(o.sp.photo)}" alt="" loading="lazy" />` : `<span style="color:${GROUP_STYLE[o.sp.group]?.color || '#5fd08a'}">●</span>`}<em>WANTED</em></div>`;
@@ -140,21 +147,27 @@ export function initExpeditions(ctx) {
     if (why) meta.push(`<span class="warn">${esc(why)}</span>`);
     const card = o.done ? q().s.cards.find((c) => c.id === o.id) : null;
     const btns = o.done ? `<span class="qdone">✓ Done${card ? ` ${starsHtml(card.grade === 'echo' ? 0 : card.stars)}` : ''}</span>`
-      : isAct ? `<button data-qabandon>Give up</button>${o.type !== 'bounty' ? '<button data-qcant title="Private, fenced off, across water…? Swap it, no stars lost">Can’t get there</button>' : ''}<button class="primary" data-qclose>Go!</button>`
+      : isAct ? `<button data-qabandon>Give up</button>${o.type !== 'bounty' ? '<button data-qcant title="Private, fenced off, across water…? Swap it, no stars lost">Can’t get there</button>' : ''}<button class="primary" data-qclose>${o.type === 'race' ? (o.startedAt ? 'Back to the race' : 'Start the clock') : o.type === 'bounty' ? 'Go track it' : 'Go find it'}</button>`
       : `${q().s.swaps > 0 && !locked ? `<button data-qswap="${i}" title="Swap for a different one (once a day)">↻ Swap${' '}<small>(1 left today)</small></button>` : ''}<button class="primary" data-qaccept="${esc(o.id)}" ${locked || why ? 'disabled' : ''}>${locked ? 'One at a time' : why ? 'Not here' : 'Accept'}</button>`;
     return `<article class="qcard ${o.type} r-${o.rarity} ${isAct ? 'active' : ''} ${o.done ? 'done' : ''}">
-      <div class="qtop"><span class="qtype">${T.glyph} ${T.label} <small>${T.verb}</small></span><span class="qgem r-${o.rarity}" title="Reward">${RARITY_LABEL[o.rarity]} card</span></div>
+      <div class="qtop"><span class="qtype">${T.glyph} ${T.label} <small>${T.verb}</small></span><button class="qgem r-${o.rarity}" data-qabout title="What are cards? Tap to read">${RARITY_LABEL[o.rarity]} card ⓘ</button></div>
+      ${isAct ? `<p class="qnow">✓ Accepted. ${o.type === 'race' ? (o.startedAt ? 'The clock is running.' : 'The clock starts when you head off.') : 'Read the details, then head off.'}</p>` : ''}
       ${art}<h3>${esc(o.title)}</h3>${hook}
       ${meta.length ? `<p class="qmeta">${meta.join(' · ')}</p>` : ''}${extra}
       <div class="qbtns">${btns}</div></article>`;
   }
 
+  // A mystery's clues: the ones you've bought always show; the rest only when you ask for them,
+  // so the obvious next step is simply to go.
   function cluesHtml(o) {
     const left = Math.max(1, 3 - o.used.length);
+    const got = o.clues.filter((c) => o.used.includes(c.key)), more = o.clues.filter((c) => !o.used.includes(c.key));
+    const open = cluesOpen === o.id;
     return `<div class="qclues"><p class="qmeta">Worth ${starsHtml(left)} now${o.place.year ? ' · guess its age at the end to win one back' : ''}</p>
-      ${o.clues.map((c) => o.used.includes(c.key)
-        ? `<div class="qclue got">💡 ${esc(c.text)}</div>`
-        : `<button class="qclue" data-qclue="${c.key}">💡 ${esc(c.label)} <small>−★</small></button>`).join('')}</div>`;
+      ${got.map((c) => `<div class="qclue got">💡 ${esc(c.text)}</div>`).join('')}
+      ${!more.length ? '' : open
+        ? `<p class="qmeta">Pick a clue. Each one costs a star.</p>${more.map((c) => `<button class="qclue" data-qclue="${c.key}">💡 ${esc(c.label)} <small>−★</small></button>`).join('')}`
+        : `<button class="qgetclue" data-qclues>💡 ${got.length ? 'Get another clue' : 'Stuck? Get a clue'} <small>(${more.length} left · each costs ★)</small></button>`}</div>`;
   }
 
   // ---------------------------------------------------------------- friend leagues
@@ -210,7 +223,7 @@ export function initExpeditions(ctx) {
 
   function cardsHtml() {
     const cards = q().s.cards;
-    if (!cards.length) return '<p class="qintro">No cards yet. Finish an expedition to win your first one.</p>';
+    if (!cards.length) return '<p class="qintro">No cards yet. Finish an expedition to win your first one. <button class="linkish" data-qabout>What are cards?</button></p>';
     const byR = {};
     for (const c of cards) byR[c.rarity] = (byR[c.rarity] || 0) + 1;
     const n = (t) => cards.filter((c) => c.type === t).length;
@@ -227,17 +240,23 @@ export function initExpeditions(ctx) {
     if (!b) return;
     // value-less attributes (data-qabandon, …) read as '', which is falsy: test them with !== undefined
     if (b.dataset.qtab) { tab = b.dataset.qtab; render(); }
+    else if (b.dataset.qabout !== undefined) {
+      howOpen = true; tab = 'today'; intro = false; render();
+      requestAnimationFrame(() => $('qhow-cards')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+    }
     else if (b.dataset.qshare !== undefined) share();
     else if (b.dataset.qcopy !== undefined) copy();
     else if (b.dataset.qdel) { const f = profile.data.friends?.[b.dataset.qdel]; if (f && confirm(`Remove ${f.n} from your league?`)) { delete profile.data.friends[b.dataset.qdel]; profile.save(); render(); } }
     else if (b.dataset.qintro !== undefined) { intro = false; render(); $('quests-body').scrollTop = 0; }
     else if (b.dataset.qhome !== undefined) { close(); ctx.homeSetup?.open({ onSet: () => ctx.hud.render() }); }
     else if (b.dataset.qaccept) {
+      cluesOpen = null; // a fresh start: clues tucked away again
       const o = q().accept(b.dataset.qaccept);
       render();
       if (!o) return;
       buzz([20, 30, 20]); ctx.ambience.chime(4);
-      if (o.type !== 'mystery') setTimeout(close, 450); // mysteries stay open so you can read the riddle and clues
+      // stay on the board, at the accepted card: read it, then tap its button to head off
+      requestAnimationFrame(() => $('quests-body').querySelector('.qcard.active')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
     } else if (b.dataset.qswap) { if (!q().swap(+b.dataset.qswap)) toast('Nothing else to swap in around here right now.'); render(); }
     else if (b.dataset.qcant !== undefined) { if (confirm('Can’t get there (private, fenced off, across water…)? You’ll get a fresh one instead with no stars lost, and we won’t send you there again.')) { q().cantReach(); render(); } }
     else if (b.dataset.qabandon !== undefined) { if (confirm('Give up this expedition? It goes back on the board.')) { q().abandon(); render(); } }
@@ -245,6 +264,7 @@ export function initExpeditions(ctx) {
       if (!confirm('Show the last recorded sighting nearby? It costs a star (free if there isn’t one).')) return;
       b.disabled = true; q().buySighting().then((x) => { if (x) { buzz(15); ctx.ambience.chime(2); } render(); });
     }
+    else if (b.dataset.qclues !== undefined) { cluesOpen = q().active()?.id || null; render(); }
     else if (b.dataset.qclue) { const c = q().buyClue(b.dataset.qclue); if (c) { buzz(15); ctx.ambience.chime(2); } render(); }
     else if (b.dataset.qmore !== undefined) { q().more(); render(); }
     else if (b.dataset.qcard) reveal(q().s.cards[+b.dataset.qcard], { replay: true });
@@ -372,9 +392,10 @@ export function initExpeditions(ctx) {
         ${card.credit ? `<p class="credit">Photo: ${esc(card.credit)}</p>` : ''}
       </div>`;
     const r = rank || q().rank();
-    const gained = card.grade === 'echo' ? 0 : card.stars;
+    const bonus = card.grade === 'echo' ? 0 : RARITY_BONUS[card.rarity] || 0;
+    const gained = card.grade === 'echo' ? 0 : card.stars + bonus;
     const rankHtml = replay ? '' : `<div class="rv-rank">${rankUp ? `<p class="rv-up">Rank up! You're now a <b>${esc(rankUp.name)}</b></p>` : ''}
-      <div class="qrank small"><div class="qbadge">${r.level}</div><div class="qrank-txt"><b>${esc(r.name)}</b><small>+${gained}★ · ${r.stars}★ total</small>
+      <div class="qrank small"><div class="qbadge">${r.level}</div><div class="qrank-txt"><b>${esc(r.name)}</b><small>+${gained}★${bonus ? ` (${card.stars} earned + ${bonus} for ${/^[aeiou]/i.test(card.rarity) ? 'an' : 'a'} ${RARITY_LABEL[card.rarity]} card)` : ''} · ${r.stars}★ total</small>
       <div class="qbar"><i style="width:${Math.round(((before && !rankUp ? before.frac : 0)) * 100)}%" data-to="${Math.round(r.frac * 100)}"></i></div></div></div></div>`;
     box.innerHTML = `<div class="rv-flip ${reduce || replay ? 'flipped' : ''}">
         <div class="rv-face rv-back r-${card.rarity}"><span>${T.glyph}</span><b>${RARITY_LABEL[card.rarity]}</b></div>
@@ -407,9 +428,11 @@ export function initExpeditions(ctx) {
 
   // ---------------------------------------------------------------- events from the rules
   function onEvent(ev) {
+    if (ev.type === 'quest-start' || ev.type === 'quest-abandon') cluesOpen = null; // clues tucked away on every fresh start
     if (ev.type === 'quest-done') { closeBoardQuietly(); closeCard(); reveal(ev.card, ev); ctx.hud.render(); }
     else if (ev.type === 'quest-blocked') toast(ev.msg, 'error');
     else if (ev.type === 'quest-guess') { closeBoardQuietly(); buzz([20, 40, 20]); ctx.ambience.chime(7); guess(); }
+    else if (ev.type === 'quest-clock') { const o = ev.quest; toast(o.sunset ? 'The race is on! Beat the sunset.' : `The race is on! Par ${mmss(o.par)}.`, 'quest'); buzz([20, 30, 60]); ctx.ambience.chime(5); }
     else if (ev.type === 'quest-wrong') { toast(ev.msg, 'quest'); buzz(25); }
     else if (ev.type === 'quest-habitat') { toast(`🎯 You’re in the ${ev.quest.sp.name}’s habitat. Field notes added: tap the Expedition box.`, 'quest'); buzz([20, 40, 20]); ctx.ambience.chime(4); }
     else if (ev.type === 'quest-warm') {
@@ -420,7 +443,7 @@ export function initExpeditions(ctx) {
     else if (ev.type === 'quest-info' || ev.type === 'quest-redeal') toast(ev.msg, 'quest');
     else if (ev.type === 'quest-start') {
       const o = ev.quest;
-      if (o.type === 'race') toast(o.sunset ? 'The race is on! Beat the sunset.' : `The race is on! Par ${mmss(o.par)}.`, 'quest');
+      if (o.type === 'race') { /* announced when the clock starts */ }
       else if (o.type === 'bounty') toast(`Bounty accepted: ${o.sp.name}. ${o.habitat?.d ? `Head for ${o.habitat.text}.` : 'Walk and watch for signs.'}`, 'quest');
     }
     else if (ev.type === 'quest-dealt') render();

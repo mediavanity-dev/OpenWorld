@@ -594,3 +594,22 @@ body.beta .beta-hide { display: none !important; }
 /* a mystery's closeness: warm, then hot */
 .tracker .tk-quest.warm { color: #ffc27a; }
 .tracker .tk-quest.hot { color: #ff9a6b; text-shadow: 0 0 10px rgba(255,120,80,0.8); animation: qglow 1s ease-in-out infinite; }
+
+/* a just-accepted expedition */
+.qcard .qnow { margin: 6px 0 0; color: #9be3b5; font-weight: 600; font-size: 12.5px; }
+
+/* a mystery's clues stay tucked away: going is the obvious next step */
+.qgetclue { justify-self: start; padding: 6px 12px; border-radius: 999px; border: 1px dashed rgba(255,211,107,0.55); background: transparent; color: #ffe39b; font-size: 12.5px; }
+.qgetclue small { color: var(--muted); }
+.qcard.active .qbtns .primary { flex: 1; min-height: 46px; font-size: 15px; }
+
+/* an accepted expedition: the way forward is one big button; the rest is quieter, below it */
+.qcard.active .qbtns { flex-wrap: wrap; }
+.qcard.active .qbtns .primary { order: -1; flex: 1 1 100%; }
+.qcard.active .qbtns button:not(.primary) { flex: 1; min-height: 36px; font-size: 12.5px; padding: 6px 10px; }
+
+/* the rarity badge on a quest is a button that explains cards */
+button.qgem { font: inherit; font-size: 11px; cursor: pointer; }
+button.qgem:hover { filter: brightness(1.2); }
+.qhow .qgem { display: inline-block; margin: 1px 0; }
+button.linkish { background: none; border: none; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font: inherit; }
