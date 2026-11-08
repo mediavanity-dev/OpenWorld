@@ -13,11 +13,12 @@
 // so the honesty rule holds (only real visits count).
 // Knows nothing about rendering or the DOM; the UI lives in src/ui/expeditions.js.
 
-import { haversine, offsetGeo, offsetMeters, hashStr } from '../geo.js';
+import { haversine, offsetGeo, offsetMeters } from '../geo.js';
 import { groupOf } from '../world/icons.js';
 import { wildHabitat } from '../world/habitats.js';
 import { fitsHabitat } from '../data/wildlife.js';
 import { isQuirk } from './journal.js';
+import { RULES } from './game.js';
 
 export const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 const bump = (r, n = 1) => RARITIES[Math.max(0, Math.min(RARITIES.length - 1, RARITIES.indexOf(r) + n))];
@@ -40,6 +41,8 @@ export function bearingTo(from, to) {
   const o = offsetMeters(from.lat, from.lon, to.lat, to.lon);
   return (Math.atan2(o.x, -o.z) * 180) / Math.PI;
 }
+let seq = 0;
+const uid = (k) => `${k}${Date.now().toString(36)}${(seq++).toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
 const roundTo = (m, step) => Math.max(step, Math.round(m / step) * step);
 
 const BUSINESS = new Set(['food', 'shop', 'lodging', 'other', 'geocache', 'transport']);
@@ -122,11 +125,13 @@ export const ERAS = [
  * @param {{lat:number, lon:number}} pos
  * @param {any[]} pois
  * @param {Record<string, any>} discovered
+ * @param {Set<string>} [avoid]
+ * @param {(p: {lat:number, lon:number}) => boolean} [inside] only targets the player can reach in this mode
  */
-export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = new Set()) {
+export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = new Set(), inside = (_p) => true) {
   const cands = [];
   for (const p of pois) {
-    if (!p.name || avoid.has(p.ref)) continue;
+    if (!p.name || avoid.has(p.ref) || !inside(p)) continue;
     const grp = groupOf(p.kind, p.cls);
     if (BUSINESS.has(grp)) continue;
     const d = haversine(pos.lat, pos.lon, p.lat, p.lon);
@@ -161,7 +166,7 @@ export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = n
   const zc = offsetGeo(poi.lat, poi.lon, Math.cos(a) * off, Math.sin(a) * off);
   clues.push({ key: 'zone', label: 'Search area', text: 'It’s inside the gold circle on your minimap.', zone: { lat: zc.lat, lon: zc.lon, r: 70 } });
   return {
-    type: 'mystery', id: `m${hashStr(poi.ref + Date.now())}`,
+    type: 'mystery', id: uid('m'),
     title: 'Who am I?',
     riddle: riddleFor(poi),
     sector: c.sector, dist: roundTo(c.d, 50), alike: c.alike,
@@ -173,12 +178,13 @@ export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = n
 }
 
 /** Find the nearest ground of a habitat that suits a species group (sampled rings). */
-export function nearestHabitat(pos, habitatAt, group, maxR = 600) {
+export function nearestHabitat(pos, habitatAt, group, maxR = 600, inside = (_p) => true) {
   for (let r = 0; r <= maxR; r += 40) {
     const n = r ? Math.max(8, Math.round(r / 25)) : 1;
     let best = null;
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2, p = offsetGeo(pos.lat, pos.lon, Math.sin(a) * r, Math.cos(a) * r);
+      if (!inside(p)) continue;
       const h = wildHabitat(habitatAt(p.lat, p.lon));
       if (h !== 'urban' && fitsHabitat(group, h, false)) { best = { hab: h, lat: p.lat, lon: p.lon, d: r, bearing: (a * 180) / Math.PI }; break; }
     }
@@ -192,7 +198,7 @@ const HAB_TEXT = { water: 'water', wood: 'woodland', wetland: 'wetland', scrub: 
  * Bounty: a locally recorded animal you haven't got yet, plus where it likes to be.
  * @param {any[]} species  this area's species list (src/data/wildlife.js)
  */
-export function makeBounty(pos, species, known, habitatAt, rand = Math.random, avoid = new Set()) {
+export function makeBounty(pos, species, known, habitatAt, rand = Math.random, avoid = new Set(), inside = (_p) => true) {
   const pool = species.filter((s) => !['Plantae', 'Fungi'].includes(s.group) && !avoid.has(s.id) && s.count >= 3);
   if (!pool.length) return null;
   const scored = pool.map((s) => {
@@ -203,12 +209,12 @@ export function makeBounty(pos, species, known, habitatAt, rand = Math.random, a
     return { s, v };
   }).sort((a, b) => b.v - a.v);
   for (const { s } of scored.slice(0, 6)) {
-    const hab = nearestHabitat(pos, habitatAt, s.group);
+    const hab = nearestHabitat(pos, habitatAt, s.group, 600, inside);
     const urbanOk = fitsHabitat(s.group, 'urban', false);
     if (!hab && !urbanOk) continue;
     const sp = { id: s.id, name: s.name, sci: s.sci, group: s.group, count: s.count, rarity: s.rarity, photo: s.photo, credit: s.credit };
     return {
-      type: 'bounty', id: `b${s.id}-${Date.now() % 1e6}`,
+      type: 'bounty', id: uid('b'),
       title: `Wanted: ${s.name}`,
       sp, rarity: rarityOfSpecies(s), fled: 0,
       habitat: hab ? { hab: hab.hab, text: HAB_TEXT[hab.hab] || hab.hab, lat: hab.lat, lon: hab.lon, d: roundTo(hab.d, 20), sector: sectorOf(hab.bearing) } : null,
@@ -230,14 +236,16 @@ export function parTime(d, mode) { return Math.round((d * 1.4) / (PACE[mode] || 
  * Race: the highest ground within reach (or a viewpoint / landmark), against par or sunset.
  * @param {(lat:number, lon:number) => number|null} groundAt
  */
-export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random) {
+export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random, inside = (_p) => true) {
   const here = groundAt(pos.lat, pos.lon);
   let best = null;
   if (here != null) {
     for (let e = -650; e <= 650; e += 30) for (let n = -650; n <= 650; n += 30) {
       const r = Math.hypot(e, n);
       if (r < 150 || r > 650) continue;
-      const p = offsetGeo(pos.lat, pos.lon, e, n), h = groundAt(p.lat, p.lon);
+      const p = offsetGeo(pos.lat, pos.lon, e, n);
+      if (!inside(p)) continue;
+      const h = groundAt(p.lat, p.lon);
       if (h != null && (!best || h > best.h)) best = { ...p, h, d: r };
     }
   }
@@ -245,7 +253,7 @@ export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random
   if (best && best.h - here >= 6) { target = best; kind = 'summit'; gain = Math.round(best.h - here); }
   else {
     const spots = pois.filter((p) => {
-      if (!p.name) return false;
+      if (!p.name || !inside(p)) return false;
       const d = haversine(pos.lat, pos.lon, p.lat, p.lon), grp = groupOf(p.kind, p.cls);
       return d >= 200 && d <= 750 && !BUSINESS.has(grp);
     });
@@ -263,7 +271,7 @@ export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random
   const title = sunset ? (kind === 'summit' ? 'Beat the sunset to the high ground' : `Beat the sunset to ${name}`)
     : kind === 'summit' ? 'Summit sprint' : kind === 'viewpoint' ? `Race to the view: ${name}` : `Dash to ${name}`;
   return {
-    type: 'race', id: `r${Date.now() % 1e9}`,
+    type: 'race', id: uid('r'),
     title, kind, name, lat: target.lat, lon: target.lon, dist: roundTo(target.d, 10), gain,
     par, sunset, sunsetAt: sunset ? Date.now() + sunsetMs : null,
     rarity: rarityOfRace(gain, sunset),
@@ -283,7 +291,7 @@ export class Quests {
     this._fillT = 0;
     this._tries = 0;
     this._wrong = new Set();
-    this.ensure();
+    this.tidy();
   }
   get profile() { return this.game.profile; }
   get s() { return this.ensure(); }
@@ -291,18 +299,47 @@ export class Quests {
 
   ensure() {
     const d = this.profile.data;
-    d.quests ||= { date: null, origin: null, offers: [null, null, null], swaps: 1, active: null, cards: [], done: 0 };
+    d.quests ||= { date: null, origin: null, mode: null, offers: [null, null, null], swaps: 1, active: null, cards: [], done: 0, seen: false };
+    // seen: the player has opened the board at least once (until then it glows instead of popping up)
+    if (d.quests.seen == null) d.quests.seen = !!(d.quests.cards.length || d.quests.active);
     return d.quests;
+  }
+  // after loading a save: drop moment-to-moment state (a pending age guess re-asks on arrival)
+  tidy() {
+    for (const o of this.ensure().offers) if (o) { delete o.pending; delete o.live; }
+    this._wrong.clear();
   }
   date() { return this.game.env.localNow().toISOString().slice(0, 10); }
   stars() { return this.s.cards.reduce((a, c) => a + (c.grade === 'echo' ? 0 : c.stars), 0); }
   rank() { return rankOf(this.stars()); }
   active() { return this.s.offers.find((o) => o && o.id === this.s.active) || null; }
 
+  // Can the player get to a point in this mode? (Home: only inside the home range.)
+  inside(p) {
+    const g = this.game, h = this.profile.data.home;
+    if (g.mode !== 'home' || !h) return true;
+    return haversine(h.lat, h.lon, p.lat, p.lon) <= RULES.LEASH_M - 15;
+  }
+  goal(o) { return o.type === 'bounty' ? (o.habitat?.d ? o.habitat : null) : o; }
+  reachable(o) { const t = this.goal(o); return !t || this.inside(t); }
+  // why an offer can't be played right now (null = it can)
+  blocked(o) {
+    const g = this.game;
+    if (g.mode === 'present' && g.fix?.source === 'ip') return 'You’re placed by your internet connection, so you can’t move. Set a home base, or play on your phone.';
+    if (!this.reachable(o)) return 'Outside your home range. Play it Present, or in Roam as an echo.';
+    return null;
+  }
+  // today's progress: cards won and (real) stars earned
+  today() {
+    const d = this.date(), cs = this.s.cards.filter((c) => c.date === d);
+    return { done: cs.length, stars: cs.reduce((a, c) => a + (c.grade === 'echo' ? 0 : c.stars), 0) };
+  }
+
   /** @param {'' | 'move'} [why] 'move': re-dealt for a new area (keeps today's swap) */
   deal(why = '') {
     const s = this.ensure(), keep = this.active();
     s.date = this.date();
+    s.mode = this.game.mode;
     s.origin = { lat: this.game.pos.lat, lon: this.game.pos.lon };
     s.offers = TYPES.map((t) => (keep && keep.type === t ? keep : null));
     if (why !== 'move') s.swaps = 1;
@@ -326,30 +363,71 @@ export class Quests {
     const g = this.game, pos = g.pos, w = g.world;
     const pois = [...w.pois(pos.lat, pos.lon, 900)].map((x) => x.poi);
     for (const o of this.s.offers) if (o?.ref) avoid.add(o.ref);
-    if (type === 'mystery') return makeMystery(pos, pois, this.profile.data.discoveries, Math.random, avoid);
-    if (type === 'bounty') return g.wild.species.length ? makeBounty(pos, g.wild.species, this.profile.data.species || {}, (a, b) => w.habitatAt(a, b), Math.random, avoid) : null;
+    const inside = (p) => this.inside(p);
+    if (type === 'mystery') return makeMystery(pos, pois, this.profile.data.discoveries, Math.random, avoid, inside);
+    if (type === 'bounty') return g.wild.species.length ? makeBounty(pos, g.wild.species, this.profile.data.species || {}, (a, b) => w.habitatAt(a, b), Math.random, avoid, inside) : null;
     if (type === 'race') {
       const ss = sunsetIn((t) => g.env.sun(pos.lat, pos.lon, new Date(t)).alt);
-      return makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss);
+      return makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside);
     }
     return null;
   }
 
+  // Start an offer. Returns the quest, or null (with the reason emitted as 'quest-blocked').
   accept(id) {
-    const o = this.s.offers.find((x) => x && x.id === id);
-    if (!o) return;
-    this.s.active = id;
+    const s = this.s, g = this.game, i = s.offers.findIndex((x) => x && x.id === id);
+    let o = s.offers[i];
+    if (!o || o.done || s.active) return null;
+    const why = this.blocked(o);
+    if (why) { this.emit('quest-blocked', why); return null; }
+    const pos = g.pos;
+    if (o.type === 'race') {
+      // the clock is fair from where you actually start: re-measured now, and a fresh
+      // course if you're already practically at the finish
+      let d = haversine(pos.lat, pos.lon, o.lat, o.lon);
+      if (d < 120) {
+        const fresh = this.make('race', new Set());
+        if (!fresh || haversine(pos.lat, pos.lon, fresh.lat, fresh.lon) < 120) { this.emit('quest-blocked', 'You’re already at the finish. Swap it, or start from further away.'); return null; }
+        o = s.offers[i] = fresh; d = haversine(pos.lat, pos.lon, o.lat, o.lon);
+      }
+      o.dist = roundTo(d, 10); o.par = parTime(d, g.mode);
+      if (o.sunset && o.sunsetAt - Date.now() < o.par * 1000) { o.sunset = false; o.rarity = rarityOfRace(o.gain, false); }
+    } else if (o.type === 'mystery') {
+      // directions are given from where you accept it
+      o.sector = sectorOf(bearingTo(pos, o));
+      o.dist = roundTo(haversine(pos.lat, pos.lon, o.lat, o.lon), 50);
+    }
+    o.from = { lat: +pos.lat.toFixed(5), lon: +pos.lon.toFixed(5) };
+    s.active = o.id;
     o.startedAt = Date.now();
     this._wrong.clear();
+    this.profile.log(`Expedition started: ${o.title}`);
     this.profile.save();
     this.emit('quest-start', null, { quest: o });
+    return o;
   }
   abandon() {
     const o = this.active();
     if (!o) return;
     this.s.active = null;
-    delete o.startedAt;
+    delete o.startedAt; delete o.pending;
+    this.profile.log(`Expedition dropped: ${o.title}`);
     this.profile.save();
+    this.emit('quest-abandon', null, { quest: o });
+  }
+  // switching mode (e.g. into Home) can put offers out of reach: those are re-dealt
+  onModeChange() {
+    const s = this.s;
+    s.mode = this.game.mode;
+    let changed = false;
+    s.offers = s.offers.map((o) => {
+      if (!o || o.done || o.id === s.active || this.reachable(o)) return o;
+      changed = true; return null;
+    });
+    if (changed) { this._tries = 0; this._fillT = 0; }
+    this.profile.save();
+    const a = this.active();
+    if (a && !this.reachable(a)) this.emit('quest-info', 'Your expedition’s goal is outside your home range. Finish it Present, or in Roam as an echo.');
   }
   buyClue(key) {
     const o = this.active();
@@ -369,6 +447,7 @@ export class Quests {
     const g = this.game, s = this.ensure();
     if (!g.pos) return;
     if (!s.date || s.date !== this.date()) this.deal();
+    else if (s.mode !== g.mode) this.onModeChange();
     else if (!s.active && s.origin && haversine(s.origin.lat, s.origin.lon, g.pos.lat, g.pos.lon) > REDEAL_M) { this.deal('move'); this.emit('quest-redeal', 'New expeditions for this area'); }
     this.fill();
     const o = this.active();
@@ -449,7 +528,8 @@ export class Quests {
     const stars = this.starsFor(o, secs);
     const before = this.rank();
     const card = {
-      id: o.id, type: o.type, rarity: o.rarity, stars, grade, date: this.date(), secs,
+      id: o.id, type: o.type, title: o.title, rarity: o.rarity, stars, grade, mode: g.mode, date: this.date(), secs,
+      area: g.world.chunkAt?.(o.lat ?? g.pos.lat, o.lon ?? g.pos.lon)?.areaName || null,
       lat: +(o.lat ?? g.pos.lat).toFixed(5), lon: +(o.lon ?? g.pos.lon).toFixed(5),
       ...(o.type === 'mystery' ? { name: o.place.name, kind: o.place.kind, year: o.place.year, ref: o.ref, tags: o.place.tags ? { wikipedia: o.place.tags.wikipedia, wikidata: o.place.tags.wikidata } : null, clues: o.used.length, guessRight: o.guessRight ?? null } : {}),
       ...(o.type === 'bounty' ? { name: o.sp.name, sci: o.sp.sci, group: o.sp.group, spId: o.sp.id, img: o.sp.photo, credit: o.sp.credit, photo: !!extra.photo } : {}),

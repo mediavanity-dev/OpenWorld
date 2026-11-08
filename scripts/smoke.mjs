@@ -101,6 +101,8 @@ try {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     if (document.body.classList.contains('clean')) click('ui-toggle');
     await wait(500);
+    // beta: the expedition board opens first; close it like a player would
+    if (!document.getElementById('quests').hidden) { click('quests-close'); await wait(600); }
     if (!document.getElementById('h-desc').textContent) return 'HUD did not render';
     click('b-journal'); await wait(300);
     // the journal window must stay in one place and size whichever tab is open
@@ -117,8 +119,15 @@ try {
     const o = window.openworld, tip = document.getElementById('tips');
     const tab = (m) => document.querySelector('.tabs button[data-mode="' + m + '"]');
     tab('home').click(); await wait(300);
-    if (tip.hidden || !/home base first/i.test(tip.textContent)) return 'no "set a home base first" hint';
-    tip.querySelector('.next').click();
+    const beta = document.body.classList.contains('beta'), hs = document.getElementById('homesetup');
+    if (beta) {
+      // beta: no home base opens the home base setup (device location or a typed address)
+      if (hs.hidden || !document.getElementById('hs-device')) return 'Home without a home base did not open the setup';
+      click('hs-later'); await wait(100);
+    } else {
+      if (tip.hidden || !/home base first/i.test(tip.textContent)) return 'no "set a home base first" hint';
+      tip.querySelector('.next').click();
+    }
     o.profile.data.home = { lat: o.game.pos.lat, lon: o.game.pos.lon, trust: 'gps', accuracy: 5, source: 'device', setAt: new Date().toISOString() };
     tab('home').click(); await wait(900);
     if (o.game.mode !== 'home') return 'did not enter Home';
@@ -134,15 +143,38 @@ try {
     if (!o.game.features.quests) return 'off';
     for (let k = 0; k < 30 && !o.game.quests.s.offers.some(Boolean); k++) await wait(500);
     const offers = o.game.quests.s.offers.filter(Boolean);
-    if (!offers.length) return 'no expeditions dealt';
-    o.ctx.expeditions.open('today'); await wait(300);
-    if (!document.querySelector('#quests-body .qcard')) return 'board did not render';
+    if (!offers.length) { const s = o.game.quests.s; return 'no expeditions dealt: ' + JSON.stringify({ mode: o.game.mode, smode: s.mode, date: s.date, active: s.active, offers: s.offers, tries: o.game.quests._tries, wild: o.game.wild.species.length, ready: o.world.isReadyAt(o.game.pos.lat, o.game.pos.lon), feat: o.game.features }); }
     const want = ${JSON.stringify(process.env.SMOKE_OPEN || '')};
+    // a new player: the board has not popped up by itself, and its entry point glows
+    if (o.game.quests.s.seen) return 'board was opened before the player chose to';
+    if (!document.querySelector('#nearest.qnew')) return 'the never-opened Expedition box is not glowing';
+    if (want === 'glow') return 'ok:glow';
+    if (want === 'homesetup') { o.profile.data.home = null; o.ctx.homeSetup.open({ reason: '<b>Welcome back!</b> To play from this computer you need a home base.' }); return 'ok:homesetup'; }
+    o.ctx.expeditions.open('today'); await wait(300);
+    if (!document.querySelector('#quests-body .qwelcome')) return 'no welcome blurb on first open';
+    if (!document.querySelector('#quests-body .qcard')) return 'board did not render';
     if (want === 'reveal') { const q = offers.find((x) => x.type !== 'bounty') || offers[0]; o.game.quests.accept(q.id); if (q.type === 'mystery') q.guessRight = true; o.game.quests.complete(q); await wait(2200); }
     else if (want !== 'quests') o.ctx.expeditions.close();
     return 'ok:' + offers.map((x) => x.type).join(','); })()` });
   if (qr.result?.value && !String(qr.result.value).startsWith('ok') && qr.result.value !== 'off') failures.push(`expeditions: ${qr.result.value}`);
   else if (qr.result?.value) console.log(`smoke: expeditions ${qr.result.value}`);
+
+  // beta, returning player on a computer: the start screen is skipped. Without a home base the
+  // setup window opens; with one, the game goes straight into Home.
+  if (process.env.SMOKE_PATH?.includes('beta') && !process.env.SMOKE_TOUCH && !process.env.SMOKE_OPEN) {
+    const probe = async (prep) => {
+      await send('Runtime.evaluate', { expression: prep });
+      await sleep(400);
+      await send('Page.navigate', { url: `http://localhost:${PORT}${process.env.SMOKE_PATH}` });
+      await sleep(4000);
+      return (await send('Runtime.evaluate', { returnByValue: true, expression: `({ start: !document.getElementById('start').hidden, setup: !document.getElementById('homesetup').hidden, mode: window.openworld?.game.mode || null })` })).result?.value;
+    };
+    const a = await probe(`(() => { const p = window.openworld.profile; p.data.home = null; p.dirty = true; p.flush(); })()`);
+    if (!a || a.start || !a.setup) failures.push(`returning player without a home base: ${JSON.stringify(a)}`);
+    const b = await probe(`(() => { const p = window.openworld.profile; p.data.home = { lat: 51.4779, lon: -0.0015, trust: 'gps', accuracy: 5, source: 'device', setAt: new Date().toISOString() }; p.dirty = true; p.flush(); })()`);
+    if (!b || b.start || b.mode !== 'home') failures.push(`returning player with a home base: ${JSON.stringify(b)}`);
+    else console.log('smoke: returning player skips the start screen (setup without home, Home with one)');
+  }
 
   // SMOKE_OPEN=journal:collections leaves that panel open for the screenshot
   if (process.env.SMOKE_OPEN?.startsWith('journal')) {

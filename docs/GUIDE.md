@@ -217,8 +217,9 @@ view: stand where the photographer stood and line it up. The match meter fills a
 outlines line up; **Capture** keeps it in your journal under *Then & now*, and **Save then &
 now** makes a side-by-side picture. Switch it off in Settings → Beta experiments.
 
-**Expeditions (beta).** When you start, a board deals three quests built from what's really
-around you. Pick one; tap the gold *Expedition* box (or the ✦ pill) to come back to the board.
+**Expeditions (beta).** A board of three quests built from what's really around you. The first
+time, the gold *Expedition* box and the ✦ pill glow until you tap one; after that the board
+opens by itself when you start. Pick a quest; tap the box (or the pill) to come back to the board.
 - **🔍 Mystery: deduce.** A riddle about a real place nearby that isn't named, plus the
   direction and rough distance. Buy clues if you're stuck (its age or type, its initial, a
   search circle on the minimap); each one costs a star. Visit the wrong place and it tells
@@ -234,6 +235,16 @@ it is listed or has a Wikipedia article, how rarely the species is recorded loca
 you climbed. The reward is shown on the board before you pick. Stars (1–3) build your **field
 rank**. You can **swap** one quest a day, and once all three are done you can deal three more.
 In **Roam** your cards are *echoes*: you keep them, but they earn no stars.
+In **Home**, every quest is inside your home range. Directions for a mystery are given from where
+you accept it, and a race's clock is set from where you start. Your cards (with where and when you
+won them) are under *Your cards*, on the journal's overview and as ◆ on the journal map.
+
+**Starting the beta.** First time: the start screen, as usual. After that it skips straight in. On
+a phone it starts where you are (Present); on a computer it starts at your home base. If a computer
+has no home base yet, a short window helps you set one: **use this device's location** (computers
+usually locate by Wi-Fi), or **type your street or postcode**. A typed address is accepted only if
+it's near where your internet connection places you, so a home base is still somewhere you really
+are. The same window opens from **Set home base** and from the **Home** tab.
 
 ### 10. Set your home base
 

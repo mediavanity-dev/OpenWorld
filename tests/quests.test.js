@@ -165,3 +165,91 @@ test('quests: the board re-deals daily and when you travel; one swap a day', () 
   q.step();
   assert.equal(q.s.origin.lat, game.pos.lat);
 });
+
+const setHome = (profile, p = HOME) => { profile.data.home = { ...p, trust: 'gps', accuracy: 5, source: 'device', setAt: new Date().toISOString() }; };
+
+test('quests: in Home, every goal is inside the home range; switching mode re-deals what is out of reach', () => {
+  const far = at(0, 750, { ref: 'osm:node/9', name: 'Far Abbey', kind: 'amenity:place_of_worship', tags: { start_date: '1200' } });
+  const near = at(0, 300, { ref: 'osm:node/8', name: 'Near Memorial', kind: 'historic:memorial', tags: null });
+  const { game, q, profile } = setup({ pois: [far, near] });
+  game.enter('roam', { to: HOME });
+  for (let k = 0; k < 20; k++) { q.s.offers[0] = null; q._fillT = 0; q.step(); if (q.s.offers[0]?.ref === far.ref) break; }
+  assert.equal(q.s.offers[0].ref, far.ref); // Roam may deal the far one
+  setHome(profile);
+  game.enter('home');
+  q._fillT = 0; q.step();
+  assert.equal(q.s.offers[0].ref, near.ref); // out of the 600 m range: re-dealt
+  for (let k = 0; k < 10; k++) { q.s.offers[0] = null; q._fillT = 0; q.step(); assert.notEqual(q.s.offers[0]?.ref, far.ref); }
+});
+
+test('quests: an active goal outside the range says so; Present on an internet fix cannot start one', () => {
+  const far = at(0, 750, { ref: 'osm:node/9', name: 'Far Abbey', kind: 'amenity:place_of_worship', tags: null });
+  const { game, q, profile, events } = setup({ pois: [far] });
+  game.enter('roam', { to: HOME });
+  q.step();
+  q.accept(q.s.offers[0].id);
+  setHome(profile);
+  game.enter('home');
+  q.step();
+  assert.ok(events.some((e) => e.type === 'quest-info' && /outside your home range/.test(e.msg)));
+  q.abandon();
+  game.setFix({ ...HOME, accuracy: 5000, source: 'ip', t: Date.now() });
+  game.enter('present');
+  q.step();
+  const o = q.s.offers.find(Boolean);
+  assert.equal(q.accept(o.id), null);
+  assert.ok(events.some((e) => e.type === 'quest-blocked' && /internet/.test(e.msg)));
+});
+
+test('quests: the race clock is measured from where you accept it, never from the finish line', () => {
+  const hill = (lat) => 10 + Math.max(0, (lat - HOME.lat) * 111320) * 0.08;
+  const { game, q } = setup({ ground: hill });
+  game.enter('roam', { to: HOME });
+  q.step();
+  const r = q.s.offers[2];
+  assert.equal(r.type, 'race');
+  // walk to (almost) the finish, then accept: a fresh course, not a free three stars
+  game.pos = offsetGeo(r.lat, r.lon, 20, 0);
+  const o = q.accept(r.id);
+  if (o) {
+    assert.notEqual(o.id, r.id);
+    assert.ok(haversine(game.pos.lat, game.pos.lon, o.lat, o.lon) >= 120);
+  }
+  assert.ok(!q.active() || q.active().par >= 30);
+});
+
+test('quests: a reload while the age question was showing asks again on arrival', () => {
+  const { game, q, profile, events } = setup({ pois: [chapel] });
+  game.enter('roam', { to: HOME });
+  q.step();
+  const m = q.s.offers[0];
+  q.accept(m.id);
+  game.pos = { lat: m.lat, lon: m.lon };
+  q.step();
+  assert.equal(events.filter((e) => e.type === 'quest-guess').length, 1);
+  // "reload": a new Quests over the same saved profile
+  const again = new Quests(game, (e) => events.push(e));
+  game.quests = again;
+  assert.equal(again.active().pending, undefined);
+  again.step();
+  assert.equal(events.filter((e) => e.type === 'quest-guess').length, 2);
+  again.guess('18c');
+  const card = profile.data.quests.cards[0];
+  assert.equal(card.mode, 'roam');
+  assert.ok(card.title && card.date);
+});
+
+test('home base: a typed address must be near where the device or connection says you are', () => {
+  const { game, profile, events } = setup();
+  const ip = { ...HOME, accuracy: 5000, source: 'ip', t: Date.now() };
+  assert.match(game.homeCheck(offsetGeo(HOME.lat, HOME.lon, 0, 80000), ip), /80 km/);
+  assert.equal(game.homeCheck(offsetGeo(HOME.lat, HOME.lon, 0, 8000), ip), null); // same town: fine
+  const gps = { ...HOME, accuracy: 20, source: 'device', t: Date.now() };
+  assert.ok(game.homeCheck(offsetGeo(HOME.lat, HOME.lon, 0, 2000), gps)); // a precise fix only allows a small refinement
+  assert.ok(game.setHomeAt(offsetGeo(HOME.lat, HOME.lon, 0, 8000), ip, { via: 'address', place: 'Blackheath' }));
+  assert.equal(profile.data.home.trust, 'address');
+  assert.equal(profile.data.home.place, 'Blackheath');
+  // and it's still permanent for 30 days
+  assert.equal(game.setHomeAt(HOME, gps), undefined);
+  assert.ok(events.some((e) => e.type === 'error' && /permanent/.test(e.msg)));
+});

@@ -26,6 +26,7 @@
         <button id="s-device" class="primary">Be here: use my device location</button>
         <button id="s-ip">Locate me via my internet connection</button>
         <button id="s-home" hidden>Go to my home base</button>
+        <button id="s-sethome" hidden>Set up a home base on this computer</button>
         <button id="s-resume" hidden>Resume at last spot (Roam)</button>
       </div>
       <div class="roam">
@@ -147,6 +148,14 @@
     </div>
   </div>
   <div id="reveal" class="reveal" hidden role="dialog" aria-live="polite"></div>
+
+  <!-- Home base setup (beta): device location or a typed address near you -->
+  <div id="homesetup" class="modal" hidden>
+    <div class="card">
+      <h2>Set your home base</h2>
+      <div id="homesetup-body"></div>
+    </div>
+  </div>
 
   <div id="tips" class="tips" hidden role="dialog" aria-live="polite"></div>
   <div id="tip-ring" class="tip-ring" hidden></div>

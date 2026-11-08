@@ -38,6 +38,7 @@ import { initArMode } from './ui/arMode.js';
 import { initSettingsPanel } from './ui/settingsPanel.js';
 import { initRephoto } from './ui/rephoto.js';
 import { initExpeditions } from './ui/expeditions.js';
+import { initHomeSetup } from './ui/homeSetup.js';
 import { initAvatar } from './render/avatar.js';
 import { initMarkers } from './render/markers.js';
 import { initCritters } from './render/critters.js';
@@ -92,6 +93,7 @@ ctx.labels = initLabels(ctx);
 ctx.rephoto = initRephoto(ctx);
 ctx.settingsPanel = initSettingsPanel(ctx);
 ctx.expeditions = initExpeditions(ctx);
+ctx.homeSetup = initHomeSetup(ctx, { parsePlace: (q) => parsePlace(q) });
 ctx.minimap = new Minimap($('minimap'), { onTap: () => openJournal('map') });
 const { controls, hud, avatar, markers, critters, effects, arMode, labels, ambience, sky } = ctx;
 
@@ -431,6 +433,8 @@ $('s-ip').onclick = async () => {
   }
 };
 $('s-home').onclick = () => enterHome();
+$('s-sethome').hidden = !BETA || !!profile.data.home || isTouch;
+$('s-sethome').onclick = () => ctx.homeSetup.open({ onSet: () => homeWasSet(true) });
 $('s-resume').onclick = () => begin('roam', { to: profile.data.last });
 $('s-roam-form').onsubmit = async (e) => {
   e.preventDefault();
@@ -456,6 +460,7 @@ document.querySelectorAll('.tabs button[data-mode]').forEach((b) => (b.onclick =
 function enterHome() {
   const range = fmtDist(RULES.LEASH_M);
   if (!profile.data.home) {
+    if (BETA) return ctx.homeSetup.open({ reason: `<b>Home needs a home base first.</b> Set one and you can wander ${range} around it from anywhere.`, onSet: () => homeWasSet(true) });
     const shown = game.mode && showHint({ target: () => document.querySelector('.tabs button[data-mode="present"]'), timeout: 12000,
       text: `<b>Set a home base first.</b> Go <b>Present</b> (where you really are) and tap <b>Set home base</b>. After that, Home lets you wander ${range} around it from anywhere.` });
     if (!shown) toast(`No home base yet. Go Present and set one; then Home lets you wander ${range} around it from anywhere.`, 'error');
@@ -467,8 +472,8 @@ function enterHome() {
   const text = isTouch
     ? `<b>Use the joystick to wander.</b> Go anywhere within ${range} of your home base (the blue ring). Push it all the way out to run.`
     : `<b>Use W A S D or the arrow keys to wander.</b> Go anywhere within ${range} of your home base (the blue ring). Hold Shift to run.`;
-  // wait a moment for the mode switch (and the joystick) to appear
-  setTimeout(() => showHint({ key: 'home', text, until, target: () => (isTouch ? $('stick') : document.querySelector('.tabs button[data-mode="home"]')) }), 400);
+  // wait a moment for the mode switch (and the joystick) to appear, and for the expedition board to close
+  ctx.expeditions.whenClear('home-hint', () => setTimeout(() => showHint({ key: 'home', text, until, target: () => (isTouch ? $('stick') : document.querySelector('.tabs button[data-mode="home"]')) }), 400));
 }
 const left = $('left');
 function setCollapsed(on) {
@@ -491,6 +496,7 @@ $('nearest').onclick = () => { if (game.features.quests) return ctx.expeditions.
 $('b-locate').onclick = async () => { if (await locateDevice()) { if (game.mode === 'present') begin('present'); else toast('Device fix updated: ' + fixText(game.fix)); } };
 $('b-ip').onclick = async () => { if (await locateIp()) { if (game.mode === 'present') begin('present'); else toast('Fix updated: ' + fixText(game.fix)); } };
 $('b-sethome').onclick = () => {
+  if (BETA) return ctx.homeSetup.open({ onSet: () => homeWasSet(game.mode !== 'present') });
   if (profile.data.home && !confirm('Move your home base here? It can then not be moved again for 30 days.')) return;
   if (!profile.data.home && !confirm('Set your permanent home base at your current real location?')) return;
   if (game.setHome()) { $('s-home').hidden = false; markers.refreshBeacons(); hud.render(); }
@@ -503,7 +509,7 @@ $('h-roam-form').onsubmit = async (e) => {
 };
 
 // journal + this spot
-initJournal({ profile, game, onSpecies: (id) => { const x = profile.data.species[id]; if (x) showSpecies({ id, name: x.name, sci: x.sci, group: x.group }, { grade: x.grade, pos: game.pos }); } });
+initJournal({ profile, game, onQuests: () => ctx.expeditions.open('today'), onSpecies: (id) => { const x = profile.data.species[id]; if (x) showSpecies({ id, name: x.name, sci: x.sci, group: x.group }, { grade: x.grade, pos: game.pos }); } });
 $('b-journal').onclick = () => openJournal();
 $('b-here').onclick = () => {
   if (!game.pos) return;
@@ -535,7 +541,7 @@ function startTutorial() {
   // deliberately tiny: show the eye, then one pointer, then never again
   const steps = [];
   if (document.body.classList.contains('clean')) steps.push({ target: () => $('ui-toggle'), text: '<b>Tap to show the menus.</b>', waitFor: 'click' });
-  const first = game.features.quests ? 'Your expedition lives here: tap it for clues, progress and the board.' : "Today's field assignment: follow its arrow.";
+  const first = game.features.quests ? '<b>✦ Expeditions</b>: quests from the real world around you. Tap the glowing box to pick your first one.' : "Today's field assignment: follow its arrow.";
   steps.push({ target: () => $('nearest'), text: `${first} Tap any icon for details. ${isTouch ? 'Pinch to zoom.' : 'Scroll to zoom.'} More in Settings → Help.` });
   runTutorial(steps);
 }
@@ -543,9 +549,36 @@ $('ui-toggle').onclick = () => setClean(!document.body.classList.contains('clean
 $('recenter').onclick = () => controls.recenter();
 $('tracker').addEventListener('click', () => { if (game.features.quests && ctx.expeditions.chip()) return ctx.expeditions.open(); if (game.taskTarget && !journal.task().done) openPlace(game.taskTarget.poi); });
 
+// a new home base: refresh what depends on it, and (optionally) go there
+function homeWasSet(go) {
+  $('s-home').hidden = false; $('s-sethome').hidden = true;
+  markers.refreshBeacons(); hud.render();
+  if (go) enterHome();
+}
+
 // deep link: ?at=lat,lon starts directly in Roam there
 const at = new URLSearchParams(location.search).get('at');
 if (at) parsePlace(at).then((to) => begin('roam', { to })).catch((e) => (sMsg.textContent = e.message));
+// beta: returning players skip the start screen (first-timers still see it)
+else if (BETA && profile.data.last) autoStart();
+
+// Phones start where they really are; computers start at their home base, or are helped to
+// set one up. If that fails or they'd rather not, the start screen is the fallback.
+async function autoStart() {
+  $('start').hidden = true;
+  const fallback = (m = '') => { if (!game.mode) { $('start').hidden = false; sMsg.textContent = m; } };
+  if (isTouch) {
+    toast('Finding where you are…');
+    if (await locateDevice()) return begin('present');
+    return fallback('Couldn’t get your location. Choose how to start:');
+  }
+  if (profile.data.home) return enterHome();
+  ctx.homeSetup.open({
+    reason: '<b>Welcome back!</b> To play from this computer you need a home base. It takes a few seconds, and only once.',
+    onSet: () => homeWasSet(true),
+    onLater: () => fallback(),
+  });
+}
 
 // housekeeping: drop stale cached reference data once the game is idle
 setTimeout(() => pruneCache().catch(() => {}), 15000);
