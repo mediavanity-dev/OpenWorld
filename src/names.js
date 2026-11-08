@@ -28,4 +28,6 @@ export function renameStaticText(root = document.body) {
       .replace(/\bPresent\b/g, 'Walk')
       .replace(/\bclaimed\b/g, 'walked');
   }
+  const homeStat = document.querySelector('#c-home + span'); // the stats row: how each find was made
+  if (homeStat) homeStat.textContent = 'from home';
 }

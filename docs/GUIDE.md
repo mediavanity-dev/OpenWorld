@@ -58,6 +58,9 @@ base, search).
 
 ### 3. The three ways to play
 
+*In the beta these have plainer names: **Walk** (Present), **Home** and **Roam**, and finds say
+how you made them: **walked**, **from home** or **echo** (instead of "claimed").*
+
 The buttons at the top switch between them. Each one has a different rule:
 
 - **Present** (orange): you are where your phone or computer really is. You can't use
