@@ -1,4 +1,4 @@
-# OpenWorld on the App Store (iPhone)
+# OpenWorld on the App Store (iPhone): "OpenEarth"
 
 The iPhone app is the same game as the website, bundled inside a native shell with
 [Capacitor](https://capacitorjs.com). Every file ships inside the app, and builds run on a
@@ -10,7 +10,7 @@ Actions allowance.
 
 | Path | Purpose |
 | --- | --- |
-| `capacitor.config.json` | App ID `com.mediavanity.openworld`, name, background colour |
+| `capacitor.config.json` | App ID `com.mediavanity.openworld`, home-screen name OpenEarth, background colour |
 | `scripts/build-www.mjs` | `npm run build:app`: the Vite build into `www/`, without the service worker or web manifest; fails on remote scripts or analytics |
 | `src/boot.js` | Entry point: inside the app, loads `src/native/` first (storage must be ready before the game reads its profile) |
 | `src/native/native.js` | Native storage (Preferences), haptics, location, the tip jar plugin |
@@ -30,7 +30,7 @@ push, then run **Actions → iOS → TestFlight → Run workflow**. CI rebuilds 
 
 - Bundle ID: `com.mediavanity.openworld`
 - Tip products (consumable): `com.mediavanity.openworld.tip.small` ($0.99), `.tip.medium` ($2.99), `.tip.large` ($4.99)
-- Name for TestFlight: **OpenWorld**. "OpenWorld" is a generic genre word: expect to add a suffix or rename before the public release (the name can change with any version; the bundle ID can't).
+- App Store name: **OpenEarth** ("OpenWorld" and "WorldAway" were taken). App Store Connect app ID 6835607118, SKU `openworld-ios`. Inside the app the start screen, home-screen name and notifications say OpenEarth; the website stays OpenWorld. The name can change with any version; the bundle ID can't.
 
 ## Repository secrets (Settings → Secrets and variables → Actions)
 

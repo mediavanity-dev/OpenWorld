@@ -26,7 +26,7 @@ export function plan(hour, showers = [], now = new Date()) {
     const body = shower ? `🌠 The ${shower.name} meteor shower peaks tonight. There’s a night-sky expedition on your board.`
       : full ? '🌕 Full moon tonight. Anything you finish under it after dark earns a rarer card.'
         : PLAIN[k % PLAIN.length];
-    out.push({ id: IDS[k - 1], title: 'OpenWorld', body, schedule: { at, allowWhileIdle: false } });
+    out.push({ id: IDS[k - 1], title: 'OpenEarth', body, schedule: { at, allowWhileIdle: false } });
   }
   return out;
 }
