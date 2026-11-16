@@ -72,5 +72,9 @@ export async function startNative() {
   useNativeHaptics((pattern) => { hapticsFor(pattern).catch(() => {}); });
   useNativeGeolocation(nativeGeo);
   document.documentElement.classList.add('native');
+  // the App Store name (the website keeps OpenWorld)
+  document.title = 'OpenEarth';
+  const rename = () => { for (const el of document.querySelectorAll('#start h1, .app-name')) el.textContent = 'OpenEarth'; };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', rename); else rename();
   window.OpenWorldNative = { app, notifications: () => import('./notify.js') };
 }

@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>OpenWorld</string>
+        <string>OpenEarth</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -25,7 +25,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>OpenWorld uses your location while you play to put you on the map and count the places, wildlife and ground you really visit. It stays on your phone; only the rough area is used to fetch map, weather and wildlife data.</string>
+	<string>OpenEarth uses your location while you play to put you on the map and count the places, wildlife and ground you really visit. It stays on your phone; only the rough area is used to fetch map, weather and wildlife data.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>The camera view shows nearby places and creatures over what you see, and lets you line up old photos of a place. The picture stays on your screen and is never recorded or uploaded.</string>
 	<key>NSMotionUsageDescription</key>
