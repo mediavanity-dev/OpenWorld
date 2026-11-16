@@ -43,7 +43,8 @@ easier home base setup, and the plainer names (Walk / Home / Roam).
 
 ## For developers
 
-Planned work and ideas: see [BACKLOG.md](BACKLOG.md).
+Planned work and ideas: see [BACKLOG.md](BACKLOG.md). The iPhone app (Capacitor, TestFlight): see
+[APP_STORE.md](APP_STORE.md).
 
 ```
 npm install

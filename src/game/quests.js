@@ -15,6 +15,7 @@
 
 import { haversine, offsetGeo, offsetMeters } from '../geo.js';
 import { groupOf } from '../world/icons.js';
+import { liveEvents, liveBonus, RAIN_GROUPS } from './events.js';
 import { wildHabitat } from '../world/habitats.js';
 import { fitsHabitat } from '../data/wildlife.js';
 import { isQuirk } from './journal.js';
@@ -32,6 +33,15 @@ const bump = (r, n = 1) => RARITIES[Math.max(0, Math.min(RARITIES.length - 1, RA
 export const RARITY_BONUS = { common: 0, uncommon: 0, rare: 1, epic: 2, legendary: 3 };
 /** What a card adds to your rank: its stars plus its rarity bonus (echoes: nothing). */
 export const cardPoints = (c) => (c.grade === 'echo' ? 0 : c.stars + (RARITY_BONUS[c.rarity] || 0));
+// Roam practice: echo cards earn their plain stars (no rarity bonus) toward your rank, but at most
+// ROAM_DAILY a day and ROAM_CAP in all, so a newcomer on a sofa (or a reviewer at a desk) sees
+// progress, while every rank past Scout still needs real visits.
+export const ROAM_DAILY = 3, ROAM_CAP = 5;
+export function roamStars(cards) {
+  const byDay = {};
+  for (const c of cards) if (c.grade === 'echo') byDay[c.date] = Math.min(ROAM_DAILY, (byDay[c.date] || 0) + (c.stars || 0));
+  return Math.min(ROAM_CAP, Object.values(byDay).reduce((a, b) => a + b, 0));
+}
 
 /** @type {[number, string][]} */
 export const RANKS = [
@@ -284,7 +294,15 @@ export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = n
 }
 
 /** Find the nearest ground of a habitat that suits a species group (sampled rings). */
-export function nearestHabitat(pos, habitatAt, group, maxR = 600, inside = (_p) => true) {
+export function nearestHabitat(pos, habitatAt, group, maxR = 600, inside = (_p) => true, prefer = null) {
+  if (prefer?.length) { // a species with a clear home (water birds, frogs, woodpeckers): look for that first
+    const fits = (h) => prefer.includes(h);
+    const hit = ringSearch(pos, habitatAt, fits, maxR, inside);
+    if (hit) return hit;
+  }
+  return ringSearch(pos, habitatAt, (h) => h !== 'urban' && fitsHabitat(group, h, false), maxR, inside);
+}
+function ringSearch(pos, habitatAt, fits, maxR, inside) {
   for (let r = 0; r <= maxR; r += 40) {
     const n = r ? Math.max(8, Math.round(r / 25)) : 1;
     let best = null;
@@ -292,10 +310,19 @@ export function nearestHabitat(pos, habitatAt, group, maxR = 600, inside = (_p) 
       const a = (k / n) * Math.PI * 2, p = offsetGeo(pos.lat, pos.lon, Math.sin(a) * r, Math.cos(a) * r);
       if (!inside(p)) continue;
       const h = wildHabitat(habitatAt(p.lat, p.lon));
-      if (h !== 'urban' && fitsHabitat(group, h, false)) { best = { hab: h, lat: p.lat, lon: p.lon, d: r, bearing: (a * 180) / Math.PI }; break; }
+      if (fits(h)) { best = { hab: h, lat: p.lat, lon: p.lon, d: r, bearing: (a * 180) / Math.PI }; break; }
     }
     if (best) return best;
   }
+  return null;
+}
+// Habitats a species clearly prefers, from what it is (iconic group + common name). Real field
+// knowledge, kept short: water birds and amphibians want water, woodpeckers and owls want trees.
+const WATERY = /\b(goose|geese|duck|swan|heron|egret|grebe|coot|moorhen|gull|tern|cormorant|kingfisher|mallard|teal|wigeon|gadwall|pochard|merganser|shoveler|dipper|wagtail|sandpiper|plover|rail|crake|bittern|dragonfly|damselfly|darter|hawker|chaser|skimmer|newt|frog|toad|pond|water|otter|beaver|vole)\b/i;
+const WOODY = /\b(woodpecker|nuthatch|treecreeper|owl|jay|squirrel|bat|warbler|tit|thrush|blackcap|chiffchaff|goldcrest|wren|robin|badger|deer)\b/i;
+export function preferredHabitats(sp) {
+  if (['Amphibia', 'Actinopterygii'].includes(sp.group) || WATERY.test(sp.name || '')) return ['water', 'wetland'];
+  if (WOODY.test(sp.name || '')) return ['wood', 'park', 'scrub'];
   return null;
 }
 const HAB_TEXT = { water: 'water', wood: 'woodland', wetland: 'wetland', scrub: 'scrubland', farmland: 'fields', park: 'parks and green spaces' };
@@ -316,7 +343,7 @@ export function makeBounty(pos, species, known, habitatAt, rand = Math.random, a
     return { s, v };
   }).sort((a, b) => b.v - a.v);
   for (const { s } of scored.slice(0, 6)) {
-    const hab = nearestHabitat(pos, habitatAt, s.group, 600, inside);
+    const hab = nearestHabitat(pos, habitatAt, s.group, 600, inside, preferredHabitats(s));
     const urbanOk = fitsHabitat(s.group, 'urban', false);
     if (!hab && !urbanOk) continue;
     const sp = { id: s.id, name: s.name, sci: s.sci, group: s.group, count: s.count, rarity: s.rarity, photo: s.photo, credit: s.credit };
@@ -406,7 +433,7 @@ export function parTime(d, mode) { return Math.round((d * 1.4) / (PACE[mode] || 
  * @param {(lat: number, lon: number) => ({lat: number, lon: number} | null)} [snap] the nearest
  *   point on a public way (null: nothing walkable near); finishes are never off the paths
  */
-export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random, inside = (_p) => true, snap = (lat, lon) => ({ lat, lon }), { reach = 650, habitatAt = null } = {}) {
+export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random, inside = (_p) => true, snap = (lat, lon) => ({ lat, lon }), { reach = 650, habitatAt = null, waterName = null } = {}) {
   const here = groundAt(pos.lat, pos.lon);
   let target = null, kind, gain = 0;
   if (here != null) {
@@ -455,7 +482,7 @@ export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random
           const a = (k / n) * Math.PI * 2, p = offsetGeo(pos.lat, pos.lon, Math.sin(a) * r, Math.cos(a) * r);
           if (habitatAt(p.lat, p.lon) !== 'water' || !inside(p)) continue;
           const q = snap(p.lat, p.lon);
-          if (q) { target = { lat: q.lat, lon: q.lon, name: 'the water’s edge', d: haversine(pos.lat, pos.lon, q.lat, q.lon) }; kind = 'water'; }
+          if (q) { target = { lat: q.lat, lon: q.lon, name: waterName?.(q.lat, q.lon) || 'the water’s edge', d: haversine(pos.lat, pos.lon, q.lat, q.lon) }; kind = 'water'; }
         }
       }
     }
@@ -467,13 +494,39 @@ export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random
   const sunset = sunsetMs != null && sunsetMs > par * 1000 * 1.1 && sunsetMs < 100 * 60000;
   const name = target.name || null;
   const title = sunset ? (kind === 'summit' ? 'Beat the sunset to the high ground' : `Beat the sunset to ${name}`)
-    : kind === 'summit' ? 'Summit sprint' : kind === 'viewpoint' ? `Race to the view: ${name}` : kind === 'water' ? 'Race to the water’s edge' : `Dash to ${name}`;
+    : kind === 'summit' ? 'Summit sprint' : kind === 'viewpoint' ? `Race to the view: ${name}` : kind === 'water' ? (name && name !== 'the water’s edge' ? `Race to the water: ${name}` : 'Race to the water’s edge') : `Dash to ${name}`;
   return {
     type: 'race', id: uid('r'),
     title, kind, name, lat: target.lat, lon: target.lon, dist: roundTo(target.d, 10), gain,
     par, sunset, sunsetAt: sunset ? Date.now() + sunsetMs : null,
     rarity: rarityOfRace(gain, sunset),
   };
+}
+
+/**
+ * A night-sky quest (meteor shower, full moon): reach open green ground, away from streets,
+ * after dark. Built like a race (same finish line rules) with a generous clock.
+ */
+export function makeSkyQuest(pos, habitatAt, mode, ev, inside = (_p) => true, snap = (lat, lon) => ({ lat, lon }), reach = 900) {
+  const open = (h) => ['park', 'wood', 'farmland', 'scrub', 'wetland'].includes(h);
+  for (let r = 150; r <= reach; r += 40) {
+    const n = Math.max(8, Math.round(r / 25));
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2, p = offsetGeo(pos.lat, pos.lon, Math.sin(a) * r, Math.cos(a) * r);
+      if (!inside(p) || !open(wildHabitat(habitatAt(p.lat, p.lon)))) continue;
+      const q = snap(p.lat, p.lon);
+      if (!q || !inside(q)) continue;
+      const d = haversine(pos.lat, pos.lon, q.lat, q.lon);
+      return {
+        type: 'race', id: uid('e'), kind: 'sky', name: ev.name ? `${ev.name} night` : 'Full-moon night',
+        title: ev.name ? `${ev.name} tonight: find dark open sky` : 'Full moon: walk out under it',
+        lat: q.lat, lon: q.lon, dist: roundTo(d, 10), gain: 0, par: Math.round(parTime(d, mode) * 1.5),
+        sunset: false, sunsetAt: null, needsDark: true, rarity: 'epic',
+        event: { key: ev.key, glyph: ev.glyph, title: ev.title, blurb: ev.blurb },
+      };
+    }
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------- the live state
@@ -531,7 +584,10 @@ export class Quests {
     this._wrong.clear();
   }
   date() { return this.game.env.localNow().toISOString().slice(0, 10); }
-  stars() { return this.s.cards.reduce((a, c) => a + cardPoints(c), 0); }
+  /** real stars only (Walk and Home): what friend leagues compare */
+  realStars() { return this.s.cards.reduce((a, c) => a + cardPoints(c), 0); }
+  /** rank stars: real stars plus capped Roam practice */
+  stars() { return this.realStars() + roamStars(this.s.cards); }
   rank() { return rankOf(this.stars()); }
   active() { return this.s.offers.find((o) => o && o.id === this.s.active) || null; }
 
@@ -566,6 +622,7 @@ export class Quests {
   blocked(o) {
     const g = this.game;
     if (g.mode === 'present' && g.fix?.source === 'ip') return 'You’re placed by your internet connection, so you can’t move. Set a home base, or play on your phone.';
+    if (o.needsDark && g.pos && g.env.sunPhase(g.env.sun(g.pos.lat, g.pos.lon).alt) !== 'night') return 'Opens after dark, when the sky is dark enough to see it.';
     if (!this.reachable(o)) return `Outside your home range. Play it in ${WALK}, or in Roam as an echo.`;
     return null;
   }
@@ -583,6 +640,7 @@ export class Quests {
     s.origin = { lat: this.game.pos.lat, lon: this.game.pos.lon };
     const at = keep ? s.offers.findIndex((o) => o && o.id === keep.id) : -1; // the active quest keeps its slot
     s.offers = TYPES.map((_, i) => (i === at ? keep : null));
+    if (keep && at >= TYPES.length) s.offers.push(keep); // an event quest in progress
     if (why !== 'move') s.swaps = 1;
     this._tries = 0;
     this._fillT = 0;
@@ -595,7 +653,7 @@ export class Quests {
   // swap one offer for a fresh one of the same type (once a day)
   swap(i) {
     const s = this.s, o = s.offers[i];
-    if (!o || o.id === s.active || s.swaps < 1) return false;
+    if (!o || o.id === s.active || s.swaps < 1 || o.event) return false; // event quests are one-offs
     const fresh = this.make(o.type, new Set([o.ref, o.sp?.id].filter(Boolean)));
     if (!fresh) return false;
     s.offers[i] = fresh; s.swaps--;
@@ -627,8 +685,9 @@ export class Quests {
     if (type === 'race') {
       const ss = sunsetIn((t) => g.env.sun(pos.lat, pos.lon, new Date(t)).alt);
       const habitatAt = (a, b) => w.habitatAt(a, b);
-      let r = makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside, snap, { habitatAt });
-      if (!r) { r = makeRace(pos, (a, b) => w.groundAt(a, b), [...w.pois(pos.lat, pos.lon, 1900)].map((x) => x.poi), g.mode, ss, Math.random, inside, snap, { reach: 1800, habitatAt }); if (r) longer(r); }
+      const waterName = (a, b) => w.chunkAt?.(a, b)?.waterNameNear?.(a, b) || null;
+      let r = makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside, snap, { habitatAt, waterName });
+      if (!r) { r = makeRace(pos, (a, b) => w.groundAt(a, b), [...w.pois(pos.lat, pos.lon, 1900)].map((x) => x.poi), g.mode, ss, Math.random, inside, snap, { reach: 1800, habitatAt, waterName }); if (r) longer(r); }
       return r;
     }
     if (type === 'ground') {
@@ -652,7 +711,7 @@ export class Quests {
       // the clock is fair from where you actually start: re-measured now, and a fresh
       // course if you're already practically at the finish
       let d = haversine(pos.lat, pos.lon, o.lat, o.lon);
-      if (d < 120) {
+      if (d < 120 && !o.event) {
         const fresh = this.make('race', new Set());
         if (!fresh || haversine(pos.lat, pos.lon, fresh.lat, fresh.lon) < 120) { this.emit('quest-blocked', 'You’re already at the finish. Swap it, or start from further away.'); return null; }
         o = s.offers[i] = fresh; d = haversine(pos.lat, pos.lon, o.lat, o.lon);
@@ -729,6 +788,7 @@ export class Quests {
     else if (s.mode !== g.mode) this.onModeChange();
     else if (!s.active && s.origin && haversine(s.origin.lat, s.origin.lon, g.pos.lat, g.pos.lon) > REDEAL_M) { this.deal('move'); this.emit('quest-redeal', 'New expeditions for this area'); }
     this.fill();
+    this.eventOffer();
     const o = this.active();
     if (!o || o.pending) return;
     const d = o.type === 'bounty' ? null : haversine(g.pos.lat, g.pos.lon, o.lat, o.lon);
@@ -780,6 +840,35 @@ export class Quests {
         this.emit('quest-info', 'The sun beat you this time. Finish the race anyway for a regular card.');
       }
       if (d <= this.reach()) this.complete(o);
+    }
+  }
+
+  // A one-off quest for tonight's sky or today's rain, as a fourth card on the board.
+  eventOffer() {
+    const s = this.s, g = this.game;
+    const now = Date.now();
+    if (now - (this._evT || 0) < 15000) return;
+    this._evT = now;
+    if (s.offers.some((o) => o?.event) || !g.world.isReadyAt(g.pos.lat, g.pos.lon)) return;
+    const d = this.date();
+    for (const ev of liveEvents(g.env, g.pos)) {
+      if (!ev.quest || (s.events || []).includes(`${d}:${ev.key}`)) continue;
+      const w = g.world, inside = (p) => this.inside(p) && !this.isBlocked(p);
+      const snap = (lat, lon) => { const n = nearestPath(w, lat, lon, 60); return !n.known ? { lat, lon } : n.d <= 60 ? { lat: n.lat, lon: n.lon } : null; };
+      let o = null;
+      if (ev.quest === 'sky') o = makeSkyQuest(g.pos, (a, b) => w.habitatAt(a, b), g.mode, ev, inside, snap);
+      if (ev.quest === 'rain' && g.wild.species.length) {
+        const wet = g.wild.species.filter((x) => RAIN_GROUPS.has(x.group));
+        const b = wet.length && makeBounty(g.pos, wet, this.profile.data.species || {}, (a, c) => w.habitatAt(a, c), Math.random, new Set(), inside, wet.every((x) => x.group === 'Fungi'));
+        if (b) o = { ...b, title: `Rain walk: ${b.sp.name}`, rarity: bump(b.rarity), event: { key: ev.key, glyph: ev.glyph, title: ev.title, blurb: ev.blurb } };
+      }
+      if (!o) continue;
+      (s.events ||= []).push(`${d}:${ev.key}`); // dealt once a day per event
+      if (s.events.length > 60) s.events.splice(0, s.events.length - 60);
+      s.offers.push(o);
+      this.profile.save();
+      this.emit('quest-event', null, { quest: o });
+      return;
     }
   }
 
@@ -862,15 +951,20 @@ export class Quests {
     const secs = Math.round((Date.now() - (o.startedAt || Date.now())) / 1000);
     const stars = this.starsFor(o, secs);
     const before = this.rank();
+    /** @type {any} */
     const card = {
       id: o.id, type: o.type, title: o.title, rarity: o.rarity, stars, grade, mode: g.mode, date: this.date(), secs,
-      area: g.world.chunkAt?.(o.lat ?? g.pos.lat, o.lon ?? g.pos.lon)?.areaName || null,
+      area: g.world.chunkAt?.(o.lat ?? g.pos.lat, o.lon ?? g.pos.lon)?.nameAt?.(o.lat ?? g.pos.lat, o.lon ?? g.pos.lon) || null,
       lat: +(o.lat ?? g.pos.lat).toFixed(5), lon: +(o.lon ?? g.pos.lon).toFixed(5),
       ...(o.type === 'mystery' ? { name: o.place.name, kind: o.place.kind, year: o.place.year, ref: o.ref, tags: o.place.tags ? { wikipedia: o.place.tags.wikipedia, wikidata: o.place.tags.wikidata } : null, clues: o.used.length, guessRight: o.guessRight ?? null } : {}),
       ...(o.type === 'bounty' ? { name: o.sp.name, sci: o.sp.sci, group: o.sp.group, spId: o.sp.id, img: o.sp.photo, credit: o.sp.credit, photo: !!extra.photo } : {}),
       ...(o.type === 'ground' ? { name: o.area ? `New ground in ${o.area}` : 'New ground', target: o.target, par: o.par } : {}),
       ...(o.type === 'race' ? { name: o.kind === 'summit' ? 'High ground' : o.name, gain: o.gain, par: o.par, sunset: o.sunset, raceKind: o.kind, ground: g.world.groundAt(g.pos.lat, g.pos.lon) } : {}),
     };
+    // a real-world moment makes it rarer (golden hour, rain, snow, a full moon or meteor shower at night)
+    const bonus = o.event ? null : liveBonus(g.env, g.pos);
+    if (o.event) card.event = { glyph: o.event.glyph, title: o.event.title };
+    else if (bonus) { card.event = { glyph: bonus.glyph, title: bonus.title }; card.rarity = bump(card.rarity); }
     s.cards.unshift(card);
     if (s.cards.length > 500) s.cards.length = 500;
     s.done++;
@@ -892,4 +986,4 @@ export class Quests {
 }
 
 // next card type for the board header: all offers done today?
-export function allDone(s) { return s.offers.every((o) => o?.done); }
+export function allDone(s) { return s.offers.slice(0, 3).every((o) => o?.done); }

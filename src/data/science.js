@@ -5,6 +5,7 @@ import { getTimes, getMoonTimes, getMoonIllumination } from 'suncalc';
 import { cachedJson, cacheGet, cachePut } from './cache.js';
 import { geohash, haversine } from '../geo.js';
 import { getJson, tryJson } from './net.js';
+import { SAFE_LICENCES } from './wildlife.js';
 
 const DAY = 864e5;
 
@@ -191,7 +192,7 @@ export async function recentNearby(lat, lon) {
   for (const o of j?.results || []) {
     const t = o.taxon;
     if (!t || seen.has(t.id)) continue;
-    const ph = (o.photos || []).find((p) => p.license_code);
+    const ph = (o.photos || []).find((p) => SAFE_LICENCES.has(p.license_code));
     seen.set(t.id, { id: t.id, name: t.preferred_common_name || t.name, sci: t.name, group: t.iconic_taxon_name, date: o.observed_on, photo: ph ? ph.url : null });
   }
   return [...seen.values()].slice(0, 6);

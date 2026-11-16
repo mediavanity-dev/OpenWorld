@@ -21,7 +21,12 @@
   <div id="start" class="modal">
     <div class="card">
       <h1>OpenWorld</h1>
-      <p class="sub">The real Earth, abstracted. Open data, true coordinates.</p>
+      <p class="sub">The wildlife, rock, sky and history hidden in the streets around you.</p>
+      <ul class="hooks">
+        <li>🔍 Solve riddles about real places nearby</li>
+        <li>🎯 Track animals people have really seen here</li>
+        <li>🌠 Race the real sunset, chase tonight's meteors</li>
+      </ul>
       <div class="choices">
         <button id="s-device" class="primary">Walk where I am</button>
         <button id="s-home" hidden>Go to my home base</button>
@@ -29,7 +34,7 @@
         <button id="s-resume" hidden>Resume at last spot (Roam)</button>
       </div>
       <div class="roam">
-        <label for="s-roam">…or Roam (projection) anywhere:</label>
+        <label for="s-roam">…or explore anywhere in the world (Roam):</label>
         <form id="s-roam-form" class="row">
           <input id="s-roam" placeholder="place name or lat, lon" autocomplete="off" />
           <button type="submit">Go</button>
@@ -207,11 +212,29 @@
         <select id="set-names"><option value="zoom">When zoomed in (tidy)</option><option value="always">Always</option><option value="never">Never (tap icons instead)</option></select>
       </label>
       <label class="set check"><input type="checkbox" id="set-weather" /> Weather effects (rain, snow, fog)</label>
+      <label class="set check"><input type="checkbox" id="set-sfx" /> Sound effects (finds, cards, getting warmer)</label>
       <label class="set check"><input type="checkbox" id="set-sound" /> Ambient sound (wind, rain, birdsong)</label>
       <label class="set check"><input type="checkbox" id="set-motion" /> Reduce motion (no flashes, swaying or bobbing)</label>
       <label class="set check"><input type="checkbox" id="set-datasaver" /> Data saver (skip trees, opening hours and wildlife downloads)</label>
       <label class="set check"><input type="checkbox" id="set-awake" /> Keep screen on while walking</label>
       <label class="set check"><input type="checkbox" id="set-compass" /> Camera follows my phone's compass (Walk)</label>
+      <label class="set check"><input type="checkbox" id="set-tech" /> Show technical details (position, location fix, event log)</label>
+      <div class="beta-box native-only">
+        <h4>Morning nudge</h4>
+        <label class="set check"><input type="checkbox" id="set-notify" /> Tell me when today's expeditions are ready (at most once a day, never if you've already played)</label>
+        <label class="set">At <select id="set-notify-hour"><option value="7">7:00</option><option value="8">8:00</option><option value="9">9:00</option><option value="10">10:00</option><option value="12">12:00</option><option value="17">17:00</option></select></label>
+      </div>
+      <div class="beta-box native-only" id="tipjar">
+        <h4>Support OpenWorld</h4>
+        <p class="hint">OpenWorld is free, with no ads and nothing to unlock. If you enjoy it, you can leave a tip. It doesn't change the game; it helps keep it going.</p>
+        <div class="row" id="tip-btns"><span class="hint">Loading…</span></div>
+        <p class="hint" id="tip-msg"></p>
+      </div>
+      <div class="beta-box">
+        <h4>Back up your progress</h4>
+        <p class="hint">Your journal lives only on this device. Export a backup file to keep it safe or move it to another device.</p>
+        <div class="row" id="set-backup"></div>
+      </div>
       <div id="beta-box" class="beta-box" hidden>
         <h4 id="beta-title">Game features</h4>
         <div id="set-beta"></div>
@@ -237,6 +260,6 @@
   <div id="sr" class="sr-only" aria-live="polite"></div>
   <div class="attrib">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> · Terrain: AWS/Mapzen · Weather: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> · Wildlife: <a href="https://www.inaturalist.org" target="_blank" rel="noopener">iNaturalist</a></div>
 
-  <script type="module" src="/src/main.js"></script>
+  <script type="module" src="/src/boot.js"></script>
 </body>
 </html>

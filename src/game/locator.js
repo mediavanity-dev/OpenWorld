@@ -6,6 +6,13 @@
 
 import { getJson } from '../data/net.js';
 
+// The phone app swaps in native location (one clear iOS permission prompt, better accuracy);
+// it has the same shape as navigator.geolocation.
+/** @type {any} */
+let nativeGeo = null;
+export function useNativeGeolocation(g) { nativeGeo = g; }
+const geo = () => nativeGeo || navigator.geolocation;
+
 export function trustOf(fix) {
   if (!fix) return 'none';
   if (fix.source === 'ip') return 'ip';
@@ -16,8 +23,8 @@ export function trustOf(fix) {
 
 export function deviceFix(timeout = 20000) {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error('Geolocation not supported by this browser'));
-    navigator.geolocation.getCurrentPosition(
+    if (!geo()) return reject(new Error('Geolocation not supported by this browser'));
+    geo().getCurrentPosition(
       (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy, heading: p.coords.heading, speed: p.coords.speed, source: 'device', t: Date.now() }),
       (e) => reject(new Error(e.message || 'Location permission denied')),
       { enableHighAccuracy: true, timeout, maximumAge: 10000 },
@@ -34,11 +41,12 @@ export async function ipFix() {
 }
 
 export function watchDevice(onFix, onError) {
-  if (!navigator.geolocation) return () => {};
-  const id = navigator.geolocation.watchPosition(
+  if (!geo()) return () => {};
+  const g = geo();
+  const id = g.watchPosition(
     (p) => onFix({ lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy, heading: p.coords.heading, speed: p.coords.speed, source: 'device', t: Date.now() }),
     (e) => onError?.(new Error(e.message)),
     { enableHighAccuracy: true, maximumAge: 5000 },
   );
-  return () => navigator.geolocation.clearWatch(id);
+  return () => g.clearWatch(id);
 }

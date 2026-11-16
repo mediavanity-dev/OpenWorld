@@ -46,6 +46,18 @@ export function unhealthy() {
   return [...health].filter(([, s]) => !s.ok).sort((a, b) => b[1].at - a[1].at).map(([k]) => k);
 }
 
+// Remote switches: a data provider can ask us to stop sending requests (Nominatim's usage policy
+// requires this to work without an app update). The list of switched-off hosts comes from a
+// small public file (src/data/switches.js); requests to them fail at once, like a down service.
+/** @type {Set<string>} */
+let switchedOff = new Set();
+/** @param {string[]} hosts */
+export function setSwitchedOff(hosts) { switchedOff = new Set((hosts || []).map((h) => String(h).toLowerCase())); }
+function isOff(url) {
+  if (!switchedOff.size) return false;
+  try { const h = new URL(url).hostname.toLowerCase(); return [...switchedOff].some((x) => h === x || h.endsWith(`.${x}`)); } catch { return false; }
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Exponential backoff with full jitter: somewhere in [0.5, 1.5] x base x 2^attempt. */
 export function backoff(attempt, base = 1000, rand = Math.random) { return base * 2 ** attempt * (0.5 + rand()); }
@@ -66,6 +78,7 @@ export class HttpError extends Error {
 export async function request(url, opts = {}) {
   const { init, timeout = DEFAULT_TIMEOUT, retries = 0, base = 1000, okStatus = (s) => s >= 200 && s < 300, fetchImpl = fetch } = opts;
   const service = opts.service || serviceOf(url);
+  if (isOff(url)) { note(service, false); throw new Error('switched off for now'); }
   let lastErr;
   for (let a = 0; a <= retries; a++) {
     try {

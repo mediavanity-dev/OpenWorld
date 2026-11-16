@@ -20,10 +20,12 @@ export async function speciesNear(lat, lon) {
         sci: r.taxon.name,
         group: r.taxon.iconic_taxon_name, // Aves, Plantae, Insecta, Mammalia, Fungi, ...
         count: r.count,
-        // only openly licensed photos (CC / public domain); "all rights reserved" photos are not shown
-        photo: r.taxon.default_photo?.license_code ? r.taxon.default_photo.square_url : null,
-        credit: r.taxon.default_photo?.license_code ? r.taxon.default_photo.attribution : null,
+        // only photos whose licence allows use in any app (see SAFE_LICENCES); others are swapped below
+        photo: safePhoto(r.taxon.default_photo)?.square_url || null,
+        credit: safePhoto(r.taxon.default_photo)?.attribution || null,
+        licence: safePhoto(r.taxon.default_photo)?.license_code || null,
       }));
+  await swapPhotos(species.filter((s) => !s.photo).slice(0, 60));
   // rarity from real local observation counts (rank within this area's list)
   const sorted = species.map((s) => s.count).sort((a, b) => a - b);
   for (const s of species) {
@@ -31,6 +33,27 @@ export async function speciesNear(lat, lon) {
     s.rarity = p < 0.2 ? 'rare' : p < 0.6 ? 'uncommon' : 'common';
   }
   return { cell, species };
+}
+
+// Licences that allow showing a photo in any app, including one sold on an app store:
+// public domain, CC BY and CC BY-SA. Non-commercial (NC) and no-derivatives (ND, since photos are
+// cropped and framed) are left out, as are "all rights reserved" photos.
+export const SAFE_LICENCES = new Set(['cc0', 'cc-by', 'cc-by-sa']);
+export const safePhoto = (ph) => (ph && SAFE_LICENCES.has(ph.license_code) ? ph : null);
+
+// For species whose main photo isn't safe, look through their other photos (one batched request
+// per 30 species, cached for 30 days).
+async function swapPhotos(list) {
+  for (let i = 0; i < list.length; i += 30) {
+    const part = list.slice(i, i + 30);
+    const ids = part.map((s) => s.id).join(',');
+    const j = await cachedJson(`inat-ph:${ids}`, `https://api.inaturalist.org/v1/taxa/${ids}?per_page=30`, { ttl: 30 * 864e5 });
+    for (const t of j?.results || []) {
+      const s = part.find((x) => x.id === t.id);
+      const ph = (t.taxon_photos || []).map((x) => x.photo).find(safePhoto);
+      if (s && ph) { s.photo = ph.square_url; s.credit = ph.attribution; s.licence = ph.license_code; }
+    }
+  }
 }
 
 export const GROUP_STYLE = {

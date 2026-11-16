@@ -1,0 +1,14 @@
+{
+  "appId": "com.mediavanity.openworld",
+  "appName": "OpenWorld",
+  "webDir": "www",
+  "backgroundColor": "#161a20",
+  "ios": {
+    "contentInset": "never"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "iconColor": "#ff7a3d"
+    }
+  }
+}

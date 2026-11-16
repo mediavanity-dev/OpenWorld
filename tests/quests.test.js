@@ -87,7 +87,8 @@ test('quests: clues cost stars; the right place solves it, the wrong one nudges'
   const done = events.find((e) => e.type === 'quest-done');
   assert.ok(done);
   assert.equal(done.card.grade, 'echo'); // Roam
-  assert.equal(q.stars(), 0);            // echoes earn no stars
+  assert.equal(q.realStars(), 0);        // echoes earn no real stars
+  assert.equal(q.stars(), Math.min(3, done.card.stars)); // only capped Roam practice stars
   assert.equal(done.card.stars, m.place.year ? 3 : 2);
 });
 

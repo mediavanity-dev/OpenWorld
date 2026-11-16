@@ -3,3 +3,4 @@ dist/
 Abstract.txt
 .env.local
 .env.*.local
+www/

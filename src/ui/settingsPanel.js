@@ -2,7 +2,7 @@
 // "copy my main profile", playtest stats, and the help & about page.
 
 import { settings, saveSettings, startTier } from '../settings.js';
-import { startCompass, keepAwake, compassSupported } from '../sensors.js';
+import { startCompass, keepAwake, compassSupported, buzz } from '../sensors.js';
 import { BETA, FEATURES, featureAvailable } from '../channel.js';
 import { STABLE_PROFILE_KEY } from '../game/profile.js';
 import { storage } from '../storage.js';
@@ -10,6 +10,8 @@ import { CHASE_GOAL_S } from '../game/metrics.js';
 import { fmtDist } from '../units.js';
 import { esc } from '../util/html.js';
 import { toast } from './hud.js';
+import { sfx } from '../sfx.js';
+import { skyNotes } from '../data/science.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -35,6 +37,8 @@ export function initSettingsPanel(ctx) {
     $('set-text').value = settings.textSize;
     $('set-motion').checked = settings.reduceMotion;
     $('set-sound').checked = settings.sound;
+    $('set-sfx').checked = settings.sfx !== false;
+    $('set-tech').checked = !!settings.tech;
     $('set-beta').innerHTML = Object.entries(FEATURES).filter(([k]) => featureAvailable(k))
       .map(([k, f]) => `<label class="set check"><input type="checkbox" data-feature="${k}" ${settings.features?.[k] !== false ? 'checked' : ''}/> ${esc(f.label)}</label>`).join('');
     $('set-names').value = settings.placeNames;
@@ -60,6 +64,12 @@ export function initSettingsPanel(ctx) {
   $('set-units').onchange = (e) => { settings.units = e.target.value; saveSettings(); ctx.hud.render(); };
   $('set-text').onchange = (e) => { settings.textSize = e.target.value; saveSettings(); applyLook(); };
   $('set-motion').onchange = (e) => { settings.reduceMotion = e.target.checked; saveSettings(); applyLook(); };
+  // backups live here now (not on the main screen); technical details are opt-in
+  $('set-backup').append($('p-export'), document.querySelector('label.filebtn'));
+  $('set-tech').onchange = (e) => { settings.tech = e.target.checked; saveSettings(); document.body.classList.toggle('tech', settings.tech); };
+  document.body.classList.toggle('tech', !!settings.tech);
+  initNativeSettings(ctx);
+  $('set-sfx').onchange = (e) => { settings.sfx = e.target.checked; saveSettings(); };
   $('set-sound').onchange = (e) => { settings.sound = e.target.checked; saveSettings(); settings.sound ? ambience.start() : ambience.stop(); };
 
   // game feature switches (both versions); beta extras: copy the real profile in
@@ -141,3 +151,57 @@ export function initSettingsPanel(ctx) {
 
   return { open };
 }
+
+// ---------------------------------------------------------------- iPhone app only
+// The morning nudge and the tip jar (window.OpenWorldNative is set by src/native/native.js).
+const TIP_NAMES = { 'com.mediavanity.openworld.tip.small': 'Small tip', 'com.mediavanity.openworld.tip.medium': 'Kind tip', 'com.mediavanity.openworld.tip.large': 'Generous tip' };
+function initNativeSettings(ctx) {
+  const N = window.OpenWorldNative;
+  if (!N) return;
+  const showers = () => {
+    try {
+      const sh = skyNotes(ctx.game.pos?.lat ?? 51.5, ctx.game.pos?.lon ?? 0, ctx.environment.utcOffset()).shower;
+      return sh && sh.days <= 14 ? [{ date: sh.date, name: sh.name }] : [];
+    } catch { return []; }
+  };
+  const replan = () => N.notifications().then((m) => m.reschedule(settings.notify, settings.notifyHour, showers())).catch(() => {});
+  $('set-notify').checked = !!settings.notify;
+  $('set-notify-hour').value = String(settings.notifyHour || 8);
+  $('set-notify').onchange = async (e) => {
+    if (e.target.checked) {
+      const ok = await N.notifications().then((m) => m.enable()).catch(() => false);
+      if (!ok) { e.target.checked = false; ctx.hud && toast('Notifications are off for OpenWorld in iPhone Settings → Notifications.', 'error'); return; }
+    }
+    settings.notify = e.target.checked; saveSettings(); replan();
+  };
+  $('set-notify-hour').onchange = (e) => { settings.notifyHour = +e.target.value; saveSettings(); replan(); };
+  setTimeout(replan, 8000); // every launch: today is covered (you're playing), plan from tomorrow
+
+  // tip jar
+  let loaded = false;
+  const load = async () => {
+    if (loaded) return;
+    loaded = true;
+    const box = $('tip-btns');
+    let r;
+    try { r = await N.app.tipProducts(); } catch { r = { products: [] }; }
+    const list = (r.products || []).sort((a, b) => a.value - b.value);
+    if (!list.length) { box.innerHTML = '<span class="hint">The tip jar isn’t available right now.</span>'; loaded = false; return; }
+    box.innerHTML = list.map((p) => `<button data-tip="${esc(p.id)}">${esc(TIP_NAMES[p.id] || p.name)}<br><b>${esc(p.price)}</b></button>`).join('');
+  };
+  $('tipjar').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-tip]');
+    if (!b) return;
+    const msg = $('tip-msg');
+    b.disabled = true; msg.textContent = 'Opening the App Store…';
+    let r;
+    try { r = await N.app.tip({ id: b.dataset.tip }); } catch (err) { r = { error: String(err?.message || err) }; }
+    b.disabled = false;
+    if (r.ok) { msg.textContent = 'Thank you! That really helps. 💛'; buzz([30, 40, 60]); sfx.rankUp(); }
+    else if (r.cancelled) msg.textContent = '';
+    else if (r.pending) msg.textContent = 'Waiting for approval…';
+    else msg.textContent = `The tip didn’t go through${r.error ? ` (${r.error})` : ''}.`;
+  });
+  new MutationObserver(() => { if (!$('settings').hidden) load(); }).observe($('settings'), { attributes: true, attributeFilter: ['hidden'] });
+}
+

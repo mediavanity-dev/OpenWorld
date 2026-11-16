@@ -19,6 +19,7 @@ const GRADE_DOT = { present: '#ff7a3d', home: '#3db8ff', echo: '#b07aff' };
 let ctx = null; // { profile, game, onSpecies }
 let tab = 'overview';
 let mapRadius = 1000;
+let wildGroup = null; // the group shown in "Wildlife around here"
 
 export function initJournal(c) {
   ctx = c;
@@ -29,6 +30,10 @@ export function initJournal(c) {
     if (t) { tab = t.dataset.tab; render(true); }
     const r = e.target.closest('[data-radius]');
     if (r) { mapRadius = +r.dataset.radius; render(); }
+    const gt = e.target.closest('[data-wgroup]');
+    if (gt) { wildGroup = gt.dataset.wgroup; render(); return; }
+    const un = e.target.closest('[data-unknown]');
+    if (un) { un.classList.toggle('peek'); return; }
     const sp = e.target.closest('[data-species]');
     if (sp) ctx.onSpecies?.(sp.dataset.species);
     if (e.target.id === 'j-share') shareCard();
@@ -86,7 +91,14 @@ function expeditionBox() {
     <small>${cards.length} cards${best ? ` · best: <span style="color:${RCOL[best.rarity]}">${esc(best.name || '')} (${best.rarity})</span>` : ''} · tap for the board</small></button>`;
 }
 
-function stat(n, label, color) { return `<div class="jstat"><b style="color:${color || 'inherit'}">${n}</b><span>${label}</span></div>`; }
+function stat(n, label, color) { return !n || n === '0.00' || n === '0 ft' || n === '0 m' ? '' : `<div class="jstat"><b style="color:${color || 'inherit'}">${n}</b><span>${label}</span></div>`; }
+// the collection, as progress bars: what's left to find around here
+function progressBox(profile) {
+  const p = localProgress(ctx.game, profile), mastery = Object.keys(profile.data.mastery || {}).length;
+  const bar = (n, of, label, col) => (of ? `<div class="jprog"><span>${label}</span><b>${n} / ${of}</b><i><em style="width:${Math.round((n / of) * 100)}%;background:${col}"></em></i></div>` : '');
+  const rows = bar(p.found, p.wild.length, 'Wildlife recorded around here', '#5fd08a') + bar(p.placesFound, p.places, `Places around ${esc(p.area || 'here')}`, '#ff7a3d');
+  return rows || mastery ? `<div class="jprogress" data-tab="collections">${rows}${mastery ? `<p class="muted">🎓 Field mastery: ${mastery} quick challenge${mastery === 1 ? '' : 's'} right</p>` : ''}</div>` : '';
+}
 
 function overview(profile) {
   const s = summary(profile);
@@ -104,6 +116,8 @@ function overview(profile) {
   const bars = days.map((x) => `<div class="bar" title="${esc(x.key)}: ${fmtDist(x.v.m)}, ${x.v.finds} finds, ${x.v.species} species"><i style="height:${Math.round((x.v.m / max) * 100)}%"></i><span>${'SMTWTFS'[new Date(x.key + 'T12:00:00Z').getUTCDay()]}</span></div>`).join('');
   return `
     ${expeditionBox() || `<div class="task ${t.done ? 'done' : ''}"><span>Today's field assignment</span><b>${esc(T.text)}</b><small>${t.done ? 'Complete ✓' : prog} · ${WALK} or Home mode</small></div>`}
+    ${progressBox(profile)}
+    ${s.present + s.home + s.echo + s.species + s.rocks === 0 ? '<p class="jempty">Your journal fills in as you go: every place, creature, rock and card you find lands here. Start with today’s expeditions above.</p>' : ''}
     <div class="jgrid">
       ${stat(s.present, FOUND, '#ff7a3d')}${stat(s.home, 'found from home', '#3db8ff')}${stat(s.echo, 'echoes', '#b07aff')}
       ${stat(s.species, 'species', '#5fd08a')}${stat(s.rocks, 'rock units', '#c9a27a')}${SHOW_BEACONS ? stat(s.beacons, 'beacons', '#ffd36b') : ''}
@@ -117,6 +131,40 @@ function overview(profile) {
     <div class="bars">${bars}</div>
     <p class="credit">Roam (virtual) travel: ${fmtDist(s.roamed)} · ${s.virtualKm2.toFixed(2)} km² seen virtually. These never count as real exploration.</p>
     <button id="j-share" class="primary wide">Create a summary image</button>`;
+}
+
+// ---------- what's left to find around here (real records, so every gap is a real creature) ----------
+export function localProgress(game, profile) {
+  const wild = game.wild?.species || [];
+  const have = profile.data.species || {};
+  const found = wild.filter((s) => have[s.id] && have[s.id].grade !== 'echo').length;
+  const ch = game.pos && game.world.chunkAt?.(game.pos.lat, game.pos.lon);
+  const pois = (ch?.pois || []).filter((p) => p.cls !== 'geocache');
+  const placesFound = pois.filter((p) => profile.data.discoveries[p.ref]).length;
+  return { wild, found, area: ch?.nameAt?.(game.pos.lat, game.pos.lon) || ch?.areaName || null, places: pois.length, placesFound };
+}
+function wildHere(profile) {
+  const { wild, found } = localProgress(ctx.game, profile);
+  if (!wild.length) return '';
+  const have = profile.data.species || {};
+  const groups = {};
+  for (const s of wild) (groups[s.group] ||= []).push(s);
+  const order = Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+  // start on a group you've begun, else birds (the easiest to go and see), else the biggest
+  const started = order.find(([, l]) => l.some((s) => have[s.id]));
+  const g = wildGroup && groups[wildGroup] ? wildGroup : started?.[0] || (groups.Aves ? 'Aves' : order[0][0]);
+  const list = groups[g].slice().sort((a, b) => (!!have[b.id] - !!have[a.id]) || b.count - a.count);
+  const tiles = list.map((s) => {
+    const got = have[s.id] && have[s.id].grade !== 'echo';
+    const img = safeUrl(s.photo) ? `<img src="${esc(s.photo)}" alt="" loading="lazy">` : `<span>${esc((GROUP_STYLE[s.group]?.label || '?')[0].toUpperCase())}</span>`;
+    return got
+      ? `<button class="wtile got" data-species="${esc(s.id)}">${img}<b>${esc(s.name)}</b></button>`
+      : `<button class="wtile" data-unknown title="Tap to peek">${img}<b class="q">???</b><b class="a">${esc(s.name)}</b><small>${s.rarity === 'rare' ? 'Rare here' : `Seen ${s.count}× here`}</small></button>`;
+  }).join('');
+  return `<h4>Wildlife around here <small class="muted">${found} of ${wild.length} found</small></h4>
+    <p class="credit">Species really recorded within about 3 km (iNaturalist). Silhouettes are still out there: tap one to peek at its name, then go and find it.</p>
+    <div class="wtabs">${order.map(([k, l]) => { const n = l.filter((s) => have[s.id] && have[s.id].grade !== 'echo').length; return `<button data-wgroup="${esc(k)}" class="${k === g ? 'active' : ''}">${esc(GROUP_PLURAL[k] || k)} <small>${n}/${l.length}</small></button>`; }).join('')}</div>
+    <div class="wgrid">${tiles}</div>`;
 }
 
 function collections(profile) {
@@ -144,7 +192,7 @@ function collections(profile) {
   const gcList = gcs.length ? `<ul class="jlist">${gcs.map(([code, g]) => `<li><i class="dot" style="background:${GRADE_DOT[g.grade]}"></i>${safeUrl(g.url) ? `<a href="${esc(g.url)}" target="_blank" rel="noopener">${esc(g.name)}</a>` : esc(g.name)} <small>${esc(g.type)} · D${g.difficulty ?? '–'}/T${g.terrain ?? '–'} · ${esc(code)}</small></li>`).join('')}</ul>` : '';
   const rps = Object.values(d.rephotos || {}).sort((a, b) => (b.last || '').localeCompare(a.last || ''));
   const rpList = rps.length ? `<ul class="jlist">${rps.map((r) => `<li><i class="dot" style="background:#ffd36b"></i>${safeUrl(r.photo?.url) ? `<a href="${esc(r.photo.url)}" target="_blank" rel="noopener">${esc(r.name)}</a>` : esc(r.name)} <small>${esc(r.year)} · ${esc(r.score)}% match</small></li>`).join('')}</ul>` : '';
-  return `<h4>Places</h4>${places}<h4>Life list</h4>${life}<h4>Rocks underfoot</h4>${rockList}${gcList ? `<h4>Geocaches found</h4>${gcList}` : ''}${rpList ? `<h4>Then &amp; now</h4>${rpList}` : ''}<h4>Conditions you've seen places in</h4><div class="chips">${cond}</div>`;
+  return `${wildHere(profile)}<h4>Places</h4>${places}<h4>Life list</h4>${life}<h4>Rocks underfoot</h4>${rockList}${gcList ? `<h4>Geocaches found</h4>${gcList}` : ''}${rpList ? `<h4>Then &amp; now</h4>${rpList}` : ''}<h4>Conditions you've seen places in</h4><div class="chips">${cond}</div>`;
 }
 
 function records(profile) {
