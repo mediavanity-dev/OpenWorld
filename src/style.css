@@ -617,3 +617,72 @@ button.linkish { background: none; border: none; padding: 0; color: var(--accent
 .qart.ground { background: radial-gradient(circle at 50% 50%, rgba(95,208,138,0.45), rgba(0,0,0,0.2)); font-size: 40px; }
 .qcard.empty { border-style: dashed; background: rgba(255,255,255,0.03); }
 .qlong { color: #ffd38a; }
+
+/* ---------- the moment of a find (src/ui/finds.js) ---------- */
+.find { position: fixed; left: 50%; bottom: calc(96px + var(--safe-b)); transform: translateX(-50%); z-index: 32;
+  width: min(360px, calc(100vw - 32px)); background: #1b2028; border: 1px solid var(--line); border-radius: 14px;
+  padding: 10px 12px 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); cursor: pointer; }
+.find.in { animation: find-in 0.35s cubic-bezier(.2,1.4,.4,1); }
+@keyframes find-in { from { transform: translate(-50%, 24px) scale(0.92); opacity: 0; } to { transform: translate(-50%, 0) scale(1); opacity: 1; } }
+.find .f-top { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.find .f-top small { flex: 1; text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
+.find .f-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.find .f-x { padding: 2px 8px; font-size: 11px; }
+.find .f-name { display: block; font-size: 16px; margin: 4px 0 2px; }
+.find .f-fact { margin: 4px 0 0; color: #dfe4ea; }
+.find .f-fact.muted { color: var(--muted); }
+.find .f-q { margin: 6px 0; color: var(--accent); }
+.find .f-opts { display: flex; gap: 6px; }
+.find .f-opts.col { flex-direction: column; }
+.find .f-opts button { flex: 1; padding: 8px 6px; font-weight: 600; }
+.find .f-opts button.right { background: rgba(95, 208, 138, 0.3); border-color: var(--species); opacity: 1; }
+.find .f-opts button.wrong { background: rgba(255, 110, 110, 0.25); border-color: #ff7a7a; opacity: 1; }
+.find .f-sp { display: flex; gap: 10px; align-items: flex-start; }
+.find .f-sp img { width: 92px; height: 92px; object-fit: cover; border-radius: 10px; flex: none; }
+.find .f-sp > div { flex: 1; }
+body.clean .find { display: block !important; }
+body.reduce-motion .find.in { animation: none; }
+
+/* ---------- real-world events (src/game/events.js) ---------- */
+.qevent { margin: 6px 0; padding: 7px 9px; border-radius: 8px; background: linear-gradient(90deg, rgba(120, 90, 255, 0.28), rgba(40, 60, 140, 0.18)); border: 1px solid rgba(170, 150, 255, 0.4); font-size: 12px; }
+.qcard:has(.qevent) { border-color: rgba(170, 150, 255, 0.6); box-shadow: 0 0 18px rgba(140, 110, 255, 0.25); }
+.qart.sky { background: radial-gradient(circle at 70% 25%, #3b3f8f, #0d1030 70%); }
+.qsoon { display: block; margin-top: 4px; color: #c9bcff; font-size: 12px; }
+.qevent-note { color: #c9bcff; }
+.set-note { color: var(--accent); }
+
+/* ---------- collection progress and "Wildlife around here" (journal) ---------- */
+.jprogress { display: grid; gap: 8px; margin: 10px 0; padding: 10px; border-radius: 10px; background: rgba(255,255,255,0.05); cursor: pointer; }
+.jprogress p { margin: 2px 0 0; }
+.jprog { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
+.jprog i { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.jprog em { display: block; height: 100%; border-radius: 3px; }
+.jempty { color: var(--muted); margin: 10px 0; }
+.wtabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.wtabs button { white-space: nowrap; }
+.wtabs button.active { background: rgba(95, 208, 138, 0.25); border-color: var(--species); }
+.wgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin: 8px 0 14px; }
+.wtile { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px; text-align: center; }
+.wtile img, .wtile > span { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; background: rgba(255,255,255,0.08); font-size: 22px; }
+.wtile b { font-size: 11px; line-height: 1.2; }
+.wtile small { color: var(--muted); font-size: 10px; }
+.wtile:not(.got) img { filter: blur(5px) grayscale(1) brightness(0.5); }
+.wtile .a { display: none; }
+.wtile.peek .a { display: block; } .wtile.peek .q { display: none; }
+.wtile.peek img { filter: blur(2px) grayscale(0.6) brightness(0.8); }
+.wtile.got { border-color: rgba(95, 208, 138, 0.5); }
+
+/* ---------- a calmer main screen: technical rows and the event log are opt-in (Settings) ---------- */
+body:not(.tech) #left .kv, body:not(.tech) #log { display: none; }
+#set-backup button, #set-backup .filebtn { flex: 1; text-align: center; }
+#start .hooks { list-style: none; padding: 0; margin: 4px 0 14px; display: grid; gap: 4px; color: #dfe4ea; }
+.native-only { display: none; }
+html.native .native-only { display: block; }
+#tip-btns button { flex: 1; padding: 8px 4px; line-height: 1.3; }
+/* card art for races and new ground: a simple scene instead of a stopwatch */
+.rv-img.scene-water { background: linear-gradient(180deg, #2b5f86, #123049); }
+.rv-img.scene-summit { background: linear-gradient(180deg, #5a7fa8 0%, #2e4a35 100%); }
+.rv-img.scene-sunset { background: linear-gradient(180deg, #ff9a52, #6b2f5e); }
+.rv-img.scene-sky { background: radial-gradient(circle at 70% 25%, #3b3f8f, #0d1030 70%); }
+.rv-img.scene-trail { background: linear-gradient(180deg, #4f6b3a, #24331b); }
+.rv-img[class*="scene-"] span { font-size: 64px; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.4)); }

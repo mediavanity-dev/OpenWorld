@@ -8,7 +8,7 @@
 import { cacheGet, cachePut } from './cache.js';
 import { request, backoff } from './net.js';
 
-const ENDPOINTS = [
+const ENDPOINTS = [ // public instances, used in turn (see the OSM wiki's Overpass page)
   'https://overpass-api.de/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
 ];

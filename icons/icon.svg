@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect width="1024" height="1024" rx="0" fill="#161a20"/>
+  <defs><clipPath id="g"><circle cx="500" cy="540" r="340"/></clipPath></defs>
+  <g clip-path="url(#g)">
+    <rect x="100" y="140" width="800" height="800" fill="#7fb2d9"/>
+    <path d="M520 190 C 700 200, 900 330, 860 560 C 830 760, 700 880, 560 900 C 500 760, 380 700, 420 560 C 450 450, 600 400, 520 190 Z" fill="#7aa968"/>
+    <path d="M150 420 C 230 470, 260 560, 160 650 Z" fill="#7aa968"/>
+    <ellipse cx="500" cy="540" rx="170" ry="340" fill="none" stroke="#eef1f4" stroke-width="22"/>
+    <line x1="500" y1="190" x2="500" y2="890" stroke="#eef1f4" stroke-width="26"/>
+    <line x1="150" y1="540" x2="850" y2="540" stroke="#eef1f4" stroke-width="26"/>
+  </g>
+  <circle cx="500" cy="540" r="340" fill="none" stroke="#ffd36b" stroke-width="30"/>
+  <path d="M800 150 L 830 235 L 915 265 L 830 295 L 800 380 L 770 295 L 685 265 L 770 235 Z" fill="#ffd36b" stroke="#161a20" stroke-width="14" stroke-linejoin="round"/>
+</svg>

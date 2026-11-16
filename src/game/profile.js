@@ -57,6 +57,7 @@ function fresh() {
     beacons: [],         // { id, label, mode, anchor }
     stats: { meters: { present: 0, home: 0, roam: 0 } },
     log: [],             // [{ t, msg }]
+    mastery: {},         // field mastery from quick challenges: 'p:<ref>' | 's:<taxon>' | 'r:<rock>' -> ISO date
   };
 }
 

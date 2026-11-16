@@ -162,6 +162,11 @@ internal testing tracks (TestFlight / Play internal testing) before any public l
 
 ### Daily expedition notifications (once it's a phone app)
 
+*Status (Nov 2026): **built** in the iPhone app (local notifications, opt-in in Settings, at a
+chosen hour, the next 14 days re-planned at each launch from tomorrow, so never on a day you've
+played; meteor-shower and full-moon days get their own line). Moments and "close to something"
+nudges are not built.*
+
 A gentle reason to open the app, in the spirit of the game (no streak guilt, no nagging):
 
 - **One morning nudge, opt-in, at a time the player picks:** "Today's expeditions are ready: a
@@ -181,6 +186,23 @@ A gentle reason to open the app, in the spirit of the game (no streak guilt, no 
   iPhones only for installed home-screen web apps). Probably not worth it before the store app.
 - **Store requirements** *(verify)*: notification permission asked at a meaningful moment (not on
   first launch), Android 13+ runtime permission, and a privacy note on what triggers each one.
+
+### Fun pass for newcomers (Nov 2026, built in main)
+
+From a "would someone with no interest in nature yet enjoy this?" audit: sound effects on by
+default (`src/sfx.js`) and native haptics in the app; the moment of a find (`src/ui/finds.js`:
+a card with one real fact, grouped arrivals) with ten-second **micro-challenges** (build era,
+species ID from photo, rock older/younger than 66 Ma) feeding **field mastery**; **Wildlife
+around here** (blurred silhouettes of locally recorded species, per-group progress) and progress
+first in the journal; **real-world events** (`src/game/events.js`): golden hour / rain / snow /
+full-moon / meteor-shower bonuses (+1 rarity, "combos") and one-off event expeditions (dark-sky
+walk, rain-walk bounty), plus an upcoming-shower teaser; **Roam practice stars** (3 a day, 5 in
+all, leagues compare real stars); richer cards (milestone ages, area sets, scene art, named
+water); a calmer HUD (technical rows and log opt-in, backups in Settings); a start screen that
+says what you do. Fixes: no procedural trees in water, buildings or on paths; water birds and
+amphibians sent to water; park names for spots. Licences: only CC0 / CC BY / CC BY-SA wildlife
+photos (alternatives looked up), remote service switches (`public/switches.json`).
+Not done: Game Center, weekly legendary bounty, Mapped layer, OSM Notes.
 
 ## 4. Test version (beta channel)
 

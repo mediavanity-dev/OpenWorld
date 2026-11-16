@@ -118,7 +118,7 @@ export async function loadBaseTile(z, x, y) {
   return normalizeTile(vt);
 }
 
-function emptyFabric() { return { extent: 4096, buildings: [], areas: [], lines: [], pois: [], streets: [], walk: [], areaName: null }; }
+function emptyFabric() { return { extent: 4096, buildings: [], areas: [], lines: [], pois: [], streets: [], walk: [], waterNames: [], areaName: null }; }
 
 export function normalizeTile(vt) {
   const out = emptyFabric();
@@ -133,7 +133,17 @@ export function normalizeTile(vt) {
       if (f.type !== 3) continue;
       const cls = areaClass(name, f.properties);
       if (!cls) continue;
-      for (const poly of classifyRings(f.loadGeometry())) out.areas.push({ cls, rings: poly.map(pts) });
+      const label = name === 'park' || name === 'water' ? f.properties.name || null : null; // named parks and lakes (area labels)
+      for (const poly of classifyRings(f.loadGeometry())) out.areas.push({ cls, rings: poly.map(pts), ...(label ? { name: label } : {}) });
+    }
+  }
+  // labels of ponds, lakes and rivers (points), so a race can say which water it means
+  const wn = vt.layers.water_name;
+  if (wn) {
+    for (let i = 0; i < wn.length; i++) {
+      const f = wn.feature(i), p = f.properties;
+      const g = f.loadGeometry()[0]?.[0];
+      if (p.name && g) out.waterNames.push({ name: p.name, px: g.x, py: g.y });
     }
   }
 

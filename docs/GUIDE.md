@@ -71,6 +71,18 @@ The buttons at the top switch between them. Each one has a different rule:
 
 ### 4. Discover places
 
+**The moment of a find.** A new place gets a small card with the one real fact worth knowing
+("Built 1676: 350 years old, older than Newton's laws of motion"), and arriving among several
+places at once is one message. Some finds come with a **ten-second challenge**:
+
+- a place with a known build date: *When was it built?* (three eras);
+- a creature you spot: *Which is it?* (its photo and three names of species really recorded nearby);
+- new rock underfoot: *Is it older than the end of the dinosaurs?*
+
+Getting it right is **field mastery**, counted in the journal. Sound effects play for finds,
+cards and getting warmer (Settings → *Sound effects*; on iPhone they follow the silent switch).
+
+
 Small round **icons** mark real named places. Each icon shows the kind of place, taken
 from OpenStreetMap's own categories: ☕ food & drink, 🛍 shops, 🏛 museums & galleries,
 ★ sights, ⏳ history, 📖 culture & entertainment, 🎓 education, places of worship, civic
@@ -96,6 +108,19 @@ discover it.**
   iPhone, Google Maps on Android, with *Other app* to choose another; Google Maps or an
   OpenStreetMap route on a computer). Only the destination is sent, so the route starts
   from where you really are.
+
+### Real-world moments: events and bonuses
+
+The real sky and weather change play:
+
+- **Bonuses.** Finish any expedition during **golden hour**, in the **rain** or **snow**, or after
+  dark under a **full moon** or on a **meteor shower** night, and its card is one rarity higher
+  (the card says why).
+- **Event expeditions.** On a meteor shower's peak night or a full moon, a fourth, one-off card
+  appears on the board: reach open green ground after dark (it opens once the sky is dark). In
+  the rain, a *rain walk* bounty asks for a snail, slug, frog or fungus recorded nearby. Event
+  cards can't be swapped and come once a day.
+- **Coming up.** The board says when a meteor shower peaks in the next few days.
 
 ### 5. Real weather, time and seasons
 
@@ -145,9 +170,12 @@ All three can be switched off in **Settings → Game features**.
 
 Tap **📓 Journal** to see what you've done:
 
-- **Overview**: places claimed, species, rock units, area explored on foot, distance walked,
-  days out, and a chart of your last 7 days.
-- **Collections**: places by type, your **life list** of species (tap one for details), the
+- **Overview**: your collection around here first (wildlife recorded nearby that you've found,
+  places in this area, field mastery), then places, species, rock units, area explored on foot,
+  distance walked, days out, and a chart of your last 7 days. Numbers still at zero are hidden.
+- **Collections**: **Wildlife around here**: every species really recorded within about 3 km,
+  by group (*Birds 3/25*). Ones you haven't found are blurred: tap to peek at the name, then go and
+  find it. Then places by type, your **life list** of species (tap one for details), the
   **rocks** you've stood on, and the conditions you've seen places in.
 - **Records**: highest point stood on, longest day on foot, oldest place, rarest species,
   furthest north and south, peaks reached.
@@ -241,7 +269,7 @@ Stars (1–3) are for how well you did; with a rarity bonus (Rare +1, Epic +2, L
 build your **field rank**. After accepting, the board stays open on that quest so you can read
 it: a mystery's clues wait behind **Get a clue**, and a race's clock starts when you head off.
 You can **swap** one quest a day, and once all three are done you can deal three more.
-In **Roam** your cards are *echoes*: you keep them, but they earn no stars.
+In **Roam** your cards are *echoes*: they earn **practice stars** (their plain stars, no rarity bonus), at most 3 a day and 5 in all, which is enough to reach Scout. Every rank after that needs real visits, and friend leagues only compare real stars.
 In **Home**, every quest is inside your home range. Directions for a mystery are given from where
 you accept it, and a race's clock is set from where you start. Your cards (with where and when you
 won them) are under *Your cards*, on the journal's overview and as ◆ on the journal map.
@@ -327,17 +355,27 @@ except the map, place icons and street names. Tap it again to bring it all back.
   graphics, and if your battery drops below 20% it switches to battery saver by itself.
   When nothing is moving, it slows down drawing to save power.
 - Discoveries and creatures give a short **vibration** (Android).
+- **Settings → Show technical details** brings back your exact position, the location fix and
+  the event log in the panels (hidden by default to keep the screen calm).
 - **Settings** also has **units** (metres/°C or feet/°F), **large text**, **reduce motion**
   (no flashes, swaying or bobbing) and an optional quiet **ambient soundscape** (wind, rain,
   birdsong), generated on your device.
 - **Install it like an app**: in your browser's menu choose *Add to Home Screen* / *Install*.
   It then opens full-screen and starts instantly.
 
+### The iPhone app
+
+The App Store version is the same game with a few things only an app can do: real haptics, native
+location, its journal kept in the phone's own storage (iOS can clear a web page's storage), an
+optional **morning nudge** when today's expeditions are ready (Settings; at most once a day, never
+if you've already played, with the real sky: "The Leonids peak tonight"), and an optional **tip
+jar** (tips unlock nothing).
+
 ### 14. Keep your progress safe
 
 Your progress is saved **only in this browser on this device**. It isn't stored online.
-To keep a backup or move to another device, use **Export** to save a file, then
-**Import** it on the other device. Clearing your browser data erases your progress unless
+To keep a backup or move to another device, use **Settings → Back up your progress → Export** to
+save a file, then **Import** it on the other device. Clearing your browser data erases your progress unless
 you've exported it. Progress is saved a moment after each find and straight away when you
 close or switch away from the page. If storage is full or blocked (private browsing), the game
 tells you.
@@ -379,5 +417,8 @@ wildlife (iNaturalist, to about 5 km). Wikipedia is contacted only when you open
 card; Macrostrat (geology), Open-Meteo's climate archive, iNaturalist taxon pages and USGS
 (earthquakes) only when you open *This spot* or a species card, or move into a new area
 (geology). "Locate via internet" asks geojs.io where your connection is. Your discoveries,
-species, beacons and home base are never uploaded. In AR, the camera image stays on your
+species, beacons and home base are never uploaded. At start the game reads a small public
+file from its own website (`switches.json`) listing any data service that has asked us to pause;
+nothing is sent with it. Wildlife photos are only ones whose licence allows use in any app
+(public domain, CC BY, CC BY-SA), each credited. In AR, the camera image stays on your
 screen and is never recorded or sent anywhere.

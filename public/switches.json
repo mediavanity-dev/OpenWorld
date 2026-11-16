@@ -1,0 +1,4 @@
+{
+  "about": "Hosts listed in 'off' are not contacted by any copy of OpenWorld (web or app). Used if a data provider asks us to stop. Example: [\"nominatim.openstreetmap.org\"]",
+  "off": []
+}

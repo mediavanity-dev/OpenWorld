@@ -17,6 +17,7 @@ import { deviceFix, watchDevice } from './game/locator.js';
 import { GROUP_STYLE } from './data/wildlife.js';
 import { getJson } from './data/net.js';
 import { pruneCache } from './data/cache.js';
+import { loadSwitches } from './data/switches.js';
 import { cachesIn, nodesFor } from './data/geocaching.js';
 import { deepPlaces } from './data/deep.js';
 import { getAtlas, iconVisibility } from './world/icons.js';
@@ -40,11 +41,13 @@ import { initSettingsPanel } from './ui/settingsPanel.js';
 import { initRephoto } from './ui/rephoto.js';
 import { initExpeditions } from './ui/expeditions.js';
 import { initHomeSetup } from './ui/homeSetup.js';
+import { initFinds } from './ui/finds.js';
 import { initAvatar } from './render/avatar.js';
 import { initMarkers } from './render/markers.js';
 import { initCritters } from './render/critters.js';
 import { initEffects } from './render/effects.js';
 import { Ambience } from './audio.js';
+import { sfx } from './sfx.js';
 import { WALK } from './names.js';
 
 const $ = (id) => document.getElementById(id);
@@ -97,6 +100,8 @@ ctx.rephoto = initRephoto(ctx);
 ctx.settingsPanel = initSettingsPanel(ctx);
 ctx.expeditions = initExpeditions(ctx);
 ctx.homeSetup = initHomeSetup(ctx, { parsePlace: (q) => parsePlace(q) });
+ctx.openJournal = (tab) => openJournal(tab);
+ctx.finds = initFinds(ctx);
 ctx.minimap = new Minimap($('minimap'), { onTap: () => openJournal('map') });
 const { controls, hud, avatar, markers, critters, effects, arMode, labels, ambience, sky } = ctx;
 
@@ -129,6 +134,8 @@ onStorageError(() => {
 });
 if (profile.loadError) setTimeout(() => toast(`Your saved profile couldn't be loaded (${profile.loadError.message}). It has been kept untouched; you're playing on a fresh one.`, 'error'), 1500);
 if (isVolatile()) setTimeout(() => toast('This browser is blocking storage (private mode?), so progress will be lost when you close it.', 'error'), 1500);
+
+loadSwitches(); // providers that asked us to pause (public switches.json)
 
 world.addSource(async (chunk) => {
   if (!game.features.geocaching) return [];
@@ -344,7 +351,7 @@ requestAnimationFrame(frame);
 function onGameEvent(ev) {
   metrics.record(ev);
   if (ev.type === 'error') toast(ev.msg, 'error');
-  else if (ev.type === 'discover') { toast(ev.msg, ev.grade); buzz(ev.grade === 'echo' ? 30 : [40, 60, 40]); }
+  else if (ev.type === 'discover') { ctx.finds.discovered(ev); buzz(ev.grade === 'echo' ? 30 : [40, 60, 40]); }
   else if (ev.type === 'mode') {
     if (ev.mode !== 'present') arMode.exit();
     toast(ev.msg, ev.mode === 'roam' ? 'echo' : ev.mode);
@@ -353,23 +360,24 @@ function onGameEvent(ev) {
   } else if (ev.type === 'critter') { toast(ev.msg, 'species'); buzz(25); }
   else if (ev.type === 'critter-gone') { /* it wandered off */ }
   else if (ev.type === 'spotted') {
-    buzz([30, 40, 30, 40, 60]);
-    showSpecies(ev.critter.sp, { result: ev.result, grade: ev.grade, autoClose: 12000, pos: game.pos });
+    buzz([30, 40, 30, 40, 60]); sfx.discover(ev.grade);
     hud.render();
+    const card = () => showSpecies(ev.critter.sp, { result: ev.result, grade: ev.grade, autoClose: 12000, pos: game.pos });
+    if (ev.result === 'new') ctx.finds.quizSpecies(ev.critter.sp, card); else card();
   } else if (ev.type === 'beacon') { toast(ev.msg); markers.refreshBeacons(); }
-  else if (ev.type === 'rock') { toast(ev.msg, 'rock'); buzz(30); }
+  else if (ev.type === 'rock') { ctx.finds.rockFound(ev.rock); buzz(30); }
   else if (ev.type === 'task') { toast(ev.msg, 'species'); buzz([40, 50, 40, 50, 80]); hud.render(); }
-  else if (ev.type === 'hunt') { toast(ev.msg, 'species'); buzz(15); ambience.chime(0); }
-  else if (ev.type === 'hunt-signal-up') { buzz(8 + ev.hunt.signal * 6); ambience.chime(ev.hunt.signal); }
+  else if (ev.type === 'hunt') { toast(ev.msg, 'species'); buzz(15); sfx.chime(0); }
+  else if (ev.type === 'hunt-signal-up') { buzz(8 + ev.hunt.signal * 6); sfx.chime(ev.hunt.signal); }
   else if (ev.type === 'hunt-tracks') { buzz(12); }
-  else if (ev.type === 'hunt-reveal') { buzz([20, 40, 20]); ambience.chime(7); }
+  else if (ev.type === 'hunt-reveal') { buzz([20, 40, 20]); sfx.chime(7); }
   else if (ev.type === 'hunt-flee' || ev.type === 'hunt-cold') { toast(ev.msg); }
-  else if (ev.type === 'treasure-hot') { buzz([12, 30, 12]); ambience.chime(5); }
-  else if (ev.type === 'geocache') { toast(ev.msg, 'gold'); buzz([30, 40, 30]); ambience.chime(6); hud.render(); }
-  else if (ev.type === 'deep-unlock') { if (game.features.deep) { toast(ev.msg, 'gold'); buzz([40, 60, 40, 60, 120]); ambience.chime(10); world.refreshSources(); } }
-  else if (ev.type === 'area-tier') { toast(ev.msg, 'gold'); buzz([30, 40, 30, 40, 60]); ambience.chime(8); }
-  else if (ev.type === 'treasure') { toast(ev.msg, 'gold'); buzz([30, 40, 60]); ambience.chime(9); hud.render(); }
-  else if (ev.type === 'rephoto') { toast(ev.msg, 'gold'); buzz([30, 40, 60]); ambience.chime(8); hud.render(); }
+  else if (ev.type === 'treasure-hot') { buzz([12, 30, 12]); sfx.chime(5); }
+  else if (ev.type === 'geocache') { toast(ev.msg, 'gold'); buzz([30, 40, 30]); sfx.chime(6); hud.render(); }
+  else if (ev.type === 'deep-unlock') { if (game.features.deep) { toast(ev.msg, 'gold'); buzz([40, 60, 40, 60, 120]); sfx.chime(10); world.refreshSources(); } }
+  else if (ev.type === 'area-tier') { toast(ev.msg, 'gold'); buzz([30, 40, 30, 40, 60]); sfx.chime(8); }
+  else if (ev.type === 'treasure') { toast(ev.msg, 'gold'); buzz([30, 40, 60]); sfx.chime(9); hud.render(); }
+  else if (ev.type === 'rephoto') { toast(ev.msg, 'gold'); buzz([30, 40, 60]); sfx.chime(8); hud.render(); }
   else if (ev.type.startsWith('quest')) ctx.expeditions.onEvent(ev);
   else if (ev.msg) toast(ev.msg);
 }
@@ -518,7 +526,7 @@ $('b-journal').onclick = () => openJournal();
 $('b-here').onclick = () => {
   if (!game.pos) return;
   const ch = world.chunkAt(game.pos.lat, game.pos.lon);
-  showHere(game.pos, { game, areaName: ch?.areaName, elevation: world.groundAt(game.pos.lat, game.pos.lon) });
+  showHere(game.pos, { game, areaName: ch?.nameAt?.(game.pos.lat, game.pos.lon) ?? ch?.areaName, elevation: world.groundAt(game.pos.lat, game.pos.lon) });
 };
 
 // battery-aware quality
@@ -599,7 +607,7 @@ async function autoStart() {
 setTimeout(() => pruneCache().catch(() => {}), 15000);
 
 // installable app + instant reloads (production builds only)
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+if (import.meta.env.PROD && 'serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) {
   addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }
 

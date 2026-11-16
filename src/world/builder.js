@@ -2,7 +2,7 @@
 // and owns the chunk's queries (height, habitat, places) and late detail merging.
 
 import * as THREE from 'three';
-import { lonToTileX, latToTileY, CHUNK_Z, offsetMeters, rng } from '../geo.js';
+import { lonToTileX, latToTileY, CHUNK_Z, offsetMeters, rng, haversine } from '../geo.js';
 import { HABITATS } from './habitats.js';
 import { terrainMaterial, treeMat, trunkMat, buildingMat, treeGeoHi, treeGeoLo, coneGeo, trunkGeo, iconMat, iconQuad, gridIndex } from './materials.js';
 import { iconIndex, priorityOf } from './icons.js';
@@ -129,6 +129,26 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
     walk: p.walk || null,     // [Float32Array x,z,...] public walkable ways, chunk-local metres (null: unknown)
     get pois() { return pois; },
     snapshot: null, detail: false,
+    // the most specific name for a spot: a named park it's inside (smallest wins), else the area
+    nameAt(lat, lon) {
+      let best = null;
+      for (const a of p.named || []) if ((!best || a.area < best.area) && inRings(lat, lon, a.rings)) best = a;
+      if (best) return best.name;
+      // city parks often come only as a named point: the nearest park marker close by
+      let near = null, nd = 300;
+      for (const q of pois) {
+        if (!/^leisure:(park|garden|nature_reserve)|^park/.test(q.kind || '')) continue;
+        const d = haversine(lat, lon, q.lat, q.lon);
+        if (d < nd) { nd = d; near = q; }
+      }
+      return near?.name || p.areaName || null;
+    },
+    // the name of the pond, lake or river labelled nearest a spot (within maxM metres), or null
+    waterNameNear(lat, lon, maxM = 350) {
+      let best = null, bd = maxM;
+      for (const w of p.waterNames || []) { const d = haversine(lat, lon, w.lat, w.lon); if (d < bd) { bd = d; best = w.name; } }
+      return best;
+    },
     contains(lat, lon) { return lat <= p.bounds.n && lat > p.bounds.s && lon >= p.bounds.w && lon < p.bounds.e; },
     heightAt(lat, lon) {
       const fx = (lonToTileX(lon, CHUNK_Z) - p.x) * p.gridN, fy = (latToTileY(lat, CHUNK_Z) - p.y) * p.gridN;
@@ -212,4 +232,16 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
     },
   };
   return chunk;
+}
+
+// point in polygon with holes (even-odd), rings as [[lat, lon], ...]
+function inRings(lat, lon, rings) {
+  let inside = false;
+  for (const r of rings) {
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const [yi, xi] = r[i], [yj, xj] = r[j];
+      if ((yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+  }
+  return inside;
 }

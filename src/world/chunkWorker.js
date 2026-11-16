@@ -185,6 +185,26 @@ async function build({ x, y, opts }) {
   const blobs = [], cones = [];
   const maxTrees = opts.maxTrees || 4000;
   const evergreenShare = Math.abs(latc) > 55 ? 0.6 : 0.22;
+  // never plant a tree in a pond or inside a building (parks often contain both)
+  const blockers = [
+    ...fabric.areas.filter((a) => a.cls === 'water').map((a) => ({ rings: a.rings, bb: bbox(a.rings[0]) })),
+    ...footprints.map((f) => ({ rings: [f.ring], bb: f.bb })),
+  ];
+  // roads, paths and rivers: a coarse occupancy mask (~5 m cells) so trees stand beside them
+  const MN = 256, cell = E / MN, mask = new Uint8Array(MN * MN);
+  for (const ln of fabric.lines) {
+    const rad = Math.floor(((ln.width / 2 + 1.5) / mPerPx) / cell); // paths: their own cell only
+    for (let k = 1; k < ln.pts.length; k++) {
+      const [ax, ay] = ln.pts[k - 1], [bx, by] = ln.pts[k];
+      const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / cell));
+      for (let t = 0; t <= steps; t++) {
+        const c0 = Math.floor((ax + ((bx - ax) * t) / steps) / cell), r0 = Math.floor((ay + ((by - ay) * t) / steps) / cell);
+        for (let r = r0 - rad; r <= r0 + rad; r++) for (let c = c0 - rad; c <= c0 + rad; c++) if (r >= 0 && c >= 0 && r < MN && c < MN) mask[r * MN + c] = 1;
+      }
+    }
+  }
+  const onWay = (px, py) => { const c = Math.floor(px / cell), r = Math.floor(py / cell); return c >= 0 && r >= 0 && c < MN && r < MN && mask[r * MN + c] === 1; };
+  const blocked = (px, py) => onWay(px, py) || blockers.some((o) => px >= o.bb.x0 && px <= o.bb.x1 && py >= o.bb.y0 && py <= o.bb.y1 && insidePoly(px, py, o.rings));
   for (let ai = 0; ai < fabric.areas.length && blobs.length + cones.length < maxTrees; ai++) {
     const a = fabric.areas[ai];
     const dens = DENS[a.cls];
@@ -197,7 +217,7 @@ async function build({ x, y, opts }) {
     const rand = rng(seed ^ (ai * 2654435761));
     for (let k = 0, tries = 0; k < n && tries < n * 4; tries++) {
       const px = bb.x0 + rand() * (bb.x1 - bb.x0), py = bb.y0 + rand() * (bb.y1 - bb.y0);
-      if (!insidePoly(px, py, a.rings)) continue;
+      if (!insidePoly(px, py, a.rings) || blocked(px, py)) continue;
       const small = a.cls === 'scrub';
       const radius = small ? 0.9 + rand() * 0.9 : 2 + rand() * 2.4;
       const evergreen = !small && a.cls === 'wood' && rand() < evergreenShare;
@@ -257,7 +277,17 @@ async function build({ x, y, opts }) {
     pois.push({ ref: p.ref, lat: latOf(p.py), lon: lonOf(p.px), x: X(p.px), z: Z(p.py), y: base + 5, ground: H(p.px, p.py), name: p.name, kind: p.kind, cls: p.cls || null, rank: p.rank });
   }
 
+  // named parks (for "where am I" labels) and water labels, in lat/lon
+  const named = fabric.areas.filter((a) => a.name && a.cls === 'park')
+    .map((a) => ({ name: a.name, area: ringArea(a.rings[0]), rings: a.rings.map((r) => r.map(([px, py]) => [latOf(py), lonOf(px)])) }));
+  const waterNames = (fabric.waterNames || []).map((w) => ({ name: w.name, lat: latOf(w.py), lon: lonOf(w.px) }));
+  for (const a of fabric.areas) if (a.name && a.cls === 'water') { // named lake polygons: label at the ring's middle
+    const r = a.rings[0]; let sx = 0, sy = 0; for (const [px, py] of r) { sx += px; sy += py; }
+    waterNames.push({ name: a.name, lat: latOf(sy / r.length), lon: lonOf(sx / r.length) });
+  }
+
   const payload = {
+    named, waterNames,
     key: `${CHUNK_Z}/${x}/${y}`, x, y, bounds: b, latc, lonc, extent: E, gridN: GRID, grid, areaName: fabric.areaName, streets, walk,
     terrain: { pos: tPos, uv: tUv }, texture, habitat, habitatN: HGRID,
     buildings, trees: packTrees(blobs), cones: packTrees(cones), pois,

@@ -77,4 +77,11 @@ export async function watchBattery(fn) {
 }
 
 // ---------- haptics ----------
-export function buzz(pattern) { try { navigator.vibrate?.(pattern); } catch { /* ignore */ } }
+// The phone app installs native haptics here (iPhones have no navigator.vibrate); the web
+// version vibrates on Android. pattern: ms, or [on, off, on, ...] like navigator.vibrate.
+let nativeBuzz = null;
+export function useNativeHaptics(fn) { nativeBuzz = fn; }
+export function buzz(pattern) {
+  if (nativeBuzz) { try { nativeBuzz(pattern); } catch { /* ignore */ } return; }
+  try { navigator.vibrate?.(pattern); } catch { /* ignore */ }
+}

@@ -7,6 +7,7 @@
 //   SMOKE_PATH=/beta/ npm run smoke           (the beta build)
 //   SMOKE_SIZE=390,844 SMOKE_OPEN=journal:records   (window size; leave a panel open for the shot)
 //   SMOKE_TOUCH=1                             (emulate a phone: touch screen, joystick, phone layout)
+//   SMOKE_EVAL='(async () => {...})()'        (stage a moment before the screenshot; prints its result)
 
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -208,6 +209,12 @@ try {
     const t = process.env.SMOKE_OPEN.split(':')[1] || 'overview';
     await send('Runtime.evaluate', { expression: `document.getElementById('b-journal').click(); document.querySelector('#journal-tabs button[data-tab="${t}"]')?.click();` });
     await sleep(600);
+  }
+  // SMOKE_EVAL='(async () => { ... })()': stage a moment (a find, a card) before the screenshot
+  if (process.env.SMOKE_EVAL) {
+    const r = await send('Runtime.evaluate', { returnByValue: true, awaitPromise: true, expression: process.env.SMOKE_EVAL });
+    console.log('smoke eval:', JSON.stringify(r.result?.value ?? r.exceptionDetails?.exception?.description ?? r));
+    await sleep(+(process.env.SMOKE_EVAL_WAIT || 800));
   }
   if (process.env.SMOKE_SHOT) {
     const shot = await send('Page.captureScreenshot', { format: 'png' });
