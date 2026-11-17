@@ -640,7 +640,7 @@ button.linkish { background: none; border: none; padding: 0; color: var(--accent
 .find .f-sp { display: flex; gap: 10px; align-items: flex-start; }
 .find .f-sp img { width: 92px; height: 92px; object-fit: cover; border-radius: 10px; flex: none; }
 .find .f-sp > div { flex: 1; }
-body.clean .find { display: block !important; }
+body.clean .find:not([hidden]) { display: block !important; } /* never override hidden: the ✕ and the timer must work in the map-only view */
 body.reduce-motion .find.in { animation: none; }
 
 /* ---------- real-world events (src/game/events.js) ---------- */
