@@ -328,3 +328,33 @@ test('riddles: facts are fetched once per mystery in the background, and never w
   assert.equal(calls, 1);
   assert.equal(q.s.offers[0].fact, 'Nicholas Hawksmoor designed me.');
 });
+
+test('quests: a mystery finishes at the door, not only at its map point ("I\'m here" within 90 m)', () => {
+  const { game, q, events } = setup({ pois: [memorial] }); // no build date: no age guess, straight to the card
+  game.enter('roam', { to: HOME });
+  q.step();
+  const m = q.s.offers.find((o) => o?.type === 'mystery');
+  assert.ok(m);
+  q.accept(m.id);
+  // 70 m from its point (the far side of a big building): not automatic, but "I'm here" works
+  game.pos = offsetGeo(m.lat, m.lon, 70, 0);
+  q.step();
+  assert.ok(!events.some((e) => e.type === 'quest-done'));
+  // 120 m away: too far even for "I'm here"
+  game.pos = offsetGeo(m.lat, m.lon, 120, 0);
+  q.step();
+  assert.equal(q.imHere(), false);
+  game.pos = offsetGeo(m.lat, m.lon, 70, 0);
+  q.step();
+  assert.equal(q.imHere(), true);
+  assert.ok(events.some((e) => e.type === 'quest-done'));
+  // and the automatic radius is a little wider than discovering a place (reach + 10 m)
+  const t = setup({ pois: [memorial] });
+  t.game.enter('roam', { to: HOME });
+  t.q.step();
+  const m2 = t.q.s.offers.find((o) => o?.type === 'mystery');
+  t.q.accept(m2.id);
+  t.game.pos = offsetGeo(m2.lat, m2.lon, 32, 0);
+  t.q.step();
+  assert.ok(t.events.some((e) => e.type === 'quest-done'));
+});

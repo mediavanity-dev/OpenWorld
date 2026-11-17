@@ -47,7 +47,8 @@ export function initFinds(ctx) {
   // ---------------------------------------------------------------- places
   function placeCard(ev) {
     const poi = ev.poi, info = groupInfo(poi.kind, poi.cls), fact = factFor(poi), y = yearOf(poi);
-    const canQuiz = y && !mastered(`p:${poi.ref}`);
+    const mysteryHere = ctx.game.quests?.active()?.ref === poi.ref; // its own age guess is coming
+    const canQuiz = y && !mastered(`p:${poi.ref}`) && !mysteryHere;
     show(`<div class="f-top"><i class="f-dot" style="background:${info.color}"></i><small>${esc(info.label)} · ${gradeWord(ev.grade)}</small><button class="f-x" aria-label="Close">✕</button></div>
       <b class="f-name">${esc(poi.name)}</b>
       ${canQuiz ? `<p class="f-q">Quick: when was it built?</p><div class="f-opts">${eraChoices(y).map((o) => `<button data-era="${o.right ? 1 : 0}">${o.label}</button>`).join('')}</div>`

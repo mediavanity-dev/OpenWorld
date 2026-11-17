@@ -532,6 +532,9 @@ export function makeSkyQuest(pos, habitatAt, mode, ev, inside = (_p) => true, sn
 // ---------------------------------------------------------------- the live state
 const TYPES = ['mystery', 'bounty', 'race'];
 export const MYSTERY_WARM_M = 150, MYSTERY_HOT_M = 60; // closeness signals for a mystery
+// A place's map point is often the middle of a church, a building or a park, so standing at its
+// door can be well over the automatic radius: within this distance the player can say "I'm here".
+export const MYSTERY_HERE_M = 90;
 const REDEAL_M = 1500;          // walk/roam this far from where the board was dealt and it re-deals
 const FILL_FALLBACK_S = 25;     // a slot that can't be filled (no wildlife data…) becomes another type
 const EMPTY_AFTER_S = 60;       // still nothing at all: say honestly that little is mapped here
@@ -775,6 +778,20 @@ export class Quests {
     return o.clues.find((c) => c.key === key) || null;
   }
 
+  // A mystery's place is reached: ask its age first (if known), else turn the card over.
+  arrive(o) {
+    if (o.place.year && !o.guessed) { o.pending = true; this.emit('quest-guess', null, { quest: o }); return true; }
+    this.complete(o);
+    return true;
+  }
+  /** "I'm here" for the active mystery: works within MYSTERY_HERE_M of its place. */
+  imHere() {
+    const o = this.active(), g = this.game;
+    if (!o || o.type !== 'mystery' || o.pending || !g.pos) return false;
+    if (haversine(g.pos.lat, g.pos.lon, o.lat, o.lon) > MYSTERY_HERE_M) return false;
+    return this.arrive(o);
+  }
+
   reach() {
     const g = this.game;
     return g.mode === 'present' ? Math.min(45, Math.max(25, (g.fix?.accuracy || 10) * 1.2)) : 25;
@@ -794,10 +811,7 @@ export class Quests {
     const d = o.type === 'bounty' ? null : haversine(g.pos.lat, g.pos.lon, o.lat, o.lon);
     o.live = d; // not saved meaningfully, handy for the UI
     if (o.type === 'mystery') {
-      if (d <= this.reach()) {
-        if (o.place.year && !o.guessed) { o.pending = true; return this.emit('quest-guess', null, { quest: o }); }
-        return this.complete(o);
-      }
+      if (d <= this.reach() + 10) return this.arrive(o); // a little more generous than discovering a place
       // getting close: warm (~150 m) then hot (~60 m); never a direction, so it's still a puzzle
       const band = d <= MYSTERY_HOT_M ? 'hot' : d <= MYSTERY_WARM_M ? 'warm' : null;
       if (band !== o.band) {
