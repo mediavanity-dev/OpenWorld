@@ -51,13 +51,14 @@ test('habitats: water birds and frogs look for water first', () => {
 // a stand-in Environment
 const env = (snap, shower = null) => ({ snapshot: () => snap, utcOffset: () => 0, _shower: shower });
 
+const NOSKY = { shower: null }; // the real sky changes daily (a meteor shower peak night outranks everything)
 test('events: golden hour, rain and night-only bonuses', () => {
   const pos = { lat: 51.5, lon: 0 };
-  assert.equal(liveBonus(env({ sun: 'golden hour', moon: 'waxing crescent', weather: 'clear' }), pos)?.key, 'golden');
-  assert.equal(liveBonus(env({ sun: 'day', moon: 'waxing crescent', weather: 'rain' }), pos)?.key, 'rain');
-  assert.equal(liveBonus(env({ sun: 'day', moon: 'full moon', weather: 'clear' }), pos), null); // full moon counts after dark
-  assert.equal(liveBonus(env({ sun: 'night', moon: 'full moon', weather: 'clear' }), pos)?.key, 'fullmoon');
-  assert.ok(liveEvents(env({ sun: 'day', moon: 'full moon', weather: 'rain' }), pos).some((e) => e.quest === 'rain'));
+  assert.equal(liveBonus(env({ sun: 'golden hour', moon: 'waxing crescent', weather: 'clear' }), pos, NOSKY)?.key, 'golden');
+  assert.equal(liveBonus(env({ sun: 'day', moon: 'waxing crescent', weather: 'rain' }), pos, NOSKY)?.key, 'rain');
+  assert.equal(liveBonus(env({ sun: 'day', moon: 'full moon', weather: 'clear' }), pos, NOSKY), null); // full moon counts after dark
+  assert.equal(liveBonus(env({ sun: 'night', moon: 'full moon', weather: 'clear' }), pos, NOSKY)?.key, 'fullmoon');
+  assert.ok(liveEvents(env({ sun: 'day', moon: 'full moon', weather: 'rain' }), pos, NOSKY).some((e) => e.quest === 'rain'));
 });
 
 test('events: a sky quest goes to open green ground, needs the dark, and is epic', () => {

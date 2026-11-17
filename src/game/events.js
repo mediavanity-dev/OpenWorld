@@ -16,15 +16,16 @@ import { skyNotes } from '../data/science.js';
  * What's happening at this spot right now (and the meteor shower peaking tonight).
  * @param {any} env  Environment (snapshot, utcOffset)
  * @param {{lat: number, lon: number}} pos
+ * @param {{ shower?: any }} [sky] the meteor shower (tests pass one; null = none); computed when absent
  * @returns {LiveEvent[]}
  */
-export function liveEvents(env, pos) {
+export function liveEvents(env, pos, sky = {}) {
   const out = [];
   let snap;
   try { snap = env.snapshot(pos.lat, pos.lon); } catch { return out; }
   const night = snap.sun === 'night';
-  let shower = null;
-  try { shower = skyNotes(pos.lat, pos.lon, env.utcOffset()).shower; } catch { /* no sky data */ }
+  let shower = sky.shower !== undefined ? sky.shower : null;
+  if (sky.shower === undefined) try { shower = skyNotes(pos.lat, pos.lon, env.utcOffset()).shower; } catch { /* no sky data */ }
   if (shower && shower.days === 0) {
     out.push({ key: `shower:${shower.name}`, glyph: '🌠', name: shower.name, bonus: night, quest: 'sky',
       title: `${shower.name} meteor shower tonight`,
@@ -50,8 +51,8 @@ export function liveEvents(env, pos) {
 }
 
 /** The bonus that applies to a card finished now (the first one that's on), or null. */
-export function liveBonus(env, pos) {
-  return liveEvents(env, pos).find((e) => e.bonus) || null;
+export function liveBonus(env, pos, sky) {
+  return liveEvents(env, pos, sky).find((e) => e.bonus) || null;
 }
 
 // groups that come out in the rain
