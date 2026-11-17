@@ -56,7 +56,9 @@ export async function pruneCache(maxAge = 60 * 24 * 3600 * 1000) {
       req.onsuccess = () => {
         const c = req.result;
         if (!c) return resolve(n);
-        if (!c.value || Date.now() - c.value.t > maxAge) { c.delete(); n++; }
+        // map tiles are big: they go after 8 days (they're only read for 7)
+        const age = c.value ? Date.now() - c.value.t : Infinity;
+        if (age > (String(c.key).startsWith('vt:') ? 8 * 24 * 3600 * 1000 : maxAge)) { c.delete(); n++; }
         c.continue();
       };
       req.onerror = () => resolve(n);

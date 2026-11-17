@@ -787,7 +787,7 @@ export class Quests {
   /** "I'm here" for the active mystery: works within MYSTERY_HERE_M of its place. */
   imHere() {
     const o = this.active(), g = this.game;
-    if (!o || o.type !== 'mystery' || o.pending || !g.pos) return false;
+    if (!o || o.type !== 'mystery' || o.pending || !g.pos || (g.sharpEnough && !g.sharpEnough())) return false;
     if (haversine(g.pos.lat, g.pos.lon, o.lat, o.lon) > MYSTERY_HERE_M) return false;
     return this.arrive(o);
   }
@@ -807,7 +807,7 @@ export class Quests {
     this.fill();
     this.eventOffer();
     const o = this.active();
-    if (!o || o.pending) return;
+    if (!o || o.pending || (g.sharpEnough && !g.sharpEnough())) return;
     const d = o.type === 'bounty' ? null : haversine(g.pos.lat, g.pos.lon, o.lat, o.lon);
     o.live = d; // not saved meaningfully, handy for the UI
     if (o.type === 'mystery') {

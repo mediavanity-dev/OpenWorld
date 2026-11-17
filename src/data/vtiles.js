@@ -8,15 +8,31 @@
 import { VectorTile, classifyRings } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import { getJson, request } from './net.js';
+import { cacheGet, cachePut } from './cache.js';
 
 const TILEJSON = 'https://tiles.openfreemap.org/planet';
 let tileUrl = null;
 
+// The tile address (it names the current weekly map build) is kept for 12 hours, so a start
+// doesn't wait for a round trip; an old one is still used if the server can't be reached.
 async function template() {
   if (tileUrl) return tileUrl;
-  tileUrl = (await getJson(TILEJSON, { retries: 2 })).tiles[0];
+  const fresh = await cacheGet('vt-tilejson', 12 * 3600 * 1000);
+  if (fresh) return (tileUrl = fresh);
+  try {
+    tileUrl = (await getJson(TILEJSON, { retries: 2 })).tiles[0];
+    cachePut('vt-tilejson', tileUrl);
+  } catch (err) {
+    const stale = await cacheGet('vt-tilejson', Infinity);
+    if (!stale) throw err;
+    tileUrl = stale;
+  }
   return tileUrl;
 }
+
+// Map areas are kept on the device for a week (the streets you walk every day load from the
+// phone, not the network). Keyed by the full tile address, so a new map build fetches afresh.
+export const TILE_TTL = 7 * 24 * 3600 * 1000;
 
 export function osmRef(id) {
   if (!id) return null;
@@ -111,10 +127,17 @@ function stripClose(r) {
 
 export async function loadBaseTile(z, x, y) {
   const url = (await template()).replace('{z}', z).replace('{x}', x).replace('{y}', y);
-  // 204/404 = nothing mapped here (open sea): an empty area, not an error
-  const res = await request(url, { retries: 2, okStatus: (s) => (s >= 200 && s < 300) || s === 404 });
-  if (res.status === 204 || res.status === 404) return emptyFabric();
-  const vt = new VectorTile(new PbfReader(new Uint8Array(await res.arrayBuffer())));
+  const key = `vt:${url}`;
+  let buf = await cacheGet(key, TILE_TTL);
+  if (buf === 'empty') return emptyFabric();
+  if (!buf) {
+    // 204/404 = nothing mapped here (open sea): an empty area, not an error
+    const res = await request(url, { retries: 2, okStatus: (s) => (s >= 200 && s < 300) || s === 404 });
+    if (res.status === 204 || res.status === 404) { cachePut(key, 'empty'); return emptyFabric(); }
+    buf = await res.arrayBuffer();
+    if (buf.byteLength < 3e6) cachePut(key, buf);
+  }
+  const vt = new VectorTile(new PbfReader(new Uint8Array(buf)));
   return normalizeTile(vt);
 }
 

@@ -21,6 +21,7 @@ const DEV = typeof location !== 'undefined' && new URLSearchParams(location.sear
 export const RULES = {
   LEASH_M: 600,             // home-base free movement radius
   DISCOVER_M: 30,           // how close to a place counts as "visited"
+  SHARP_M: 50,              // Walk: location accuracy needed before finds count
   HOME_COOLDOWN_DAYS: 30,   // a home base is (near) permanent
   HOME_IP_M: 50000,         // a typed home address must be this close to the internet (IP) location
   BEACON_PLACE_M: 25,       // beacons latch onto a named place within this distance...
@@ -260,6 +261,7 @@ export class Game {
 
   checkDiscoveries() {
     const grade = MODES[this.mode].grade;
+    const sharp = this.sharpEnough();
     let nearest = null, taskNear = null;
     const task = this.journal?.task();
     const wantPlace = task && !task.done && TASKS[task.type]?.place ? task.type : null;
@@ -270,7 +272,7 @@ export class Game {
       const st = d < 1500 ? this.openState(poi) : null;
       if (d < 1500) chunk.setClosed(poi.ref, st && !st.open);
       const known = this.profile.data.discoveries[poi.ref];
-      if (d <= RULES.DISCOVER_M) {
+      if (d <= RULES.DISCOVER_M && sharp) {
         stillNear.add(poi.ref);
         if (this.nearby.has(poi.ref)) continue; // already handled this visit
         // Closed places still count: finding out a place exists shouldn't depend on its
@@ -312,6 +314,9 @@ export class Game {
 
   // ---------------- geocaches ----------------
   // How close you need to be to say you found it (GPS-aware), and whether that's allowed now.
+  // Walk: finds only count once the location is precise (a quick start fix from the phone's
+  // cache can be tens of metres out; GPS sharpens it within seconds).
+  sharpEnough() { return this.mode !== 'present' || (this.fix?.accuracy ?? Infinity) <= RULES.SHARP_M; }
   cacheReach() { return this.mode === 'present' ? Math.min(60, Math.max(30, (this.fix?.accuracy || 10) * 1.5)) : 30; }
   canLogCache(poi) {
     if (this.mode === 'roam') return { ok: false, why: 'Visit for real to log a find.' };

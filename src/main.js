@@ -439,10 +439,15 @@ async function locate(getFix, failText, msgEl, busyText) {
   }
 }
 const locateDevice = (msgEl) => locate(deviceFix, (e) => `Couldn’t get this device’s location (${e.message}).`, msgEl, 'Asking your device for its location…');
+// Fast start: the position the phone already knows (almost instant), else a fresh GPS fix.
+// The location watch started by begin('present') sharpens it within seconds either way.
+async function locateFast(msgEl) {
+  try { const f = await deviceFix(4000, { quick: true }); game.setFix(f); if (msgEl) msgEl.textContent = ''; return f; } catch { return locateDevice(msgEl); }
+}
 // Walk always needs a fresh, real device location. If there isn't one: computers are
 // pointed to a home base (that's how to play from a computer); phones to the location setting.
 async function presentNow(msgEl) {
-  if (await locateDevice(msgEl)) return begin('present');
+  if (await locateFast(msgEl)) return begin('present');
   if (!isTouch) return ctx.homeSetup.open({ reason: `<b>${WALK} needs this device’s real location</b>, and it couldn’t be found. To play from a computer, set a home base and play <b>Home</b>.`, onSet: () => homeWasSet(true) });
   toast(`${WALK} needs your location. Allow location for this site in your browser settings, then try again.`, 'error');
   return false;
@@ -591,8 +596,12 @@ async function autoStart() {
   $('start').hidden = true;
   const fallback = (m = '') => { if (!game.mode) { $('start').hidden = false; sMsg.textContent = m; } };
   if (isTouch) {
+    // start building the world where you last played while the phone finds you: most starts are
+    // near the last spot, so the map is often ready the moment the location arrives
+    const last = profile.data.last;
+    if (last && Number.isFinite(last.lat)) world.update(last.lat, last.lon);
     toast('Finding where you are…');
-    if (await locateDevice()) return begin('present');
+    if (await locateFast()) return begin('present');
     return fallback('Couldn’t get your location. Choose how to start:');
   }
   if (profile.data.home) return enterHome();
