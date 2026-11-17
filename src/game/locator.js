@@ -21,13 +21,15 @@ export function trustOf(fix) {
   return 'coarse';
 }
 
-export function deviceFix(timeout = 20000) {
+// quick: the position the phone already knows (cached up to 2 minutes, network-level accuracy),
+// which comes back almost at once; the location watch then sharpens it with GPS.
+export function deviceFix(timeout = 20000, { quick = false } = {}) {
   return new Promise((resolve, reject) => {
     if (!geo()) return reject(new Error('Geolocation not supported by this browser'));
     geo().getCurrentPosition(
       (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy, heading: p.coords.heading, speed: p.coords.speed, source: 'device', t: Date.now() }),
       (e) => reject(new Error(e.message || 'Location permission denied')),
-      { enableHighAccuracy: true, timeout, maximumAge: 10000 },
+      quick ? { enableHighAccuracy: false, timeout: Math.min(timeout, 4000), maximumAge: 120000 } : { enableHighAccuracy: true, timeout, maximumAge: 10000 },
     );
   });
 }

@@ -154,3 +154,14 @@ test('game: GPS jitter inside the accuracy circle does not move you', () => {
   game.setFix({ ...fix(jitter, 20), t: Date.now() + 1000 });
   assert.equal(game.fix.lat, HOME.lat);
 });
+
+test('Walk: a coarse quick-start fix shows the map but counts nothing until GPS sharpens it', () => {
+  const { game, profile } = setup({ pois: [place()] });
+  game.setFix(fix(HOME, 80)); // the phone's cached, network-level position
+  game.enter('present');
+  game.checkDiscoveries();
+  assert.equal(profile.data.discoveries['osm:node/1'], undefined);
+  game.setFix(fix(HOME, 8)); // GPS arrives
+  game.checkDiscoveries();
+  assert.equal(profile.data.discoveries['osm:node/1'].grade, 'present');
+});
