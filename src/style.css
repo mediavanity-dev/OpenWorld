@@ -725,3 +725,6 @@ html.native .native-only { display: block; }
 .qsaved-row small { display: block; color: var(--muted); }
 .qsaved-row .link { background: none; border: none; color: var(--muted); }
 .qart.water-q { background: linear-gradient(180deg, #2b5f86, #123049); }
+
+.rv-card.habitat .hb-way { display: grid; gap: 2px; margin: 8px 0; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.05); font-size: 13px; }
+.rv-card.habitat .hb-way b { color: var(--accent); }

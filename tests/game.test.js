@@ -165,3 +165,19 @@ test('Walk: a coarse quick-start fix shows the map but counts nothing until GPS 
   game.checkDiscoveries();
   assert.equal(profile.data.discoveries['osm:node/1'].grade, 'present');
 });
+
+test('hunt, Home/Roam: walking up with the joystick is gentle; running in scares it off', async () => {
+  const { startHunt } = await import('../src/game/hunt.js');
+  for (const run of [false, true]) {
+    const { game, events } = setup({ pois: [] });
+    game.enter('roam', { to: HOME });
+    game.hunt = startHunt(game.pos, { id: 1, name: 'Fox', group: 'Mammalia', rarity: 'common' }, 0, () => 0.5);
+    const h = game.hunt;
+    for (let k = 0; k < 400 && game.hunt && !events.some((e) => /hunt-(reveal|flee)/.test(e.type)); k++) {
+      const dn = (h.lat - game.pos.lat) * 111320, de = (h.lon - game.pos.lon) * 111320 * Math.cos(game.pos.lat * Math.PI / 180), d = Math.hypot(dn, de) || 1;
+      game.tick(0.2, { east: de / d, north: dn / d, run });
+      game.stepHunt();
+    }
+    assert.ok(events.some((e) => e.type === (run ? 'hunt-flee' : 'hunt-reveal')), run ? 'running in should scare it' : 'walking up should reveal it');
+  }
+});

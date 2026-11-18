@@ -137,6 +137,8 @@ place (🌙 🌧️ ❄️ 🌕 🌅 🎉), so revisiting has a point.
 
 ### 6. Track wildlife and find daily treasure
 
+*What each kind of creature looks like, and exactly how tracking works: [Creatures](CREATURES.md).*
+
 **The hunt.** As you walk, especially through parks, woods and along water, you'll notice
 *signs* of an animal nearby ("Fresh signs of a bird nearby"):
 
