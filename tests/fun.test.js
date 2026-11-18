@@ -78,3 +78,15 @@ test('licences: only photos free for any use are shown', () => {
   assert.equal(safePhoto({ license_code: 'cc-by-nd' }), null);
   assert.equal(safePhoto({ license_code: null }), null);
 });
+
+test('watershed: USGS gauge names become water bodies, in flow order', async () => {
+  const { waterBodyName, orderWaters, inUS } = await import('../src/data/watershed.js');
+  assert.equal(waterBodyName('ROCK RIVER AT DIXON, IL'), 'Rock River');
+  assert.equal(waterBodyName('LAKE MONONA OUTLET AT MONONA, WI'), 'Lake Monona');
+  assert.equal(waterBodyName('MISSISSIPPI R NR ST. FRANCISVILLE, LA'), 'Mississippi River');
+  assert.equal(waterBodyName('MISSISSIPPI RIVER POOL LOCK AND DAM 10'), null);
+  const site = (comid, name) => ({ properties: { comid, name } });
+  const flow = [1, 2, 3].map((c) => ({ properties: { nhdplus_comid: c } }));
+  assert.deepEqual(orderWaters([site(3, 'ROCK RIVER AT X'), site(1, 'LAKE MENDOTA AT Y'), site(3, 'ROCK RIVER NR Z')], flow), ['Lake Mendota', 'Rock River']);
+  assert.ok(inUS(43, -89.5) && !inUS(51.5, 0));
+});

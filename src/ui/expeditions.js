@@ -14,6 +14,7 @@ import { sfx } from '../sfx.js';
 import { olderThan } from '../game/facts.js';
 import { skyNotes } from '../data/science.js';
 
+const listing = (a) => (a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`);
 const SCENE_GLYPH = { water: '🌊', summit: '⛰️', sunset: '🌅', sky: '🌌', trail: '🧭' };
 // a photo credit whose licence doesn't allow use in any app (non-commercial, no-derivatives, all rights reserved)
 const restricted = (credit) => /\bCC[- ]BY[- A-Z]*\b(NC|ND)\b|\bcc-by-(nc|nd)|all rights reserved/i.test(credit || '');
@@ -29,6 +30,7 @@ const TYPE = {
   bounty: { glyph: '🎯', label: 'Bounty', verb: 'Track' },
   race: { glyph: '⏱', label: 'Race', verb: 'Beat the clock' },
   ground: { glyph: '🧭', label: 'New ground', verb: 'Explore' },
+  water: { glyph: '🌊', label: 'Water', verb: 'Follow' },
 };
 const RARITY_LABEL = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' };
 const starsHtml = (n, of = 3) => `<span class="qstars">${'<i class="on">★</i>'.repeat(n)}${'<i>★</i>'.repeat(Math.max(0, of - n))}</span>`;
@@ -109,6 +111,7 @@ export function initExpeditions(ctx) {
           <p><b>Stars</b> (1 to 3) are for how well you did: fewer clues, a careful approach, beating par. Real play (${WALK} or Home) counts in full. Echo cards from Roam earn practice stars, at most 3 a day and 5 in all, enough to reach Scout; every rank after that needs real visits.</p>
         </details>`}
         <div class="qdeck">${s.offers.map((o, i) => offerHtml(o, i, act)).join('')}</div>
+        ${savedHtml()}
         ${allDone(s) ? '<button class="primary qmore" data-qmore>Deal three more</button>' : ''}`;
     } else body = tab === 'friends' ? friendsHtml() : cardsHtml();
     const html = header() + body;
@@ -124,6 +127,15 @@ export function initExpeditions(ctx) {
       if (sh && sh.days >= 1 && sh.days <= 3) return `<span class="qsoon">🌠 The ${esc(sh.name)} meteor shower peaks ${sh.days === 1 ? 'tomorrow night' : `in ${sh.days} days`}: a special night expedition will be dealt.</span>`;
     } catch { /* no sky data */ }
     return '';
+  }
+
+  // expeditions put aside with "This is a bit much for today"
+  function savedHtml() {
+    const list = q().saved();
+    if (!list.length) return '';
+    return `<details class="qsaved"><summary>Saved for another day (${list.length})</summary>
+      ${list.map((o) => `<div class="qsaved-row"><span>${TYPE[o.type]?.glyph || '✦'} ${esc(o.title)}<small>saved ${esc(o.savedOn || '')}</small></span>
+        <button data-qrestore="${esc(o.id)}">Bring it back</button><button class="link" data-qdrop="${esc(o.id)}" aria-label="Remove">✕</button></div>`).join('')}</details>`;
   }
 
   function offerHtml(o, i, act) {
@@ -161,6 +173,14 @@ export function initExpeditions(ctx) {
       }
       if (o.fled) meta.push(`Fled ${o.fled}×`);
       if (o.sp.credit) extra += `<p class="credit">Photo: ${esc(o.sp.credit)}</p>`;
+    } else if (o.type === 'water') {
+      art = '<div class="qart race water-q"><span>🌊</span></div>';
+      const where = `${fmtDist(game.pos ? haversine(game.pos.lat, game.pos.lon, o.lat, o.lon) : o.dist)} to the <b>${sectorOf(bearingTo(game.pos || o, o))}</b>`;
+      hook = o.kind === 'confluence'
+        ? `<p class="qhook">Follow the water to where the <b>${esc(o.a)}</b> flows into the <b>${esc(o.b)}</b>: ${where}.</p>`
+        : `<p class="qhook">Find where the <b>${esc(o.a)}</b> begins, the very start of the stream: ${where}.</p>`;
+      if (o.off) hook += `<p class="qhook muted">The water’s edge there isn’t open to walk, so the finish is as close as the public paths go (about ${fmtDist(o.off)} from it).</p>`;
+      if (o.journey?.length) hook += `<p class="qhook muted">When you get there, you’ll see where this water goes next.</p>`;
     } else if (o.type === 'ground') {
       art = '<div class="qart ground"><span>🧭</span></div>';
       hook = `<p class="qhook">Walk <b>${o.target} stretches of ground you’ve never walked</b>, in any direction. Each lit square on your minimap is one stretch (about ${fmtDist(150)} across).</p>
@@ -177,15 +197,16 @@ export function initExpeditions(ctx) {
     if (o.long) meta.unshift('<span class="qlong">Long expedition: nothing closer fits, so it’s rarer</span>');
     const card = o.done ? q().s.cards.find((c) => c.id === o.id) : null;
     const btns = o.done ? `<span class="qdone">✓ Done${card ? ` ${starsHtml(card.grade === 'echo' ? 0 : card.stars)}` : ''}</span>`
-      : isAct ? `${o.type === 'mystery' && o.live != null && o.live <= MYSTERY_HERE_M ? '<button class="primary qhere" data-qhere>📍 I’m here</button>' : ''}<button data-qabandon>Give up</button>${o.type === 'mystery' || o.type === 'race' ? '<button data-qcant title="Private, fenced off, across water…? Swap it, no stars lost">Can’t get there</button>' : ''}<button class="primary" data-qclose>${o.type === 'race' ? (o.startedAt ? 'Back to the race' : 'Start the clock') : o.type === 'bounty' ? 'Go track it' : o.type === 'ground' ? 'Go explore' : 'Go find it'}</button>`
+      : isAct ? `${o.type === 'mystery' && o.live != null && o.live <= MYSTERY_HERE_M ? '<button class="primary qhere" data-qhere>📍 I’m here</button>' : ''}${o.type === 'water' && game.pos && haversine(game.pos.lat, game.pos.lon, o.lat, o.lon) <= MYSTERY_HERE_M ? '<button class="primary qhere" data-qwater>📍 I’m there!</button>' : ''}${o.type === 'bounty' ? `${!o.inHabitat && nearHabitat(o) ? '<button class="primary qhere" data-qthere>📍 I’m there!</button>' : ''}<button class="primary qhere" data-qsaw>👀 I saw it!</button>` : ''}<button data-qabandon>Give up</button>${o.type === 'mystery' || o.type === 'race' ? '<button data-qcant title="Private, fenced off, across water…? Swap it, no stars lost">Can’t get there</button>' : ''}<button class="primary" data-qclose>${o.type === 'race' ? (o.startedAt ? 'Back to the race' : 'Start the clock') : o.type === 'bounty' ? 'Go track it' : o.type === 'ground' ? 'Go explore' : 'Go find it'}</button>`
       : `${q().s.swaps > 0 && !locked && !o.event ? `<button data-qswap="${i}" title="Swap for a different one (once a day)">↻ Swap${' '}<small>(1 left today)</small></button>` : ''}<button class="primary" data-qaccept="${esc(o.id)}" ${locked || why ? 'disabled' : ''}>${locked ? 'One at a time' : why ? 'Not here' : 'Accept'}</button>`;
+    const later = !o.done && !o.event ? `<button class="qlater" data-qsave="${esc(o.id)}">This is a bit much for today: save it for another day</button>` : '';
     return `<article class="qcard ${o.type} r-${o.rarity} ${isAct ? 'active' : ''} ${o.done ? 'done' : ''}">
       <div class="qtop"><span class="qtype">${T.glyph} ${T.label} <small>${T.verb}</small></span><button class="qgem r-${o.rarity}" data-qabout title="What are cards? Tap to read">${RARITY_LABEL[o.rarity]} card ⓘ</button></div>
       ${isAct ? `<p class="qnow">✓ Accepted. ${o.type === 'race' ? (o.startedAt ? 'The clock is running.' : 'The clock starts when you head off.') : 'Read the details, then head off.'}</p>` : ''}
       ${o.event ? `<p class="qevent">${o.event.glyph} <b>Today only: ${esc(o.event.title)}.</b> ${esc(o.event.blurb)}</p>` : ''}
       ${art}<h3>${esc(o.title)}</h3>${hook}
       ${meta.length ? `<p class="qmeta">${meta.join(' · ')}</p>` : ''}${extra}
-      <div class="qbtns">${btns}</div></article>`;
+      <div class="qbtns">${btns}</div>${later}</article>`;
   }
 
   // A mystery's clues: the ones you've bought always show; the rest only when you ask for them,
@@ -289,6 +310,12 @@ export function initExpeditions(ctx) {
       // stay on the board, at the accepted card: read it, then tap its button to head off
       requestAnimationFrame(() => $('quests-body').querySelector('.qcard.active')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
     } else if (b.dataset.qswap) { if (!q().swap(+b.dataset.qswap)) toast('Nothing else to swap in around here right now.'); render(); }
+    else if (b.dataset.qwater !== undefined) { if (!q().imThere()) toast(`Not quite: get within about ${fmtDist(MYSTERY_HERE_M)} of the spot.`, 'quest'); }
+    else if (b.dataset.qsave) { if (q().saveForLater(b.dataset.qsave)) toast('Saved for another day. It’s under “Saved for another day” on the board.', 'quest'); render(); }
+    else if (b.dataset.qrestore) { if (!q().restore(b.dataset.qrestore)) toast('One saved expedition at a time: finish or save the other first.', 'quest'); render(); }
+    else if (b.dataset.qdrop) { q().dropSaved(b.dataset.qdrop); render(); }
+    else if (b.dataset.qsaw !== undefined) { if (q().sawIt()) buzz([30, 40, 60]); }
+    else if (b.dataset.qthere !== undefined) { if (!q().atHabitat()) toast(`Not quite: get within about ${fmtDist(MYSTERY_HERE_M)} of the spot.`, 'quest'); }
     else if (b.dataset.qhere !== undefined) { if (!q().imHere()) toast(`Not quite: get within about ${fmtDist(MYSTERY_HERE_M)} of it.`, 'quest'); }
     else if (b.dataset.qcant !== undefined) { if (confirm('Can’t get there (private, fenced off, across water…)? You’ll get a fresh one instead with no stars lost, and we won’t send you there again.')) { q().cantReach(); render(); } }
     else if (b.dataset.qabandon !== undefined) { if (confirm('Give up this expedition? It goes back on the board.')) { q().abandon(); render(); } }
@@ -331,6 +358,11 @@ export function initExpeditions(ctx) {
       nm.textContent = open ? `${open} expedition${open > 1 ? 's' : ''} waiting` : allDone(s) ? 'All done! Deal three more' : 'Scouting the area…';
       nd.textContent = `${q().rank().name} · ${q().stars()}★ · tap to choose`;
       na.textContent = '✦';
+    } else if (o.type === 'water') {
+      nm.textContent = o.title;
+      const d = game.pos ? haversine(game.pos.lat, game.pos.lon, o.lat, o.lon) : null;
+      nd.textContent = d != null && d <= MYSTERY_HERE_M ? 'There? Tap here, then “I’m there!”' : `${d != null ? fmtDist(d) : ''} · follow the water`;
+      arrow = game.pos ? bearingTo(game.pos, o) : null;
     } else if (o.type === 'ground') {
       nm.textContent = o.title;
       nd.textContent = `${o.prog || 0} of ${o.target} new stretches · any direction you haven’t walked`;
@@ -368,6 +400,7 @@ export function initExpeditions(ctx) {
     }
     if (o.type === 'mystery') return `<span class="tk-quest ${o.band || ''}">🔍 ${o.band === 'hot' ? 'Very close!' : o.band === 'warm' ? 'Getting warm' : o.sector}</span>`;
     if (o.type === 'ground') return `<span class="tk-quest">🧭 ${o.prog || 0}/${o.target}</span>`;
+    if (o.type === 'water') return `<span class="tk-quest">🌊 ${game.pos ? fmtDist(haversine(game.pos.lat, game.pos.lon, o.lat, o.lon)) : ''}</span>`;
     return `<span class="tk-quest">🎯 ${esc(o.sp.name)}</span>`;
   }
   // the compass ring around the player (src/render/avatar.js): where the active goal is.
@@ -376,7 +409,7 @@ export function initExpeditions(ctx) {
   function compass() {
     const o = on() ? q().active() : null;
     if (!o || o.done) return null;
-    if (o.type === 'race') return { target: { lat: o.lat, lon: o.lon } };
+    if (o.type === 'race' || o.type === 'water') return { target: { lat: o.lat, lon: o.lon } };
     if (o.type === 'mystery') return { target: o.band ? { lat: o.lat, lon: o.lon } : null };
     if (o.type === 'bounty') return o.habitat?.d && !o.inHabitat ? { target: { lat: o.habitat.lat, lon: o.habitat.lon } } : null;
     return null;
@@ -386,9 +419,38 @@ export function initExpeditions(ctx) {
     const o = on() ? q().active() : null;
     if (!o) return null;
     if (o.type === 'mystery') { const z = o.used.includes('zone') && o.clues.find((c) => c.key === 'zone'); return z ? { zone: z.zone } : null; }
-    if (o.type === 'race') return { target: { lat: o.lat, lon: o.lon } };
+    if (o.type === 'race' || o.type === 'water') return { target: { lat: o.lat, lon: o.lon } };
     if (o.type === 'bounty') return o.sighting ? { zone: { lat: o.sighting.lat, lon: o.sighting.lon, r: 40 } } : o.habitat?.d && !o.inHabitat ? { habitat: { lat: o.habitat.lat, lon: o.habitat.lon } } : null;
     return null;
+  }
+
+  const nearHabitat = (o) => o.habitat && game.pos && haversine(game.pos.lat, game.pos.lon, o.habitat.lat, o.habitat.lon) <= MYSTERY_HERE_M;
+
+  // ---------------------------------------------------------------- in the habitat: what to do now
+  // Pops up when you reach a bounty's habitat: where and when to look, what it is, and what
+  // finishes it (its signs in the game's hunt, or seeing it yourself: "I saw it!").
+  let habitatOpen = null;
+  function habitatCard(o) {
+    const box = $('reveal');
+    habitatOpen = o.id;
+    const img = o.sp.photo && safeUrl(o.sp.photo) && !restricted(o.sp.credit) ? o.sp.photo : null;
+    const notes = o.notes ? o.notes.map((n) => `<p class="hb-note">📖 ${esc(n)}</p>`).join('') : '<p class="hb-note muted">Reading its field notes…</p>';
+    box.innerHTML = `<div class="rv-card habitat">
+      <p class="rv-kicker">🎯 You’re in its habitat</p>
+      <div class="hb-top">${img ? `<img src="${esc(img)}" alt="">` : ''}<div><h2>${esc(o.sp.name)}</h2><p class="muted"><i>${esc(o.sp.sci || '')}</i></p></div></div>
+      ${notes}
+      <p class="qhook">Watch for its signs: 🐾 on the tracker and a green glow on the minimap, then walk up to it gently or photograph it. Or, if you spot it yourself:</p>
+      <div class="hb-btns"><button class="primary" data-hb="saw">👀 I saw it!</button><button data-hb="later">Keep looking</button></div>
+      <a class="hb-inat" href="https://www.inaturalist.org/observations/new?taxon_id=${encodeURIComponent(o.sp.id)}" target="_blank" rel="noopener">Log your sighting on iNaturalist ↗</a>
+      ${o.sp.credit && img ? `<p class="credit">Photo: ${esc(o.sp.credit)}</p>` : ''}
+    </div>`;
+    box.hidden = false;
+    box.onclick = (e) => {
+      const b = e.target.closest('[data-hb]');
+      if (!b) return;
+      box.hidden = true; box.onclick = null; habitatOpen = null;
+      if (b.dataset.hb === 'saw' && q().sawIt()) buzz([30, 40, 60]);
+    };
   }
 
   // ---------------------------------------------------------------- the age guess
@@ -415,7 +477,7 @@ export function initExpeditions(ctx) {
     const T = TYPE[card.type], reduce = document.body.classList.contains('reduce-motion');
     const facts = [];
     // races and new ground get a scene for art (no photo): water, summit, sunset, night sky, trail
-    const scene = card.type === 'race' ? (card.raceKind === 'sky' ? 'sky' : card.sunset ? 'sunset' : card.raceKind === 'water' ? 'water' : card.raceKind === 'summit' ? 'summit' : 'trail') : card.type === 'ground' ? 'trail' : '';
+    const scene = card.type === 'race' ? (card.raceKind === 'sky' ? 'sky' : card.sunset ? 'sunset' : card.raceKind === 'water' ? 'water' : card.raceKind === 'summit' ? 'summit' : 'trail') : card.type === 'ground' ? 'trail' : card.type === 'water' ? 'water' : '';
     // photos saved before the licence filter: hide any that aren't free for any use
     const img = card.img && safeUrl(card.img) && !restricted(card.credit) ? card.img : null;
     if (card.type === 'mystery') {
@@ -424,7 +486,10 @@ export function initExpeditions(ctx) {
       if (card.guessRight != null) facts.push(card.guessRight ? '🎯 Dated it correctly: +★' : 'Age guess: not quite');
     } else if (card.type === 'bounty') {
       facts.push(`<i>${esc(card.sci || '')}</i>`);
-      facts.push(card.photo ? '📸 Photographed in the field' : 'Tracked down on foot');
+      facts.push(card.seen ? '👀 Seen in the wild' : card.photo ? '📸 Photographed in the field' : 'Tracked down on foot');
+    } else if (card.type === 'water') {
+      facts.push(card.waterKind === 'confluence' ? `Where the ${esc(card.a)} flows into the ${esc(card.b)}` : `Where the ${esc(card.a)} begins`);
+      if (card.journey?.length) facts.push(`🌊 From here the water flows on through ${esc(listing(card.journey))}.`);
     } else if (card.type === 'ground') {
       facts.push(`${card.target} stretches of new ground in ${mmss(card.secs)} · par ${mmss(card.par)}`);
     } else {
@@ -494,7 +559,8 @@ export function initExpeditions(ctx) {
     else if (ev.type === 'quest-ground') { const o = ev.quest; toast(`🧭 New ground: ${o.prog} of ${o.target}`, 'quest'); buzz(15); ctx.hud.render(); }
     else if (ev.type === 'quest-wrong') { toast(ev.msg, 'quest'); buzz(25); }
     else if (ev.type === 'quest-event') { toast(`${ev.quest.event.glyph} Today only: ${ev.quest.event.title}. A special expedition is on the board.`, 'quest'); buzz([20, 40, 20]); sfx.chime(6); render(); }
-    else if (ev.type === 'quest-habitat') { toast(`🎯 You’re in the ${ev.quest.sp.name}’s habitat. Field notes added: tap the Expedition box.`, 'quest'); buzz([20, 40, 20]); sfx.chime(4); }
+    else if (ev.type === 'quest-dealt' && habitatOpen && !$('reveal').hidden) { const o = q().active(); if (o?.id === habitatOpen && o.notes) habitatCard(o); render(); }
+    else if (ev.type === 'quest-habitat') { buzz([20, 40, 20]); sfx.chime(4); closeBoardQuietly(); habitatCard(ev.quest); }
     else if (ev.type === 'quest-warm') {
       const hot = ev.band === 'hot';
       toast(hot ? '🔍 Very close now. Standing at it? Tap the Expedition box, then “I’m here”.' : `🔍 You’re getting warm: it’s within about ${fmtDist(150)}.`, 'quest');

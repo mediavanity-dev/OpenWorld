@@ -29,15 +29,34 @@ export function initAvatar(ctx) {
   body.position.y = 1.12;
   const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.27, 1), skin);
   head.position.y = 1.78;
-  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.05, 12), hatM);
-  brim.position.y = 1.93;
-  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.27, 0.22, 10), hatM);
-  crown.position.y = 2.05;
+  // headwear: four looks the player can pick in Settings (all on the same simple figure)
+  const looks = {};
+  { const g = new THREE.Group(); // wide-brimmed hat
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.05, 12), hatM); brim.position.y = 1.93;
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.27, 0.22, 10), hatM); crown.position.y = 2.05;
+    g.add(brim, crown); looks.hat = g; }
+  { const g = new THREE.Group(); // cap with a visor (faces forward, -z)
+    const capM = new THREE.MeshLambertMaterial({ color: '#3d6b8c', transparent: true, flatShading: true }); parts.push(capM);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.29, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), capM); dome.position.y = 1.84;
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.03, 0.24), capM); visor.position.set(0, 1.86, -0.3);
+    g.add(dome, visor); looks.cap = g; }
+  { const g = new THREE.Group(); // knitted beanie with a bobble
+    const knit = new THREE.MeshLambertMaterial({ color: '#c27b3a', transparent: true, flatShading: true }); parts.push(knit);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), knit); dome.position.y = 1.82;
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.09, 10), knit); band.position.y = 1.83;
+    const pom = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 0), knit); pom.position.y = 2.14;
+    g.add(dome, band, pom); looks.beanie = g; }
+  { const g = new THREE.Group(); // rain hood in the jacket's colour, open at the face
+    const hood = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 8, Math.PI * 0.75, Math.PI * 1.5, 0, Math.PI * 0.62), mat);
+    hood.position.y = 1.8;
+    g.add(hood); looks.hood = g; }
+  const headwear = new THREE.Group();
+  for (const g of Object.values(looks)) { g.visible = false; headwear.add(g); }
   const pack = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.52, 0.24), packM);
   pack.position.set(0, 1.18, 0.38);
   const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.5, 8), dark); // a bedroll on top of the pack
   roll.rotation.z = Math.PI / 2; roll.position.set(0, 1.5, 0.4);
-  figure.add(legL, legR, body, head, brim, crown, pack, roll);
+  figure.add(legL, legR, body, head, headwear, pack, roll);
   const ring = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.5, 32), new THREE.MeshBasicMaterial({ color: MODE_COLOR.present, transparent: true, opacity: 0.8, depthWrite: false }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.15;
   const accuracyRing = new THREE.Mesh(new THREE.RingGeometry(0.97, 1, 64), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.18, depthWrite: false }));
@@ -75,9 +94,15 @@ export function initAvatar(ctx) {
   group.add(figure, ring, accuracyRing, shadow);
   let stride = 0, last = null;
   ctx.scene.add(group);
+  queueMicrotask(() => api.setLook(ctx.settings?.avatar || 'hat'));
 
   const api = {
     group,
+    /** 'hat' | 'cap' | 'beanie' | 'hood' (Settings → Your explorer) */
+    setLook(name) {
+      for (const [k, g] of Object.entries(looks)) g.visible = k === (looks[name] ? name : 'hat');
+      figure.traverse((m) => { if (m.isMesh) m.renderOrder = 11; });
+    },
     y: 0, // smoothed ground height under the character
     // colour and controls for the current mode
     style() {

@@ -474,6 +474,17 @@ export class Game {
     }
   }
 
+  // Seen for real by the player ("I saw it!" on a bounty): into the life list, marked as seen in the wild.
+  sawForReal(sp) {
+    const grade = MODES[this.mode].grade;
+    const { snap } = this.conditions();
+    const anchor = makeAnchor(this.world, { lat: this.pos.lat, lon: this.pos.lon });
+    const res = this.profile.recordSpecies(sp, grade, anchor, { ...snap, wild: true });
+    this.journal?.onSpecies(sp, grade, res, 'seen');
+    if (res === 'new') this.profile.log(`Saw ${sp.name} [${grade}]`);
+    return res;
+  }
+
   // Record a creature as seen (walking up to it, or photographing it in AR).
   spot(c, how = 'spotted') {
     if (!this.critters.includes(c)) return;

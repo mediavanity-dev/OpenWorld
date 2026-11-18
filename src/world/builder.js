@@ -126,7 +126,8 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
   const chunk = {
     key: p.key, x: p.x, y: p.y, bounds: p.bounds, latc: p.latc, lonc: p.lonc, group, features, areaName: p.areaName || null,
     streets: p.streets || [], // [{ name, lines: [Float32Array x,z,...] }] in chunk-local metres
-    walk: p.walk || null,     // [Float32Array x,z,...] public walkable ways, chunk-local metres (null: unknown)
+    walk: p.walk || null,
+    waterways: p.waterways || [], // [{ name, cls, line: [[lat, lon], ...] downstream, startEdge, endEdge }]     // [Float32Array x,z,...] public walkable ways, chunk-local metres (null: unknown)
     get pois() { return pois; },
     snapshot: null, detail: false,
     // the most specific name for a spot: a named park it's inside (smallest wins), else the area
