@@ -48,8 +48,8 @@ out, secondary roads at mid zoom, and small streets and paths as you get closer.
 stations) always show; civic and cultural places join at mid zoom; cafés, shops and sport
 appear close up. Icons far from where you're looking fade away to keep the view calm.
 
-You're the small coloured figure with the arrow above its head. The arrow shows through
-buildings, so you can always find yourself.
+You're the small explorer in the hat, its jacket in your mode's colour. The ring at its feet
+shows through buildings, so you can always find yourself.
 
 On phones, the **▸** button next to the mode buttons opens more options (locate, home
 base, search).
@@ -191,6 +191,15 @@ Cafés and shops never count, and each asks for just one thing. It sits in the p
 Journal and This spot, with an arrow to the nearest place that fits; tap it to open that
 place. In the map-only view it becomes a faint ★ with a small arrow at the bottom of the
 screen. It only counts in Walk or Home mode.
+
+**The compass ring.** On an expedition, a ring around your character points the way to its goal
+(a race's finish, a bounty's habitat): **blue** when it's far (over 300 m), **gold** when you're
+getting close, **orange** when you're very close (under 100 m), and it glows when you're there. A
+mystery shows only its colour until you're warm (about 150 m), so it stays a puzzle. The faint
+white circle is your GPS accuracy (how sure the phone is of your position).
+
+The first time you tap the minimap, a **key** explains its marks; it's on the journal's Map tab
+afterwards (**? Minimap key**), and in Settings → Help & about.
 
 The **minimap** (bottom-left on computers, top-right on phones) shows the ground you've
 explored lit up, the rest in fog, plus nearby places. Tap it to open the journal map.

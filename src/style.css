@@ -686,3 +686,18 @@ html.native .native-only { display: block; }
 .rv-img.scene-sky { background: radial-gradient(circle at 70% 25%, #3b3f8f, #0d1030 70%); }
 .rv-img.scene-trail { background: linear-gradient(180deg, #4f6b3a, #24331b); }
 .rv-img[class*="scene-"] span { font-size: 64px; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.4)); }
+
+/* ---------- minimap key (src/ui/mapLegend.js) ---------- */
+#maplegend { z-index: 60; }
+.card.legend { max-width: 420px; max-height: 86vh; overflow-y: auto; }
+.card.legend ul { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 9px; }
+.card.legend li { display: grid; grid-template-columns: 52px 1fr; gap: 10px; align-items: center; }
+.lg-sw { display: flex; gap: 3px; justify-content: center; align-items: center; height: 26px; border-radius: 6px; background: rgba(16,20,26,0.88); padding: 0 4px; }
+.lg-sq { width: 14px; height: 14px; border-radius: 2px; display: inline-block; }
+.lg-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.lg-you { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 13px solid #ff7a3d; display: inline-block; }
+.lg-ring { width: 13px; height: 13px; border-radius: 50%; border: 2px solid #5fd08a; display: inline-block; }
+.lg-glow { width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle, rgba(95,208,138,0.7), rgba(95,208,138,0) 70%); display: inline-block; }
+.lg-arc { width: 24px; height: 24px; border-radius: 50%; border: 3px solid transparent; border-top-color: #ffd36b; display: inline-block; }
+.lg-zone { width: 20px; height: 20px; border-radius: 50%; border: 2px dashed #ffd36b; background: rgba(255,211,107,0.12); display: inline-block; }
+.lg-pin { width: 10px; height: 10px; border-radius: 50%; background: #ffd36b; border: 2px solid #10141a; box-shadow: 0 0 0 1px #ffd36b; display: inline-block; }
