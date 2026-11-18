@@ -141,7 +141,7 @@ export async function loadBaseTile(z, x, y) {
   return normalizeTile(vt);
 }
 
-function emptyFabric() { return { extent: 4096, buildings: [], areas: [], lines: [], pois: [], streets: [], walk: [], waterNames: [], areaName: null }; }
+function emptyFabric() { return { extent: 4096, buildings: [], areas: [], lines: [], pois: [], streets: [], walk: [], waterNames: [], waterways: [], areaName: null }; }
 
 export function normalizeTile(vt) {
   const out = emptyFabric();
@@ -214,7 +214,11 @@ export function normalizeTile(vt) {
       const f = wl.feature(i);
       if (f.type !== 2 || f.properties.brunnel === 'tunnel') continue;
       const w = f.properties.class === 'river' ? 14 : f.properties.class === 'canal' ? 9 : 3;
-      for (const line of f.loadGeometry()) out.lines.push({ cls: 'river', width: w, pts: pts(line) });
+      for (const line of f.loadGeometry()) {
+        out.lines.push({ cls: 'river', width: w, pts: pts(line) });
+        // named streams and rivers, in their direction of flow (OSM draws waterways downstream)
+        if (f.properties.name && line.length > 1) out.waterways.push({ name: f.properties.name, cls: f.properties.class || 'stream', pts: pts(line) });
+      }
     }
   }
 

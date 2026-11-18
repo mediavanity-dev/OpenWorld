@@ -48,7 +48,8 @@ out, secondary roads at mid zoom, and small streets and paths as you get closer.
 stations) always show; civic and cultural places join at mid zoom; cafés, shops and sport
 appear close up. Icons far from where you're looking fade away to keep the view calm.
 
-You're the small explorer in the hat, its jacket in your mode's colour. The ring at its feet
+You're the small explorer, its jacket in your mode's colour; choose its look (wide hat, cap,
+beanie or hood) in Settings → *Your explorer*. The ring at its feet
 shows through buildings, so you can always find yourself.
 
 On phones, the **▸** button next to the mode buttons opens more options (locate, home
@@ -289,6 +290,27 @@ water's edge** (the nearest stream, pond or lake), a bounty can be a plant or fu
 **🧭 New ground** asks you to walk 8 stretches you've never walked, in any direction. Where there
 really isn't enough open data, the board says so and suggests what to do (including adding your
 area to OpenStreetMap).
+
+**🌊 Water: follow it.** Walk to where a named stream flows into another (a confluence), or to
+where a stream begins (its source), from OpenStreetMap's waterways. Where the water's edge isn't
+open to walk, the finish is the nearest public path (the card says so). In the USA, arriving tells
+you where the water goes next, lake by lake and river by river (USGS's public river network: e.g.
+"Lake Monona, the Yahara River, the Rock River and the Mississippi River"). Tap **I'm there!**
+within about 90 m if it doesn't finish by itself.
+
+**Bounties, in the habitat.** When you reach the animal's habitat, a card pops up: where and when
+to look, and what it is. Then either follow its signs (🐾, the green glow) until it shows itself,
+or, if you spot it yourself, tap **👀 I saw it!** (on your honour, like a geocache): it finishes
+the bounty, adds the species to your life list and marks the card *Seen in the wild*. **Log your
+sighting on iNaturalist** opens iNaturalist with the species filled in. If the habitat doesn't
+register, **I'm there!** appears within about 90 m of the spot.
+
+**Summit sprints** finish at a real named high place (a peak, hill, viewpoint or tower) when one is
+close to the top, and are named after it; otherwise after the park they're in.
+
+**Not today?** Every card has **This is a bit much for today: save it for another day**. Saved
+expeditions wait under *Saved for another day* on the board (up to 6) and come back with **Bring it
+back** on any later day (one at a time; it says if it's far from where you are).
 
 **Help as you go.** A mystery tells you when you're **getting warm** (within about 150 m) and
 **very close** (about 60 m), never which way. A bounty adds **field notes** once you reach its

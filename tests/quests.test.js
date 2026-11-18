@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../src/game/game.js';
 import { Profile } from '../src/game/profile.js';
 import { useBackend, memoryBackend } from '../src/storage.js';
-import { Quests, makeMystery, makeBounty, makeRace, rarityOfPlace, rarityOfSpecies, rankOf, sectorOf, sunsetIn, parTime, nearestHabitat } from '../src/game/quests.js';
+import { Quests, makeMystery, makeBounty, makeRace, makeWater, rarityOfPlace, rarityOfSpecies, rankOf, sectorOf, sunsetIn, parTime, nearestHabitat } from '../src/game/quests.js';
 import { haversine, offsetGeo, rng } from '../src/geo.js';
 
 useBackend(memoryBackend);
@@ -357,4 +357,63 @@ test('quests: a mystery finishes at the door, not only at its map point ("I\'m h
   t.game.pos = offsetGeo(m2.lat, m2.lon, 32, 0);
   t.q.step();
   assert.ok(t.events.some((e) => e.type === 'quest-done'));
+});
+
+test('water: a confluence where a named stream ends on another, a source where one begins; tile-cut ends ignored', () => {
+  const P = (e, n) => { const g = offsetGeo(HOME.lat, HOME.lon, e, n); return [g.lat, g.lon]; };
+  const brook = { name: 'Mill Brook', cls: 'stream', line: [P(0, 900), P(0, 600), P(0, 400)], startEdge: false, endEdge: false };
+  const river = { name: 'Great River', cls: 'river', line: [P(-500, 400), P(500, 400)], startEdge: true, endEdge: true };
+  const cut = { name: 'Cut Stream', cls: 'stream', line: [P(300, 1000), P(300, 700)], startEdge: true, endEdge: true };
+  const kinds = new Set();
+  for (const v of [0.05, 0.3, 0.6, 0.95]) {
+    const o = makeWater(HOME, [brook, river, cut], () => v);
+    assert.ok(o);
+    kinds.add(o.kind);
+    if (o.kind === 'confluence') { assert.equal(o.a, 'Mill Brook'); assert.equal(o.b, 'Great River'); }
+    else { assert.equal(o.kind, 'source'); assert.equal(o.a, 'Mill Brook'); }
+    assert.ok(o.a !== 'Cut Stream');
+  }
+  assert.deepEqual([...kinds].sort(), ['confluence', 'source']);
+  assert.equal(makeWater(HOME, [cut], rng(1)), null);
+});
+
+test('saved for another day: a quest leaves the board, its slot refills, and it comes back on request', () => {
+  const { game, q } = setup();
+  game.enter('roam', { to: HOME });
+  q.step();
+  const m = q.s.offers.find((o) => o?.type === 'mystery');
+  q.accept(m.id);
+  assert.ok(q.saveForLater(m.id));
+  assert.equal(q.active(), null);
+  assert.equal(q.saved()[0].id, m.id);
+  assert.ok(!q.s.offers.some((o) => o?.id === m.id));
+  const back = q.restore(m.id);
+  assert.ok(back && back.restored);
+  assert.equal(q.saved().length, 0);
+  assert.ok(q.s.offers.some((o) => o?.id === m.id));
+});
+
+test('bounty: "I saw it!" finishes it, marks the card seen in the wild, and adds the species', () => {
+  const species = [{ id: 7, name: 'Grey Heron', sci: 'Ardea cinerea', group: 'Aves', count: 30, rarity: 'common', photo: null }];
+  const { game, q, events, profile } = setup({ habitat: () => 'water' });
+  game.wild = { species };
+  game.enter('roam', { to: HOME });
+  q.step();
+  const b = q.s.offers.find((o) => o?.type === 'bounty') || q.make('bounty');
+  if (!q.s.offers.includes(b)) q.s.offers.push(b);
+  q.accept(b.id);
+  assert.ok(q.sawIt());
+  const done = events.find((e) => e.type === 'quest-done');
+  assert.ok(done.card.seen);
+  assert.ok(profile.data.species[7]);
+});
+
+test('summit: a named viewpoint near the top is the finish, and names the race', () => {
+  const view = at(0, 400, { ref: 'osm:node/9', name: 'One Tree Hill', kind: 'tourism:viewpoint', tags: null });
+  // a hill whose top is the viewpoint, 400 m north
+  const ground = (lat, lon) => Math.max(10, 40 - haversine(lat, lon, view.lat, view.lon) / 12);
+  const r = makeRace(HOME, ground, [view], 'present', null, rng(3));
+  assert.equal(r.kind, 'summit');
+  assert.equal(r.name, 'One Tree Hill');
+  assert.match(r.title, /One Tree Hill/);
 });

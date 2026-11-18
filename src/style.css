@@ -701,3 +701,27 @@ html.native .native-only { display: block; }
 .lg-arc { width: 24px; height: 24px; border-radius: 50%; border: 3px solid transparent; border-top-color: #ffd36b; display: inline-block; }
 .lg-zone { width: 20px; height: 20px; border-radius: 50%; border: 2px dashed #ffd36b; background: rgba(255,211,107,0.12); display: inline-block; }
 .lg-pin { width: 10px; height: 10px; border-radius: 50%; background: #ffd36b; border: 2px solid #10141a; box-shadow: 0 0 0 1px #ffd36b; display: inline-block; }
+
+/* ---------- bounty: in the habitat (expeditions.js habitatCard) ---------- */
+.rv-card.habitat { width: min(380px, 100%); max-height: 82vh; overflow-y: auto; background: #1b2028; border: 1px solid rgba(95, 208, 138, 0.45); border-radius: 16px; padding: 18px; }
+.rv-card.habitat .hb-top { display: flex; gap: 12px; align-items: center; margin: 6px 0 4px; }
+.rv-card.habitat .hb-top img { width: 84px; height: 84px; border-radius: 12px; object-fit: cover; flex: none; }
+.rv-card.habitat .hb-top h2 { margin: 0; }
+.rv-card.habitat .hb-note { margin: 6px 0; font-size: 13px; color: #dfe4ea; }
+.rv-card.habitat .hb-btns { display: flex; gap: 8px; margin-top: 10px; }
+.rv-card.habitat .hb-btns button { flex: 1; padding: 10px; font-weight: 600; }
+.rv-card.habitat .hb-inat { display: block; margin-top: 10px; text-align: center; font-size: 13px; }
+.qbtns .qhere + .qhere { margin-left: 0; }
+#set-look { margin-top: 6px; }
+#set-look button { flex: 1; padding: 7px 4px; }
+#set-look button.active { background: rgba(255, 122, 61, 0.28); border-color: var(--present); }
+
+/* ---------- saved for another day, water expeditions ---------- */
+.qlater { display: block; width: 100%; margin-top: 8px; background: none; border: none; color: var(--muted); font-size: 12px; text-decoration: underline; text-align: center; }
+.qsaved { margin: 10px 0; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 10px; }
+.qsaved summary { cursor: pointer; color: var(--accent); }
+.qsaved-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.qsaved-row > span { flex: 1; }
+.qsaved-row small { display: block; color: var(--muted); }
+.qsaved-row .link { background: none; border: none; color: var(--muted); }
+.qart.water-q { background: linear-gradient(180deg, #2b5f86, #123049); }

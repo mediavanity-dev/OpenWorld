@@ -286,8 +286,16 @@ async function build({ x, y, opts }) {
     waterNames.push({ name: a.name, lat: latOf(sy / r.length), lon: lonOf(sx / r.length) });
   }
 
+  // named waterways in lat/lon; an end on the tile's edge is only where the tile cut the line
+  const EDGE = E * 0.004;
+  const atEdge = ([px, py]) => px <= EDGE || py <= EDGE || px >= E - EDGE || py >= E - EDGE;
+  const waterways = (fabric.waterways || []).map((w) => ({
+    name: w.name, cls: w.cls, line: w.pts.map(([px, py]) => [+latOf(py).toFixed(6), +lonOf(px).toFixed(6)]),
+    startEdge: atEdge(w.pts[0]), endEdge: atEdge(w.pts[w.pts.length - 1]),
+  }));
+
   const payload = {
-    named, waterNames,
+    named, waterNames, waterways,
     key: `${CHUNK_Z}/${x}/${y}`, x, y, bounds: b, latc, lonc, extent: E, gridN: GRID, grid, areaName: fabric.areaName, streets, walk,
     terrain: { pos: tPos, uv: tUv }, texture, habitat, habitatN: HGRID,
     buildings, trees: packTrees(blobs), cones: packTrees(cones), pois,

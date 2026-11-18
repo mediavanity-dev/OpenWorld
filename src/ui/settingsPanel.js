@@ -38,6 +38,7 @@ export function initSettingsPanel(ctx) {
     $('set-motion').checked = settings.reduceMotion;
     $('set-sound').checked = settings.sound;
     $('set-sfx').checked = settings.sfx !== false;
+    for (const b of document.querySelectorAll('#set-look [data-look]')) b.classList.toggle('active', b.dataset.look === (settings.avatar || 'hat'));
     $('set-tech').checked = !!settings.tech;
     $('set-beta').innerHTML = Object.entries(FEATURES).filter(([k]) => featureAvailable(k))
       .map(([k, f]) => `<label class="set check"><input type="checkbox" data-feature="${k}" ${settings.features?.[k] !== false ? 'checked' : ''}/> ${esc(f.label)}</label>`).join('');
@@ -69,6 +70,12 @@ export function initSettingsPanel(ctx) {
   $('set-tech').onchange = (e) => { settings.tech = e.target.checked; saveSettings(); document.body.classList.toggle('tech', settings.tech); };
   document.body.classList.toggle('tech', !!settings.tech);
   initNativeSettings(ctx);
+  $('set-look').onclick = (e) => {
+    const b = e.target.closest('[data-look]');
+    if (!b) return;
+    settings.avatar = b.dataset.look; saveSettings(); ctx.avatar?.setLook(settings.avatar);
+    for (const x of document.querySelectorAll('#set-look [data-look]')) x.classList.toggle('active', x === b);
+  };
   $('set-sfx').onchange = (e) => { settings.sfx = e.target.checked; saveSettings(); };
   $('set-sound').onchange = (e) => { settings.sound = e.target.checked; saveSettings(); settings.sound ? ambience.start() : ambience.stop(); };
 

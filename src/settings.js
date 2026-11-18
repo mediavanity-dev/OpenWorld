@@ -25,6 +25,7 @@ const defaults = {
   reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
   sound: false,             // ambient soundscape (off by default)
   sfx: true,
+  avatar: 'hat',            // the explorer's look: hat | cap | beanie | hood
   tech: false,
   notify: false,            // app only: morning expeditions nudge
   notifyHour: 8,              // show position, location fix and the event log in the panels                // short sound effects for finds, cards and hints (on by default)

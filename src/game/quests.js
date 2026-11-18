@@ -25,6 +25,7 @@ import { placeFacts } from '../data/wikidata.js';
 import { wikiSummary } from '../data/wiki.js';
 import { reachable as walkableTo, nearestPath, closedToPublic } from './reach.js';
 import { taxonDetails, seasonality, lastSightings } from '../data/science.js';
+import { downstream } from '../data/watershed.js';
 
 export const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 const bump = (r, n = 1) => RARITIES[Math.max(0, Math.min(RARITIES.length - 1, RARITIES.indexOf(r) + n))];
@@ -433,7 +434,7 @@ export function parTime(d, mode) { return Math.round((d * 1.4) / (PACE[mode] || 
  * @param {(lat: number, lon: number) => ({lat: number, lon: number} | null)} [snap] the nearest
  *   point on a public way (null: nothing walkable near); finishes are never off the paths
  */
-export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random, inside = (_p) => true, snap = (lat, lon) => ({ lat, lon }), { reach = 650, habitatAt = null, waterName = null } = {}) {
+export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random, inside = (_p) => true, snap = (lat, lon) => ({ lat, lon }), { reach = 650, habitatAt = null, waterName = null, placeName = null } = {}) {
   const here = groundAt(pos.lat, pos.lon);
   let target = null, kind, gain = 0;
   if (here != null) {
@@ -455,7 +456,22 @@ export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random
       const d = q && haversine(pos.lat, pos.lon, q.lat, q.lon);
       if (h != null && h - here >= 6 && d >= 150 && inside(q)) { target = { lat: q.lat, lon: q.lon, h, d }; break; }
     }
-    if (target) { kind = 'summit'; gain = Math.round(target.h - here); }
+    if (target) {
+      kind = 'summit';
+      // a real named high place close to the top (a peak, hill, viewpoint or tower) is the finish
+      // instead, if it's about as high; else the top is named after the park or area it's in
+      const named = pois.filter((p) => p.name && !closedToPublic(p) && /peak|hill|viewpoint|tower|observatory|monument|memorial|attraction|castle|ruins/.test(p.kind || '')
+        && haversine(p.lat, p.lon, target.lat, target.lon) < 150)
+        .map((p) => ({ p, h: groundAt(p.lat, p.lon) }))
+        .filter(({ p, h }) => h != null && h >= target.h - 4 && h - here >= 6 && inside(p) && haversine(pos.lat, pos.lon, p.lat, p.lon) >= 150)
+        .sort((a, b) => b.h - a.h || Number(/peak|hill|viewpoint/.test(b.p.kind)) - Number(/peak|hill|viewpoint/.test(a.p.kind)));
+      for (const { p, h } of named) {
+        const q = snap(p.lat, p.lon);
+        if (q) { target = { lat: q.lat, lon: q.lon, h, d: haversine(pos.lat, pos.lon, q.lat, q.lon), name: p.name.replace(/\s*\(\d+ m\)$/, '') }; break; }
+      }
+      if (!target.name) { const n = placeName?.(target.lat, target.lon); if (n) target.name = `the top of ${n}`; }
+      gain = Math.round(target.h - here);
+    }
   }
   if (!target) {
     const spots = [];
@@ -493,8 +509,8 @@ export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random
   // the real sunset as the clock, if it's close and reachable
   const sunset = sunsetMs != null && sunsetMs > par * 1000 * 1.1 && sunsetMs < 100 * 60000;
   const name = target.name || null;
-  const title = sunset ? (kind === 'summit' ? 'Beat the sunset to the high ground' : `Beat the sunset to ${name}`)
-    : kind === 'summit' ? 'Summit sprint' : kind === 'viewpoint' ? `Race to the view: ${name}` : kind === 'water' ? (name && name !== 'the water’s edge' ? `Race to the water: ${name}` : 'Race to the water’s edge') : `Dash to ${name}`;
+  const title = sunset ? (kind === 'summit' ? (name ? `Beat the sunset to ${name}` : 'Beat the sunset to the high ground') : `Beat the sunset to ${name}`)
+    : kind === 'summit' ? (name ? `Summit sprint: ${name}` : 'Summit sprint') : kind === 'viewpoint' ? `Race to the view: ${name}` : kind === 'water' ? (name && name !== 'the water’s edge' ? `Race to the water: ${name}` : 'Race to the water’s edge') : `Dash to ${name}`;
   return {
     type: 'race', id: uid('r'),
     title, kind, name, lat: target.lat, lon: target.lon, dist: roundTo(target.d, 10), gain,
@@ -529,6 +545,62 @@ export function makeSkyQuest(pos, habitatAt, mode, ev, inside = (_p) => true, sn
   return null;
 }
 
+/**
+ * Follow the water: walk to where a named stream meets another (a confluence), or to where a
+ * stream begins (its source). From OpenStreetMap's waterways, which are drawn downstream, so a
+ * line's last point is where it flows into the next. Ends cut by a map tile's edge don't count.
+ * @param {{ name: string, cls: string, line: number[][], startEdge: boolean, endEdge: boolean }[]} ways
+ */
+export function makeWater(pos, ways, rand = Math.random, inside = (_p) => true, snap = (lat, lon) => ({ lat, lon }), range = [200, 1500]) {
+  const near = (p, w, m) => distToLine(p, w.line) <= m;
+  const cands = [];
+  for (const a of ways) {
+    if (/drain|ditch/.test(a.cls)) continue;
+    const mouth = a.line[a.line.length - 1], src = a.line[0];
+    if (!a.endEdge) {
+      const b = ways.find((w) => w !== a && w.name !== a.name && !/drain|ditch/.test(w.cls) && near(mouth, w, 20));
+      if (b) cands.push({ kind: 'confluence', a: a.name, b: b.name, at: { lat: mouth[0], lon: mouth[1] }, big: b.cls === 'river' });
+    }
+    if (!a.startEdge && a.cls === 'stream' && !ways.some((w) => w !== a && near(src, w, 20))) {
+      cands.push({ kind: 'source', a: a.name, at: { lat: src[0], lon: src[1] } });
+    }
+  }
+  const seen = new Set();
+  const pool = [];
+  for (const c of cands) {
+    const key = c.kind + c.a + (c.b || '');
+    const d = haversine(pos.lat, pos.lon, c.at.lat, c.at.lon);
+    if (seen.has(key) || d < range[0] || d > range[1] || !inside(c.at)) continue;
+    seen.add(key);
+    pool.push({ ...c, d });
+  }
+  pool.sort((x, y) => x.d - y.d).splice(6);
+  while (pool.length) {
+    const c = pool.splice(Math.floor(rand() * pool.length), 1)[0];
+    const q = snap(c.at.lat, c.at.lon);
+    if (!q) continue;
+    const d = haversine(pos.lat, pos.lon, q.lat, q.lon);
+    return {
+      type: 'water', id: uid('w'), kind: c.kind, a: c.a, b: c.b || null, at: c.at, lat: q.lat, lon: q.lon, dist: roundTo(d, 10), off: q.off > 40 ? roundTo(q.off, 10) : 0,
+      title: c.kind === 'confluence' ? `Follow the water: where the ${c.a} meets the ${c.b}` : `Find where the ${c.a} begins`,
+      rarity: c.kind === 'source' ? 'rare' : c.big ? 'rare' : 'uncommon',
+    };
+  }
+  return null;
+}
+/** metres from a point ([lat, lon]) to a polyline ([[lat, lon], ...]) */
+export function distToLine(p, line) {
+  if (line.length === 1) return haversine(p[0], p[1], line[0][0], line[0][1]);
+  let best = Infinity;
+  for (let k = 1; k < line.length; k++) {
+    const a = offsetMeters(p[0], p[1], line[k - 1][0], line[k - 1][1]), b = offsetMeters(p[0], p[1], line[k][0], line[k][1]);
+    const vx = b.x - a.x, vz = b.z - a.z, L = vx * vx + vz * vz || 1;
+    const t = Math.max(0, Math.min(1, -(a.x * vx + a.z * vz) / L));
+    best = Math.min(best, Math.hypot(a.x + vx * t, a.z + vz * t));
+  }
+  return best;
+}
+
 // ---------------------------------------------------------------- the live state
 const TYPES = ['mystery', 'bounty', 'race'];
 export const MYSTERY_WARM_M = 150, MYSTERY_HOT_M = 60; // closeness signals for a mystery
@@ -539,7 +611,8 @@ const REDEAL_M = 1500;          // walk/roam this far from where the board was d
 const FILL_FALLBACK_S = 25;     // a slot that can't be filled (no wildlife data…) becomes another type
 const EMPTY_AFTER_S = 60;       // still nothing at all: say honestly that little is mapped here
 // what a slot tries next when its own kind can't be dealt here (always ending somewhere playable)
-const FALLBACK = { mystery: ['race', 'ground'], bounty: ['ground', 'race'], race: ['ground', 'mystery'] };
+const FALLBACK = { mystery: ['race', 'water', 'ground'], bounty: ['water', 'ground', 'race'], race: ['water', 'ground', 'mystery'] };
+const WATER_SHARE = 0.4; // how often the race slot tries a water expedition first
 
 export class Quests {
   /** @param {any} game  the Game (world, profile, env, pos, mode, wild) */
@@ -550,7 +623,7 @@ export class Quests {
     this._tries = 0;
     this._wrong = new Set();
     // where real facts come from (swappable in tests)
-    this.lookup = { facts: placeFacts, summary: wikiSummary, taxon: taxonDetails, season: seasonality, sightings: lastSightings };
+    this.lookup = { facts: placeFacts, summary: wikiSummary, taxon: taxonDetails, season: seasonality, sightings: lastSightings, downstream };
     this.tidy();
   }
 
@@ -569,6 +642,17 @@ export class Quests {
       this.profile.save();
       this.emit('quest-dealt', null);
     } catch { /* the plain riddle stands */ }
+  }
+  // US only: the lakes and rivers downstream of a water expedition's spot (fetched in the background)
+  async waterFacts(o) {
+    if (o.journey !== undefined || this.game.dataSaver) return;
+    o.journey = null;
+    try {
+      const names = await this.lookup.downstream(o.at.lat, o.at.lon);
+      const after = (names || []).filter((n) => n !== o.a && n !== o.b);
+      o.journey = after.length ? after : null;
+      this.profile.save();
+    } catch { /* just the stream names */ }
   }
   get profile() { return this.game.profile; }
   get s() { return this.ensure(); }
@@ -601,7 +685,7 @@ export class Quests {
   // Swap the active quest for another of the same kind, with no penalty, and remember the spot.
   cantReach() {
     const s = this.s, o = this.active();
-    if (!o || (o.type !== 'mystery' && o.type !== 'race')) return null;
+    if (!o || (o.type !== 'mystery' && o.type !== 'race' && o.type !== 'water')) return null;
     (s.blocked ||= []).push({ ref: o.ref || null, lat: +o.lat.toFixed(5), lon: +o.lon.toFixed(5) });
     if (s.blocked.length > 300) s.blocked.splice(0, s.blocked.length - 300);
     const i = s.offers.indexOf(o);
@@ -626,6 +710,8 @@ export class Quests {
     const g = this.game;
     if (g.mode === 'present' && g.fix?.source === 'ip') return 'You’re placed by your internet connection, so you can’t move. Set a home base, or play on your phone.';
     if (o.needsDark && g.pos && g.env.sunPhase(g.env.sun(g.pos.lat, g.pos.lon).alt) !== 'night') return 'Opens after dark, when the sky is dark enough to see it.';
+    const goal = this.goal(o);
+    if (o.restored && goal && g.pos && haversine(g.pos.lat, g.pos.lon, goal.lat, goal.lon) > 3000) return `It’s about ${Math.round(haversine(g.pos.lat, g.pos.lon, goal.lat, goal.lon) / 1000)} km from here. Bring it back when you’re nearby, or save it again.`;
     if (!this.reachable(o)) return `Outside your home range. Play it in ${WALK}, or in Roam as an echo.`;
     return null;
   }
@@ -643,7 +729,7 @@ export class Quests {
     s.origin = { lat: this.game.pos.lat, lon: this.game.pos.lon };
     const at = keep ? s.offers.findIndex((o) => o && o.id === keep.id) : -1; // the active quest keeps its slot
     s.offers = TYPES.map((_, i) => (i === at ? keep : null));
-    if (keep && at >= TYPES.length) s.offers.push(keep); // an event quest in progress
+    if (keep && at >= TYPES.length) s.offers.push(keep); // an event or restored quest in progress
     if (why !== 'move') s.swaps = 1;
     this._tries = 0;
     this._fillT = 0;
@@ -652,6 +738,43 @@ export class Quests {
 
   /** Nothing could be dealt for a while: little is mapped around here (the board says so). */
   empty() { return this._tries * 2 > EMPTY_AFTER_S && this.s.offers.some((o) => !o); }
+
+  // ---------------------------------------------------------------- saved for another day
+  // "This is a bit much for today": an offer (or the active expedition) goes on a short list and
+  // its slot is dealt afresh; it comes back on any later day with "Bring it back".
+  static SAVED_MAX = 6;
+  saved() { return this.s.saved || []; }
+  saveForLater(id) {
+    const s = this.s, i = s.offers.findIndex((o) => o && o.id === id);
+    const o = s.offers[i];
+    if (!o || o.done || o.event) return false;
+    const keep = { ...o };
+    for (const k of ['startedAt', 'pending', 'live', 'band', 'inHabitat', 'from', 'guessed']) delete keep[k];
+    keep.savedOn = this.date();
+    (s.saved ||= []).unshift(keep);
+    if (s.saved.length > Quests.SAVED_MAX) s.saved.length = Quests.SAVED_MAX;
+    if (s.active === id) s.active = null;
+    if (i < TYPES.length) s.offers[i] = null; else s.offers.splice(i, 1); // the slot is dealt afresh
+    this._fillT = 0;
+    this.profile.log(`Saved for another day: ${o.title}`);
+    this.profile.save();
+    return true;
+  }
+  /** Bring a saved expedition back onto today's board (as an extra card). */
+  restore(id) {
+    const s = this.s, i = this.saved().findIndex((o) => o.id === id);
+    if (i < 0 || s.offers.some((o) => o?.restored && !o.done)) return false; // one at a time
+    const [o] = s.saved.splice(i, 1);
+    delete o.savedOn; o.restored = true;
+    s.offers.push(o);
+    this.profile.save();
+    return o;
+  }
+  dropSaved(id) {
+    const s = this.s;
+    s.saved = this.saved().filter((o) => o.id !== id);
+    this.profile.save();
+  }
 
   // swap one offer for a fresh one of the same type (once a day)
   swap(i) {
@@ -685,12 +808,30 @@ export class Quests {
       const bounty = (plants) => makeBounty(pos, g.wild.species, this.profile.data.species || {}, (a, b) => w.habitatAt(a, b), Math.random, avoid, inside, plants);
       return bounty(false) || bounty(true); // animals first, then plants and fungi
     }
+    if (type === 'water') {
+      const ways = [];
+      for (const ch of w.readyChunks?.() || []) ways.push(...(ch.waterways || [])); // the loaded areas are all around you
+      if (!ways.length) return null;
+      // water's edges are often fenced, private or wild: the finish is the nearest public path,
+      // up to 300 m away ("as close as the paths go", which the card then says)
+      const wsnap = (lat, lon) => { const n = nearestPath(w, lat, lon, 300); return !n.known ? { lat, lon } : n.d <= 300 ? { lat: n.lat, lon: n.lon, off: n.d } : null; };
+      const o = makeWater(pos, ways, Math.random, inside, wsnap);
+      if (o) this.waterFacts(o);
+      return o;
+    }
+    if (type === 'race' && !this._noWater && Math.random() < WATER_SHARE) {
+      this._noWater = true;
+      const o = this.make('water', avoid);
+      this._noWater = false;
+      if (o) return o;
+    }
     if (type === 'race') {
       const ss = sunsetIn((t) => g.env.sun(pos.lat, pos.lon, new Date(t)).alt);
       const habitatAt = (a, b) => w.habitatAt(a, b);
       const waterName = (a, b) => w.chunkAt?.(a, b)?.waterNameNear?.(a, b) || null;
-      let r = makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside, snap, { habitatAt, waterName });
-      if (!r) { r = makeRace(pos, (a, b) => w.groundAt(a, b), [...w.pois(pos.lat, pos.lon, 1900)].map((x) => x.poi), g.mode, ss, Math.random, inside, snap, { reach: 1800, habitatAt, waterName }); if (r) longer(r); }
+      const placeName = (a, b) => { const ch = w.chunkAt?.(a, b), n = ch?.nameAt?.(a, b); return n && n !== ch?.areaName ? n : null; }; // a park, not the suburb
+      let r = makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside, snap, { habitatAt, waterName, placeName });
+      if (!r) { r = makeRace(pos, (a, b) => w.groundAt(a, b), [...w.pois(pos.lat, pos.lon, 1900)].map((x) => x.poi), g.mode, ss, Math.random, inside, snap, { reach: 1800, habitatAt, waterName, placeName }); if (r) longer(r); }
       return r;
     }
     if (type === 'ground') {
@@ -784,6 +925,14 @@ export class Quests {
     this.complete(o);
     return true;
   }
+  /** "I'm there!" for a water expedition: within MYSTERY_HERE_M of the spot. */
+  imThere() {
+    const o = this.active(), g = this.game;
+    if (!o || o.type !== 'water' || !g.pos || (g.sharpEnough && !g.sharpEnough())) return false;
+    if (haversine(g.pos.lat, g.pos.lon, o.lat, o.lon) > MYSTERY_HERE_M) return false;
+    this.complete(o);
+    return true;
+  }
   /** "I'm here" for the active mystery: works within MYSTERY_HERE_M of its place. */
   imHere() {
     const o = this.active(), g = this.game;
@@ -827,6 +976,8 @@ export class Quests {
         const dd = haversine(poi.lat, poi.lon, o.lat, o.lon);
         this.emit('quest-wrong', `Not me! Look about ${roundTo(dd, 50)} m ${sectorOf(bearingTo(poi, o))} of ${poi.name}.`);
       }
+    } else if (o.type === 'water') {
+      if (d <= this.reach() + 15) this.complete(o);
     } else if (o.type === 'ground') {
       if (Date.now() - (this._groundT || 0) > 1500) {
         this._groundT = Date.now();
@@ -947,12 +1098,32 @@ export class Quests {
   // game hooks
   bounty() { const o = this.active(); return o?.type === 'bounty' ? o : null; }
   onFlee(sp) { const o = this.bounty(); if (o && o.sp.id === sp.id) { o.fled++; this.profile.save(); } }
+  /** "I saw it!": the player saw the bounty's animal (or plant) for real. On their honour, like a geocache. */
+  sawIt() {
+    const o = this.bounty();
+    if (!o) return false;
+    this.game.sawForReal?.(o.sp);
+    this.complete(o, { seen: true });
+    return true;
+  }
+  /** "I'm there!": at the bounty's habitat (within MYSTERY_HERE_M of the spot it was dealt for). */
+  atHabitat() {
+    const o = this.bounty(), g = this.game;
+    if (!o || o.inHabitat || !o.habitat || !g.pos || (g.sharpEnough && !g.sharpEnough())) return false;
+    if (haversine(g.pos.lat, g.pos.lon, o.habitat.lat, o.habitat.lon) > MYSTERY_HERE_M) return false;
+    o.inHabitat = true;
+    this.profile.save();
+    this.emit('quest-habitat', null, { quest: o });
+    this.notes(o, o.habitat.hab);
+    return true;
+  }
   onSpecies(sp, how) { const o = this.bounty(); if (o && o.sp.id === sp.id) this.complete(o, { photo: how === 'photo' }); }
 
   starsFor(o, secs) {
     if (o.type === 'mystery') return Math.min(3, Math.max(1, 3 - o.used.length) + (o.guessRight ? 1 : 0));
     if (o.type === 'bounty') return Math.max(1, 3 - o.fled - (o.used?.length || 0));
     if (o.type === 'ground') return secs <= o.par ? 3 : secs <= o.par * 1.5 ? 2 : 1;
+    if (o.type === 'water') return 3; // getting there is the achievement
     return secs <= o.par ? 3 : secs <= o.par * 1.5 ? 2 : 1;
   }
 
@@ -971,9 +1142,10 @@ export class Quests {
       area: g.world.chunkAt?.(o.lat ?? g.pos.lat, o.lon ?? g.pos.lon)?.nameAt?.(o.lat ?? g.pos.lat, o.lon ?? g.pos.lon) || null,
       lat: +(o.lat ?? g.pos.lat).toFixed(5), lon: +(o.lon ?? g.pos.lon).toFixed(5),
       ...(o.type === 'mystery' ? { name: o.place.name, kind: o.place.kind, year: o.place.year, ref: o.ref, tags: o.place.tags ? { wikipedia: o.place.tags.wikipedia, wikidata: o.place.tags.wikidata } : null, clues: o.used.length, guessRight: o.guessRight ?? null } : {}),
-      ...(o.type === 'bounty' ? { name: o.sp.name, sci: o.sp.sci, group: o.sp.group, spId: o.sp.id, img: o.sp.photo, credit: o.sp.credit, photo: !!extra.photo } : {}),
+      ...(o.type === 'bounty' ? { name: o.sp.name, sci: o.sp.sci, group: o.sp.group, spId: o.sp.id, img: o.sp.photo, credit: o.sp.credit, photo: !!extra.photo, seen: !!extra.seen } : {}),
+      ...(o.type === 'water' ? { name: o.kind === 'confluence' ? `Where the ${o.a} meets the ${o.b}` : `Source of the ${o.a}`, waterKind: o.kind, a: o.a, b: o.b, journey: o.journey || null } : {}),
       ...(o.type === 'ground' ? { name: o.area ? `New ground in ${o.area}` : 'New ground', target: o.target, par: o.par } : {}),
-      ...(o.type === 'race' ? { name: o.kind === 'summit' ? 'High ground' : o.name, gain: o.gain, par: o.par, sunset: o.sunset, raceKind: o.kind, ground: g.world.groundAt(g.pos.lat, g.pos.lon) } : {}),
+      ...(o.type === 'race' ? { name: o.kind === 'summit' ? o.name || 'High ground' : o.name, gain: o.gain, par: o.par, sunset: o.sunset, raceKind: o.kind, ground: g.world.groundAt(g.pos.lat, g.pos.lon) } : {}),
     };
     // a real-world moment makes it rarer (golden hour, rain, snow, a full moon or meteor shower at night)
     const bonus = o.event ? null : liveBonus(g.env, g.pos);
