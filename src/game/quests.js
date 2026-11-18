@@ -1103,6 +1103,8 @@ export class Quests {
     const o = this.bounty();
     if (!o) return false;
     this.game.sawForReal?.(o.sp);
+    if (this.game.hunt?.sp?.id === o.sp.id) this.game.hunt = null; // no point tracking it now
+    this.game.critters = (this.game.critters || []).filter((c) => c.sp?.id !== o.sp.id);
     this.complete(o, { seen: true });
     return true;
   }

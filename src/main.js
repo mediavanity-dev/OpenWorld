@@ -364,6 +364,7 @@ function onGameEvent(ev) {
     buzz([30, 40, 30, 40, 60]); sfx.discover(ev.grade);
     hud.render();
     const card = () => showSpecies(ev.critter.sp, { result: ev.result, grade: ev.grade, autoClose: 12000, pos: game.pos });
+    if (game.quests?.bounty()?.sp.id === ev.critter.sp.id) return; // the bounty's own card turns over instead
     if (ev.result === 'new') ctx.finds.quizSpecies(ev.critter.sp, card); else card();
   } else if (ev.type === 'beacon') { toast(ev.msg); markers.refreshBeacons(); }
   else if (ev.type === 'rock') { ctx.finds.rockFound(ev.rock); buzz(30); }

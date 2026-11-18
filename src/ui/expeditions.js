@@ -103,7 +103,7 @@ export function initExpeditions(ctx) {
           ${game.mode === 'roam' ? '<span class="echo-note">Roam: cards are echoes. They earn a few practice stars (up to 5), then only real play counts.</span>' : game.mode === 'home' ? '<span class="muted">Home: every goal is inside your home range.</span>' : ''}</p>
         ${intro ? '' : `<details class="qhow" ${howOpen ? 'open' : ''}><summary>How expeditions work</summary>
           <p>🔍 <b>Mystery</b>: a riddle about a real place nearby. Work out which one and go there. Stuck? Buy a clue, but each costs a star. At old places, guess its age at the end to win a star back.</p>
-          <p>🎯 <b>Bounty</b>: an animal people have really recorded around here. Head for the habitat it likes, follow its signs (🐾) and approach gently.</p>
+          <p>🎯 <b>Bounty</b>: an animal people have really recorded around here. Head for the habitat it likes. Then finish it either way: <b>in the game</b>, follow its signs (🐾, the green glow) until the game’s one shows itself, and walk up to it gently or photograph it; or <b>for real</b>, if you see the actual animal, tap <b>I saw it!</b> (and log it on iNaturalist if you like).</p>
           <p>⏱ <b>Race</b>: reach the high ground or a landmark inside par time, or before the real sunset.</p>
           <p id="qhow-cards"><b>Cards.</b> Every finish turns over a card for the real thing you found: the place, the animal or the climb, with its story. They're your field collection, kept in <b>Your cards</b> and shown as ◆ on your journal map.</p>
           <p><b>Rarity comes from the real world, not luck:</b> ${RARITIES.map((r) => `<span class="qgem r-${r}">${RARITY_LABEL[r]}</span>`).join(' ')}. Old places rate higher (over 120 years Rare, 250 Epic, 500 Legendary), as do listed buildings and places with an encyclopedia entry, animals rarely recorded around here, big climbs and beating the sunset. You see it before you choose.</p>
@@ -160,7 +160,7 @@ export function initExpeditions(ctx) {
       const lbl = GROUP_STYLE[o.sp.group]?.label || 'creature';
       hook = `<p class="qhook"><i>${esc(o.sp.sci || '')}</i>, ${/^[aeiou]/.test(lbl) ? 'an' : 'a'} ${esc(lbl)} recorded <b>${o.sp.count}</b> times near here by real naturalists.</p>
         <p class="qhook">${o.habitat ? `It favours ${esc(o.habitat.text)}: the nearest is ${o.habitat.d ? `about ${fmtDist(o.habitat.d)} to the <b>${o.habitat.sector}</b>` : '<b>right here</b>'}.` : 'It gets by among the streets. Keep your eyes open as you walk.'}</p>`;
-      meta.push('Follow its signs · approach gently');
+      meta.push('Two ways to finish: track the game’s one in its habitat (🐾 signs, approach gently), or see a real one and tap “I saw it!”');
       if (isAct) {
         // help as you go: field notes once you're in its habitat, and a last-sighting clue
         const used = o.used?.length || 0;
@@ -439,9 +439,10 @@ export function initExpeditions(ctx) {
       <p class="rv-kicker">🎯 You’re in its habitat</p>
       <div class="hb-top">${img ? `<img src="${esc(img)}" alt="">` : ''}<div><h2>${esc(o.sp.name)}</h2><p class="muted"><i>${esc(o.sp.sci || '')}</i></p></div></div>
       ${notes}
-      <p class="qhook">Watch for its signs: 🐾 on the tracker and a green glow on the minimap, then walk up to it gently or photograph it. Or, if you spot it yourself:</p>
+      <div class="hb-way"><b>🎮 In the game</b><span>The game’s ${esc(o.sp.name)} is somewhere in this habitat. Watch for its signs (🐾 on the tracker, a green glow on the minimap), follow them until it shows itself, then walk up to it gently or photograph it in camera view.</span></div>
+      <div class="hb-way"><b>🌿 For real</b><span>If you see a real one, that counts too: tap <b>I saw it!</b> It’s on your honour, and you can log it for science on iNaturalist.</span></div>
       <div class="hb-btns"><button class="primary" data-hb="saw">👀 I saw it!</button><button data-hb="later">Keep looking</button></div>
-      <a class="hb-inat" href="https://www.inaturalist.org/observations/new?taxon_id=${encodeURIComponent(o.sp.id)}" target="_blank" rel="noopener">Log your sighting on iNaturalist ↗</a>
+      <a class="hb-inat" href="https://www.inaturalist.org/observations/new?taxon_id=${encodeURIComponent(o.sp.id)}" target="_blank" rel="noopener">Log a real sighting on iNaturalist ↗</a>
       ${o.sp.credit && img ? `<p class="credit">Photo: ${esc(o.sp.credit)}</p>` : ''}
     </div>`;
     box.hidden = false;

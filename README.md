@@ -28,6 +28,8 @@ roam 600 m around a home base you set once. **Roam** goes anywhere, but finds th
 **Your progress stays on your device.** Nothing about where you go is uploaded. Use **Export**
 to keep a backup.
 
+The animals, plants and fungi you can meet, with pictures: **[Creatures](docs/CREATURES.md)**.
+
 Everything else (all the controls, the camera AR view, geocaches, settings and
 troubleshooting) is in the **[full guide](docs/GUIDE.md)**, and in the game under
 Settings → *Help & about*.

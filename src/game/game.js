@@ -193,11 +193,13 @@ export class Game {
         if (d > 0.05) this.pos = { lat: this.pos.lat + (this.fix.lat - this.pos.lat) * k, lon: this.pos.lon + (this.fix.lon - this.pos.lon) * k };
       }
     } else if (move && (move.east || move.north)) {
+      this._running = !!move.run;
       const speed = move.run ? (this.mode === 'roam' ? RULES.ROAM_FAST : RULES.RUN) : RULES.WALK;
       let next = offsetGeo(this.pos.lat, this.pos.lon, move.east * speed * dt, move.north * speed * dt);
       if (this.mode === 'home') next = this.leash(next);
       this.pos = next;
     }
+    if (!move || (!move.east && !move.north)) this._running = false;
     const moved = haversine(before.lat, before.lon, this.pos.lat, this.pos.lon);
     if (dt > 0) this._spd += (moved / dt - this._spd) * Math.min(1, dt * 3);
     if (moved < 500) {
@@ -404,12 +406,14 @@ export class Game {
 
   stepHunt() {
     const h = this.hunt;
-    const speed = this.mode === 'present' ? (this.fixSpeed ?? 0) : this._spd;
+    // Walk: your real speed. Home/Roam: the joystick's walk is quick in game time (to cover ground
+    // from the sofa), so only running (Shift / the stick pushed right out) counts as rushing in.
+    const speed = this.mode === 'present' ? (this.fixSpeed ?? 0) : this._running ? RULES.RUN : 1.4;
     const ev = stepHunt(h, this.pos, speed);
     if (!ev) return;
     const drop = () => { this.critters = this.critters.filter((c) => c.id !== h.id); };
     if (ev === 'cold') { drop(); this.hunt = null; this.emit('hunt-cold', 'The trail went cold'); }
-    else if (ev === 'flee') { drop(); this.quests?.onFlee(h.sp); this.emit('hunt-flee', 'It heard you coming. Approach gently.'); }
+    else if (ev === 'flee') { drop(); this.quests?.onFlee(h.sp); this.emit('hunt-flee', this.mode === 'present' ? 'It heard you coming. Approach gently.' : 'It heard you coming. Walk, don’t run, when you’re close.'); }
     else if (ev === 'reveal') {
       this.critters.push({ id: h.id, sp: h.sp, lat: h.lat, lon: h.lon, born: performance.now(), ttl: 150, hunted: true });
       this.emit('hunt-reveal', null, { hunt: h });
