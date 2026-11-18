@@ -9,6 +9,7 @@ import { ageText } from '../data/science.js';
 import { fmtDist, fmtElev } from '../units.js';
 import { esc, safeUrl } from '../util/html.js';
 import { SHOW_BEACONS } from '../channel.js';
+import { showLegend } from './mapLegend.js';
 import { WALK, FOUND } from '../names.js';
 
 const $ = (id) => document.getElementById(id);
@@ -37,6 +38,7 @@ export function initJournal(c) {
     const sp = e.target.closest('[data-species]');
     if (sp) ctx.onSpecies?.(sp.dataset.species);
     if (e.target.id === 'j-share') shareCard();
+    if (e.target.closest('[data-legend]')) showLegend();
     if (e.target.closest('[data-open-quests]')) { closeJournal(); ctx.onQuests?.(); }
   });
 }
@@ -244,7 +246,7 @@ function areas(profile) {
 
 function map() {
   const r = [[1000, '1 km'], [5000, '5 km'], [25000, '25 km'], [200000, '200 km']];
-  return `<div class="row">${r.map(([v, l]) => `<button data-radius="${v}" class="${v === mapRadius ? 'active' : ''}">${l}</button>`).join('')}</div>
+  return `<div class="row">${r.map(([v, l]) => `<button data-radius="${v}" class="${v === mapRadius ? 'active' : ''}">${l}</button>`).join('')}<button data-legend title="How to read the minimap">? Minimap key</button></div>
     <canvas id="j-map" class="jmap"></canvas>
     <p class="credit"><i class="dot" style="background:#e1ebd2"></i>explored on foot <i class="dot" style="background:#78c8ff"></i>from home <i class="dot" style="background:#b07aff"></i>virtual · dots: discoveries${ctx.game.quests?.s.cards.length ? ' · ◆ expedition cards' : ''}</p>`;
 }

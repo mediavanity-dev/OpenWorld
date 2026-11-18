@@ -370,6 +370,17 @@ export function initExpeditions(ctx) {
     if (o.type === 'ground') return `<span class="tk-quest">🧭 ${o.prog || 0}/${o.target}</span>`;
     return `<span class="tk-quest">🎯 ${esc(o.sp.name)}</span>`;
   }
+  // the compass ring around the player (src/render/avatar.js): where the active goal is.
+  // { target: {lat, lon} | null }, or null for no ring. A mystery shows no direction until
+  // you're warm (within ~150 m), so it stays a puzzle; new ground has no single goal.
+  function compass() {
+    const o = on() ? q().active() : null;
+    if (!o || o.done) return null;
+    if (o.type === 'race') return { target: { lat: o.lat, lon: o.lon } };
+    if (o.type === 'mystery') return { target: o.band ? { lat: o.lat, lon: o.lon } : null };
+    if (o.type === 'bounty') return o.habitat?.d && !o.inHabitat ? { target: { lat: o.habitat.lat, lon: o.habitat.lon } } : null;
+    return null;
+  }
   // what the minimap should draw for the active quest
   function minimap() {
     const o = on() ? q().active() : null;
@@ -516,5 +527,5 @@ export function initExpeditions(ctx) {
   // a friend's link opened (#friend=…): add them, then show the league
   function friendLink(code) { if (on() && addFriendCode(code)) open('friends'); }
 
-  return { open, close, render, hud, chip, minimap, onEvent, openOnStart, isOpen, whenClear, friendLink };
+  return { open, close, render, hud, chip, minimap, compass, onEvent, openOnStart, isOpen, whenClear, friendLink };
 }

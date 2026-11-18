@@ -42,6 +42,7 @@ import { initRephoto } from './ui/rephoto.js';
 import { initExpeditions } from './ui/expeditions.js';
 import { initHomeSetup } from './ui/homeSetup.js';
 import { initFinds } from './ui/finds.js';
+import { minimapTap } from './ui/mapLegend.js';
 import { initAvatar } from './render/avatar.js';
 import { initMarkers } from './render/markers.js';
 import { initCritters } from './render/critters.js';
@@ -102,7 +103,7 @@ ctx.expeditions = initExpeditions(ctx);
 ctx.homeSetup = initHomeSetup(ctx, { parsePlace: (q) => parsePlace(q) });
 ctx.openJournal = (tab) => openJournal(tab);
 ctx.finds = initFinds(ctx);
-ctx.minimap = new Minimap($('minimap'), { onTap: () => openJournal('map') });
+ctx.minimap = new Minimap($('minimap'), { onTap: () => minimapTap(() => openJournal('map')) });
 const { controls, hud, avatar, markers, critters, effects, arMode, labels, ambience, sky } = ctx;
 
 function applyTier(name, why) {
