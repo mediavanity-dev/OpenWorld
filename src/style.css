@@ -153,8 +153,7 @@ body.clean .panel, body.clean .bottom, body.clean #labels .label, body.clean #to
   .panel { width: calc(100vw - 24px); left: 12px !important; right: auto !important; padding: 8px; }
   /* stats panel: anchored to the bottom, just above the map credits */
   .panel.right { top: auto; bottom: calc(36px + var(--safe-b)); max-height: 40vh; overflow: auto; width: calc(100vw - 88px); }
-  .panel.right #log, .panel.right .btns { display: none; }
-  .panel.right.expanded #log, .panel.right.expanded .btns { display: grid; }
+  .panel.right #log { display: none; } /* phones: the event log stays hidden (Settings → technical details shows it on computers) */
   .panel.left .btns { grid-template-columns: repeat(4, 1fr); font-size: 11px; }
   #toasts { top: calc(64px + var(--safe-t)); }
   .sheet { left: 12px; right: 12px; width: auto; bottom: calc(12px + var(--safe-b)); max-height: 55vh; }
@@ -728,3 +727,14 @@ html.native .native-only { display: block; }
 
 .rv-card.habitat .hb-way { display: grid; gap: 2px; margin: 8px 0; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.05); font-size: 13px; }
 .rv-card.habitat .hb-way b { color: var(--accent); }
+
+/* the panel's last row is just Settings now (backups moved inside it): one full-width button */
+#right .btns.small { grid-template-columns: 1fr; }
+
+/* ---------- windows clear the phone's status bar (clock, battery) and home indicator ---------- */
+:root { --avail-h: calc(100vh - 32px - var(--safe-t) - var(--safe-b)); }
+@supports (height: 100dvh) { :root { --avail-h: calc(100dvh - 32px - var(--safe-t) - var(--safe-b)); } }
+.modal, .reveal { padding-top: calc(16px + var(--safe-t)); padding-bottom: calc(16px + var(--safe-b)); }
+.card { max-height: var(--avail-h); }
+.card.journal { height: min(1100px, var(--avail-h)); }
+.card.legend, .rv-card.habitat { max-height: min(86vh, var(--avail-h)); }
