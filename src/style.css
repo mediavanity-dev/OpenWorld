@@ -738,3 +738,6 @@ html.native .native-only { display: block; }
 .card { max-height: var(--avail-h); }
 .card.journal { height: min(1100px, var(--avail-h)); }
 .card.legend, .rv-card.habitat { max-height: min(86vh, var(--avail-h)); }
+/* compass button: a drawn compass (the 🧭 emoji looks like a stopwatch on iPhone) */
+.compass svg { display: block; }
+.compass.on .needle-n { fill: #b3141b; }
