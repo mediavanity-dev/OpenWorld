@@ -325,7 +325,7 @@ function frame(now) {
   }
   if (!settings.reduceMotion) markers.animate(now);
   miniT += rdt;
-  if (miniT > 0.25 && game.pos && !$('hud').hidden) {
+  if (miniT > (arMode.active ? 0.05 : 0.25) && game.pos && !$('hud').hidden) { // camera view: turn smoothly with the phone
     miniT = 0;
     const bearing = arMode.active ? arMode.heading() : (-controls.yaw * 180) / Math.PI;
     ctx.minimap.draw({ pos: game.pos, bearing, pois: [...world.pois(game.pos.lat, game.pos.lon, 600)].map((x) => x.poi), critters: game.critters, home: profile.data.home, discovered: profile.data.discoveries, hunt: game.hunt, treasure: game.treasureHint, quest: ctx.expeditions.minimap(), t: now });
