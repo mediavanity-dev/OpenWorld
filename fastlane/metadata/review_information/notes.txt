@@ -1,0 +1,13 @@
+OpenEarth is a walking game built from open map and nature data. No account or sign-in is needed.
+
+To try it from a desk (no travel needed):
+1. On the start screen, under "explore anywhere in the world (Roam)", tap "Greenwich" (or type any place and tap Go). This puts you in Roam mode there.
+2. Tap the gold "Expedition" box (bottom panel), then Accept a quest. Move with the joystick (bottom left); the ring around the character and the radar (top right) point the way. Reaching the goal turns over a card. For a mystery, "I'm here" in the Expedition window finishes it within about 90 m.
+3. Tap "Journal" for collections (including the wildlife recorded nearby) and "This spot" for geology, sky and history.
+4. Walk mode uses the phone's real location (permission asked when chosen). Camera view (the camera button) works in Walk mode on a phone outdoors; it asks for camera and motion permission.
+
+Location, camera and motion are used only on the device. Only the surrounding area is sent to public data services (OpenStreetMap, Open-Meteo, iNaturalist, Wikipedia/Wikidata, USGS) to load map, weather and wildlife data. Nothing is collected by us.
+
+In-app purchases: three optional consumable tips (com.mediavanity.openworld.tip.small, .tip.medium, .tip.large). They unlock nothing. Find them in the bottom panel → "Settings & help" → "Support OpenEarth". No restore is needed for consumables.
+
+Content: map data © OpenStreetMap contributors (ODbL); wildlife records and photos from iNaturalist (only CC0, CC BY and CC BY-SA photos, credited); text from Wikipedia (CC BY-SA, credited) and facts from Wikidata (CC0).

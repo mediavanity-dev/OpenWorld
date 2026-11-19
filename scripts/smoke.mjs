@@ -6,7 +6,7 @@
 //   SMOKE_SHOT=shot.png npm run smoke         (also save a screenshot)
 //   SMOKE_PATH=/beta/ npm run smoke           (the beta build)
 //   SMOKE_SIZE=390,844 SMOKE_OPEN=journal:records   (window size; leave a panel open for the shot)
-//   SMOKE_TOUCH=1                             (emulate a phone: touch screen, joystick, phone layout)
+//   SMOKE_TOUCH=1                             (emulate a phone: touch screen, joystick, phone layout; SMOKE_DPR=3 for store shots)
 //   SMOKE_EVAL='(async () => {...})()'        (stage a moment before the screenshot; prints its result)
 
 import { spawn, spawnSync } from 'node:child_process';
@@ -85,7 +85,7 @@ try {
   // SMOKE_TOUCH=1: behave like a phone (touch screen, coarse pointer: joystick, phone layout)
   if (process.env.SMOKE_TOUCH) {
     const [w, h] = (process.env.SMOKE_SIZE || '390,844').split(',').map(Number);
-    await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 2, mobile: true });
+    await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: +(process.env.SMOKE_DPR || 2), mobile: true });
     await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   }
   await send('Page.navigate', { url: `http://localhost:${PORT}${process.env.SMOKE_PATH || '/'}?at=51.4779,-0.0015` });
