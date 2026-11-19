@@ -178,7 +178,9 @@ export function initArMode(ctx) {
   return {
     ar, enter, exit, step, updateRibbon, photographCritter, flash, setWorldVisible,
     get active() { return ar.active; },
-    heading: () => currentHeading() ?? 0,
+    // the direction the camera view faces: the same heading as the compass strip (including any
+    // sideways-drag correction), so the radar turns exactly with it
+    heading: () => (ar.active ? ARView.bearingOf(camera.quaternion) : currentHeading() ?? 0),
     onEnter(fn) { listeners.enter.push(fn); },
     onExit(fn) { listeners.exit.push(fn); },
   };
