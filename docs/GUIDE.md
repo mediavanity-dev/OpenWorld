@@ -201,8 +201,18 @@ getting close, **orange** when you're very close (under 100 m), and it glows whe
 mystery shows only its colour until you're warm (about 150 m), so it stays a puzzle. The faint
 white circle is your GPS accuracy (how sure the phone is of your position).
 
-The first time you tap the minimap, a **key** explains its marks; it's on the journal's Map tab
-afterwards (**? Minimap key**), and in Settings → Help & about.
+**The radar** (the small circle; bottom-left on computers, top-right on phones) turns with you and
+shows only what matters now: your expedition's goal with its distance (pinned to the rim, pointing
+the way, when it's further than about 300 m), the nearest places you haven't found (landmarks first,
+with their map icons), 🐾 and a green glow for an animal you're tracking, a pulsing green dot for one
+that has shown itself, ✦ for today's treasure, 🎯 for a bounty's habitat and 🏠 for your home base.
+The faint rings are 100 m and 250 m. The first time you tap it, a key explains the marks (later:
+**? Radar key** on the journal's Map tab); after that a tap opens the journal map, where the ground
+you've walked glows along your paths, and faint dots are places nearby you haven't found.
+
+**Your explorer's look:** Settings → *Your explorer*: an outfit (Field jacket, Rain gear, Hiker,
+Naturalist, Birdwatcher, Night explorer, Winter, Coastal, or a very loud Rainbow) and headwear
+(wide hat, cap, beanie, hood). The jacket stays in your mode's colour, except in Rainbow.
 
 The **minimap** (bottom-left on computers, top-right on phones) shows the ground you've
 explored lit up, the rest in fog, plus nearby places. Tap it to open the journal map.

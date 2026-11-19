@@ -153,7 +153,7 @@ export function initExpeditions(ctx) {
     if (o.type === 'mystery') {
       const col = groupInfo(o.place.kind, o.place.cls).color;
       art = `<div class="qart mystery" style="--c:${col}"><span>?</span></div>`;
-      hook = `<p class="qriddle">“${esc(o.riddle)}”${o.fact ? `<span class="qfact">${esc(o.fact)}</span>` : ''}</p><p class="qhook">${isAct ? 'From where you started: to' : 'Somewhere to'} the <b>${o.sector}</b>, about ${fmtDist(o.dist)} away.${o.alike >= 2 ? ` One of ${o.alike} places like it in that direction.` : ''}</p>`;
+      hook = `<p class="qriddle">“${esc(o.riddle)}”${o.fact ? `<span class="qfact">${esc(o.fact)}</span>` : ''}</p><p class="qhook">${isAct && game.pos ? `From where you are now: to the <b>${sectorOf(bearingTo(game.pos, o))}</b>, about ${fmtDist(Math.max(50, Math.round(haversine(game.pos.lat, game.pos.lon, o.lat, o.lon) / 50) * 50))} away.` : `Somewhere to the <b>${o.sector}</b>, about ${fmtDist(o.dist)} away.`}${o.alike >= 2 ? ` One of ${o.alike} places like it in that direction.` : ''}</p>`;
       if (!isAct) meta.push(`${o.clues.length} clues to buy · each costs ★`);
       if (isAct) extra = cluesHtml(o);
     } else if (o.type === 'bounty') {
@@ -370,7 +370,7 @@ export function initExpeditions(ctx) {
       na.textContent = '🧭';
     } else if (o.type === 'mystery') {
       nm.textContent = `Who am I? “${o.riddle}”`;
-      nd.textContent = `${o.live != null && o.live <= MYSTERY_HERE_M ? 'Standing at it? Tap here, then “I’m here” · ' : o.band === 'hot' ? 'Very close now! · ' : o.band === 'warm' ? 'Getting warm · ' : ''}${o.sector} of where you started · ${o.used.length}/${o.clues.length} clues · worth ${'★'.repeat(Math.max(1, 3 - o.used.length))}`;
+      nd.textContent = `${o.live != null && o.live <= MYSTERY_HERE_M ? 'Standing at it? Tap here, then “I’m here” · ' : o.band === 'hot' ? 'Very close now! · ' : o.band === 'warm' ? 'Getting warm · ' : ''}${game.pos ? `${sectorOf(bearingTo(game.pos, o))}, about ${fmtDist(Math.max(50, Math.round(haversine(game.pos.lat, game.pos.lon, o.lat, o.lon) / 50) * 50))}` : o.sector} · ${o.used.length}/${o.clues.length} clues · worth ${'★'.repeat(Math.max(1, 3 - o.used.length))}`;
       na.textContent = '🔍';
     } else if (o.type === 'bounty') {
       nm.textContent = `Wanted: ${o.sp.name}`;
@@ -411,7 +411,7 @@ export function initExpeditions(ctx) {
     const o = on() ? q().active() : null;
     if (!o || o.done) return null;
     if (o.type === 'race' || o.type === 'water') return { target: { lat: o.lat, lon: o.lon } };
-    if (o.type === 'mystery') return { target: o.band ? { lat: o.lat, lon: o.lon } : null };
+    if (o.type === 'mystery') return { target: { lat: o.lat, lon: o.lon }, rough: !o.band }; // rough: a wide arc for the sector only
     if (o.type === 'bounty') return o.habitat?.d && !o.inHabitat ? { target: { lat: o.habitat.lat, lon: o.habitat.lon } } : null;
     return null;
   }

@@ -328,7 +328,7 @@ function frame(now) {
   if (miniT > 0.25 && game.pos && !$('hud').hidden) {
     miniT = 0;
     const bearing = arMode.active ? arMode.heading() : (-controls.yaw * 180) / Math.PI;
-    ctx.minimap.draw({ pos: game.pos, bearing, cells: profile.data.cells, pois: [...world.pois(game.pos.lat, game.pos.lon, 600)].map((x) => x.poi), critters: game.critters, home: profile.data.home, discovered: profile.data.discoveries, hunt: game.hunt, treasure: game.treasureHint, quest: ctx.expeditions.minimap(), t: now });
+    ctx.minimap.draw({ pos: game.pos, bearing, pois: [...world.pois(game.pos.lat, game.pos.lon, 600)].map((x) => x.poi), critters: game.critters, home: profile.data.home, discovered: profile.data.discoveries, hunt: game.hunt, treasure: game.treasureHint, quest: ctx.expeditions.minimap(), t: now });
     hud.tracker();
   }
   ambT += rdt;

@@ -244,9 +244,23 @@ function areas(profile) {
       <span>${x.a.walk ? Math.round(x.foot * 100) : x.placePct}%</span></div>`).join('');
 }
 
+// how far from the map's centre your finds and walked ground reach (metres)
+function findsReach(profile) {
+  const d = profile.data, c = ctx.game.pos || d.home || d.last;
+  if (!c) return 0;
+  let far = 0;
+  for (const x of Object.values(d.discoveries)) { const w = x.anchor?.wgs84; if (w) far = Math.max(far, Math.hypot(...Object.values(offsetMeters(c.lat, c.lon, w[0], w[1])))); }
+  for (const h of Object.keys(d.cells || {})) { const b = geohashBounds(h); far = Math.max(far, Math.hypot(...Object.values(offsetMeters(c.lat, c.lon, b.lat, b.lon)))); }
+  return far;
+}
 function map() {
-  const r = [[1000, '1 km'], [5000, '5 km'], [25000, '25 km'], [200000, '200 km']];
-  return `<div class="row">${r.map(([v, l]) => `<button data-radius="${v}" class="${v === mapRadius ? 'active' : ''}">${l}</button>`).join('')}<button data-legend title="How to read the minimap">? Minimap key</button></div>
+  const all = [[1000, '1 km'], [5000, '5 km'], [25000, '25 km'], [200000, '200 km']];
+  const reach = findsReach(ctx.profile);
+  const upto = all.findIndex(([v]) => v >= reach);
+  const r = all.slice(0, Math.max(1, upto < 0 ? all.length : upto + 1));
+  if (!r.some(([v]) => v === mapRadius)) mapRadius = r[r.length - 1][0];
+  return `<p class="credit">${reach > 50 ? `Your finds reach about ${fmtDist(reach)} from here.` : 'Your finds will spread out from here as you explore.'} Faint dots are places nearby you haven’t found yet.</p>
+    <div class="row">${r.map(([v, l]) => `<button data-radius="${v}" class="${v === mapRadius ? 'active' : ''}">${l}</button>`).join('')}<button data-legend title="How to read the radar">? Radar key</button></div>
     <canvas id="j-map" class="jmap"></canvas>
     <p class="credit"><i class="dot" style="background:#e1ebd2"></i>explored on foot <i class="dot" style="background:#78c8ff"></i>from home <i class="dot" style="background:#b07aff"></i>virtual · dots: discoveries${ctx.game.quests?.s.cards.length ? ' · ◆ expedition cards' : ''}</p>`;
 }
@@ -262,14 +276,27 @@ function drawMap(canvas, profile, radius, size) {
   if (!centre) return;
   const k = (W / 2) / radius;
   const P = (lat, lon) => { const o = offsetMeters(centre.lat, centre.lon, lat, lon); return [W / 2 + o.x * k, W / 2 + o.z * k]; };
-  const fill = { 1: 'rgba(176,122,255,0.55)', 2: 'rgba(120,200,255,0.7)', 3: 'rgba(225,235,210,0.85)' };
   const dLat = (radius / 111320) * 1.5;
+  // walked ground as a soft glow (overlapping blobs merge into paths), not blocks
+  const glow = { 1: '176,122,255', 2: '120,200,255', 3: '225,235,210' };
+  g.globalCompositeOperation = 'lighter';
   for (const [h, rank] of Object.entries(d.cells || {})) {
     const b = geohashBounds(h);
     if (Math.abs(b.lat - centre.lat) > dLat) continue;
-    const [x1, y1] = P(b.n, b.w), [x2, y2] = P(b.s, b.e);
-    g.fillStyle = fill[rank];
-    g.fillRect(x1, y1, Math.max(1, x2 - x1), Math.max(1, y2 - y1));
+    const [x1, y1] = P(b.n, b.w), [x2, y2] = P(b.s, b.e), cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+    const r = Math.max(2.5, Math.abs(x2 - x1) * 0.95);
+    const gr = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+    gr.addColorStop(0, `rgba(${glow[rank] || glow[1]},0.38)`); gr.addColorStop(1, `rgba(${glow[rank] || glow[1]},0)`);
+    g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+  }
+  g.globalCompositeOperation = 'source-over';
+  // places around you that you haven't found yet (from the areas loaded now): faint dots
+  if (!size) for (const { poi } of ctx.game.world.pois(centre.lat, centre.lon, Math.min(radius, 3000))) {
+    if (d.discoveries[poi.ref] || poi.cls === 'geocache') continue;
+    const [px, py] = P(poi.lat, poi.lon);
+    if (px < 0 || py < 0 || px > W || py > W) continue;
+    g.fillStyle = 'rgba(200,210,220,0.22)';
+    g.beginPath(); g.arc(px, py, Math.max(1.2, W / 320), 0, Math.PI * 2); g.fill();
   }
   for (const x of Object.values(d.discoveries)) {
     const [la, lo] = x.anchor?.wgs84 || [];

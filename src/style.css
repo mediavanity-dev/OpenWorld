@@ -748,3 +748,9 @@ html.native .native-only { display: block; }
 /* Help & about: one long page that scrolls (not the journal's clipped, tabbed layout) */
 .card.journal.about { display: block; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .card.journal.about .close { position: sticky; top: 0; float: right; z-index: 2; }
+.set.outfit { margin-top: 6px; display: flex; align-items: center; gap: 8px; }
+.set.outfit select { flex: 1; }
+.lg-rings { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.35); box-shadow: inset 0 0 0 5px rgba(16,20,26,0.88), inset 0 0 0 6.5px rgba(255,255,255,0.35); display: inline-block; }
+.lg-star { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #ffd36b; color: #ffd36b; font-style: normal; font-weight: bold; font-size: 13px; display: inline-grid; place-items: center; }
+.lg-icon { width: 18px; height: 18px; border-radius: 50%; color: #fff; font-style: normal; font-size: 10px; display: inline-grid; place-items: center; }
+.lg-emoji { font-size: 16px; line-height: 1; }

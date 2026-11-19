@@ -179,8 +179,8 @@
       <p><b>The ring around you</b> points the way on an expedition: blue when the goal is far, gold when you're getting close, orange when you're very close. A mystery only shows the way once you're warm. The faint white circle is your GPS accuracy.</p>
       <h4>Finding things as you walk</h4>
       <p>Walk within about 30 m of a coloured marker to discover a real place. A new find shows its most surprising fact, and some ask a quick question (when it was built, which bird you saw, how old the rock is): get it right for <b>field mastery</b>. Animals leave <i>signs</i>: follow the green glow on the minimap and the 🐾 tracker until one shows itself, then reach it or photograph it. Go gently, or it slips away. Three golden finds ✦ are hidden in every area each day.</p>
-      <h4>The minimap</h4>
-      <p>It turns with you (up is the way you face; the gold N is north). Walked ground lights up; coloured dots are places you haven't found, grey ones you have; a gold arc on the rim points to today's treasure and a pin to an expedition's goal. Tap it for the full map; the journal's Map tab has <b>? Minimap key</b>.</p>
+      <h4>The radar</h4>
+      <p>The small circle turns with you (up is the way you face; the gold N is north) and shows only what matters now: your expedition’s goal with its distance (on the rim, pointing the way, when it’s far), the nearest places you haven’t found (with their map icons), 🐾 for an animal you’re tracking, ✦ for treasure. The rings are 100 m and 250 m. Tap it for your journal map; its <b>? Radar key</b> explains every mark.</p>
       <h4>Your progress</h4>
       <p>📓 <b>Journal</b>: what's left to find around here (wildlife recorded nearby, places in this area), collections, records, surveyed areas and your explored map. 🔍 <b>This spot</b>: geology, sky, climate, history and earthquakes around you. Back up your journal in Settings: it lives only on this device.</p>
       <h4>Camera view (phones, Walk)</h4>
@@ -200,6 +200,10 @@
     <div class="card settings">
       <div class="set-head"><h2>Settings</h2><button id="set-done-top" class="primary">Done</button></div>
       <div class="set">Your explorer
+        <label class="set outfit">Outfit <select id="set-outfit">
+          <option value="field">Field jacket</option><option value="rain">Rain gear</option><option value="hiker">Hiker</option>
+          <option value="naturalist">Naturalist</option><option value="birdwatcher">Birdwatcher</option><option value="night">Night explorer</option>
+          <option value="winter">Winter</option><option value="coastal">Coastal</option><option value="rainbow">Rainbow 🌈</option></select></label>
         <div class="row looks" id="set-look"><button data-look="hat">Wide hat</button><button data-look="cap">Cap</button><button data-look="beanie">Beanie</button><button data-look="hood">Hood</button></div>
       </div>
       <label class="set">Graphics
