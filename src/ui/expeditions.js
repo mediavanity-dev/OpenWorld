@@ -104,7 +104,7 @@ export function initExpeditions(ctx) {
           ${game.mode === 'roam' ? '<span class="echo-note">Roam: cards are echoes. They earn a few practice stars (up to 5), then only real play counts.</span>' : game.mode === 'home' ? '<span class="muted">Home: every goal is inside your home range.</span>' : ''}</p>
         ${intro ? '' : `<details class="qhow" ${howOpen ? 'open' : ''}><summary>How expeditions work</summary>
           <p>🔍 <b>Mystery</b>: a riddle about a real place nearby. Work out which one and go there. Stuck? Buy a clue, but each costs a star. At old places, guess its age at the end to win a star back.</p>
-          <p>🎯 <b>Bounty</b>: an animal people have really recorded around here. Head for the habitat it likes. Then finish it either way: <b>in the game</b>, follow its signs (🐾, the green glow) until the game’s one shows itself, and walk up to it gently or photograph it; or <b>for real</b>, if you see the actual animal, tap <b>I saw it!</b> (and log it on iNaturalist if you like).</p>
+          <p>🎯 <b>Bounty</b>: an animal people have really recorded around here. Head for the habitat it likes. Then finish it either way: <b>in the game</b>, follow its signs (🐾, the green glow) until the game’s one shows itself, and walk up to it gently or photograph it; or <b>for real</b>, if you see the actual animal, tap <b>I saw a real one!</b> (and log it on iNaturalist if you like).</p>
           <p>⏱ <b>Race</b>: reach the high ground or a landmark inside par time, or before the real sunset.</p>
           <p id="qhow-cards"><b>Cards.</b> Every finish turns over a card for the real thing you found: the place, the animal or the climb, with its story. They're your field collection, kept in <b>Your cards</b> and shown as ◆ on your journal map.</p>
           <p><b>Rarity comes from the real world, not luck:</b> ${RARITIES.map((r) => `<span class="qgem r-${r}">${RARITY_LABEL[r]}</span>`).join(' ')}. Old places rate higher (over 120 years Rare, 250 Epic, 500 Legendary), as do listed buildings and places with an encyclopedia entry, animals rarely recorded around here, big climbs and beating the sunset. You see it before you choose.</p>
@@ -161,7 +161,7 @@ export function initExpeditions(ctx) {
       const lbl = GROUP_STYLE[o.sp.group]?.label || 'creature';
       hook = `<p class="qhook"><i>${esc(o.sp.sci || '')}</i>, ${/^[aeiou]/.test(lbl) ? 'an' : 'a'} ${esc(lbl)} recorded <b>${o.sp.count}</b> times near here by real naturalists.</p>
         <p class="qhook">${o.habitat ? `It favours ${esc(o.habitat.text)}: the nearest is ${o.habitat.d ? `about ${fmtDist(o.habitat.d)} to the <b>${o.habitat.sector}</b>` : '<b>right here</b>'}.` : 'It gets by among the streets. Keep your eyes open as you walk.'}</p>`;
-      meta.push('Two ways to finish: track the game’s one in its habitat (🐾 signs, approach gently), or see a real one and tap “I saw it!”');
+      meta.push('Two ways to finish: track the game’s one in its habitat (🐾 signs, approach gently), or see a real one and tap “I saw a real one!”');
       if (isAct) {
         // help as you go: field notes once you're in its habitat, and a last-sighting clue
         const used = o.used?.length || 0;
@@ -198,7 +198,7 @@ export function initExpeditions(ctx) {
     if (o.long) meta.unshift('<span class="qlong">Long expedition: nothing closer fits, so it’s rarer</span>');
     const card = o.done ? q().s.cards.find((c) => c.id === o.id) : null;
     const btns = o.done ? `<span class="qdone">✓ Done${card ? ` ${starsHtml(card.grade === 'echo' ? 0 : card.stars)}` : ''}</span>`
-      : isAct ? `${o.type === 'mystery' && o.live != null && o.live <= MYSTERY_HERE_M ? '<button class="primary qhere" data-qhere>📍 I’m here</button>' : ''}${o.type === 'water' && game.pos && haversine(game.pos.lat, game.pos.lon, o.lat, o.lon) <= MYSTERY_HERE_M ? '<button class="primary qhere" data-qwater>📍 I’m there!</button>' : ''}${o.type === 'bounty' ? `${!o.inHabitat && nearHabitat(o) ? '<button class="primary qhere" data-qthere>📍 I’m there!</button>' : ''}<button class="primary qhere" data-qsaw>👀 I saw it!</button>` : ''}<button data-qabandon>Give up</button>${o.type === 'mystery' || o.type === 'race' ? '<button data-qcant title="Private, fenced off, across water…? Swap it, no stars lost">Can’t get there</button>' : ''}<button class="primary" data-qclose>${o.type === 'race' ? (o.startedAt ? 'Back to the race' : 'Start the clock') : o.type === 'bounty' ? 'Go track it' : o.type === 'ground' ? 'Go explore' : 'Go find it'}</button>`
+      : isAct ? `${o.type === 'mystery' && o.live != null && o.live <= MYSTERY_HERE_M ? '<button class="primary qhere" data-qhere>📍 I’m here</button>' : ''}${o.type === 'water' && game.pos && haversine(game.pos.lat, game.pos.lon, o.lat, o.lon) <= MYSTERY_HERE_M ? '<button class="primary qhere" data-qwater>📍 I’m there!</button>' : ''}${o.type === 'bounty' ? `${!o.inHabitat && nearHabitat(o) ? '<button class="primary qhere" data-qthere>📍 I’m there!</button>' : ''}<button class="primary qhere" data-qsaw>👀 I saw a real one!</button>` : ''}<button data-qabandon>Give up</button>${o.type === 'mystery' || o.type === 'race' ? '<button data-qcant title="Private, fenced off, across water…? Swap it, no stars lost">Can’t get there</button>' : ''}<button class="primary" data-qclose>${o.type === 'race' ? (o.startedAt ? 'Back to the race' : 'Start the clock') : o.type === 'bounty' ? 'Go track it' : o.type === 'ground' ? 'Go explore' : 'Go find it'}</button>`
       : `${q().s.swaps > 0 && !locked && !o.event ? `<button data-qswap="${i}" title="Swap for a different one (once a day)">↻ Swap${' '}<small>(1 left today)</small></button>` : ''}<button class="primary" data-qaccept="${esc(o.id)}" ${locked || why ? 'disabled' : ''}>${locked ? 'One at a time' : why ? 'Not here' : 'Accept'}</button>`;
     const later = !o.done && !o.event ? `<button class="qlater" data-qsave="${esc(o.id)}">Save this task for another day</button>` : '';
     return `<article class="qcard ${o.type} r-${o.rarity} ${isAct ? 'active' : ''} ${o.done ? 'done' : ''}">
@@ -430,6 +430,16 @@ export function initExpeditions(ctx) {
   // ---------------------------------------------------------------- in the habitat: what to do now
   // Pops up when you reach a bounty's habitat: where and when to look, what it is, and what
   // finishes it (its signs in the game's hunt, or seeing it yourself: "I saw it!").
+  // Other naturalist apps worth having for this one. Links go to the App Store page, which shows
+  // "Open" when the app is installed and "Get" when it isn't (neither app offers a documented
+  // link into a species page).
+  const APP = (id, name, what) => `<a href="https://apps.apple.com/app/id${id}" target="_blank" rel="noopener">${name}</a> <small>${what}</small>`;
+  function helperApps(sp) {
+    const list = sp.group === 'Aves'
+      ? [APP(773457673, 'Merlin Bird ID', 'name it by its song or a photo'), APP(988799279, 'eBird', 'add it to a bird checklist')]
+      : [APP(1353224144, 'Seek', 'point your camera to name it')];
+    return `<p class="hb-apps">Also handy: ${list.join(' · ')}</p>`;
+  }
   let habitatOpen = null;
   function habitatCard(o) {
     const box = $('reveal');
@@ -441,9 +451,10 @@ export function initExpeditions(ctx) {
       <div class="hb-top">${img ? `<img src="${esc(img)}" alt="">` : ''}<div><h2>${esc(o.sp.name)}</h2><p class="muted"><i>${esc(o.sp.sci || '')}</i></p></div></div>
       ${notes}
       <div class="hb-way"><b>🎮 In the game</b><span>The game’s ${esc(o.sp.name)} is somewhere in this habitat. Watch for its signs (🐾 on the tracker, a green glow on the minimap), follow them until it shows itself, then walk up to it gently or photograph it in camera view.</span></div>
-      <div class="hb-way"><b>🌿 For real</b><span>If you see a real one, that counts too: tap <b>I saw it!</b> It’s on your honour, and you can log it for science on iNaturalist.</span></div>
-      <div class="hb-btns"><button class="primary" data-hb="saw">👀 I saw it!</button><button data-hb="later">Keep looking</button></div>
+      <div class="hb-way"><b>🌿 For real</b><span>Seeing a real one finishes it too: tap <b>I saw a real one!</b> It’s on your honour, and you can log it for science on iNaturalist.</span></div>
+      <div class="hb-btns"><button class="primary" data-hb="saw">👀 I saw a real one!</button><button data-hb="later">Keep looking</button></div>
       <a class="hb-inat" href="https://www.inaturalist.org/observations/new?taxon_id=${encodeURIComponent(o.sp.id)}" target="_blank" rel="noopener">Log a real sighting on iNaturalist ↗</a>
+      ${helperApps(o.sp)}
       ${o.sp.credit && img ? `<p class="credit">Photo: ${esc(o.sp.credit)}</p>` : ''}
     </div>`;
     box.hidden = false;
