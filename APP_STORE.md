@@ -68,3 +68,17 @@ it at its next start, and the game carries on without that data.
   support and privacy pages, then Submit for Review.
 - Review notes must give reviewers a way to play without travelling: **Roam** anywhere (for example
   Greenwich), and that Walk mode uses the phone's real location.
+
+## Store listing and screenshots
+
+- Text, URLs, copyright and categories: `fastlane/metadata/` (Games › Adventure, then Education). Review
+  notes are in `fastlane/metadata/review_information/notes.txt`; the upload workflow leaves them out,
+  because Apple only takes them together with the review contact, which is typed in App Store Connect.
+- Screenshots (iPhone 6.9", 1320×2868): `npm run build && node scripts/store-shots.mjs` stages six
+  scenes in the real game (Walk mode, daytime Sydney) and frames them with captions into
+  `fastlane/screenshots/en-US/`. Look at every one before uploading.
+- The tip jar's review screenshot: `fastlane/iap/tip-jar-review.png`.
+- Upload: Actions → **App Store listing** → Run workflow (version 1.0). It replaces the listing text and
+  screenshots for that version.
+- Support and privacy pages: https://mediavanity-dev.github.io/openearth-app/ (repo `openearth-app`).
+

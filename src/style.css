@@ -754,3 +754,13 @@ html.native .native-only { display: block; }
 .lg-star { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #ffd36b; color: #ffd36b; font-style: normal; font-weight: bold; font-size: 13px; display: inline-grid; place-items: center; }
 .lg-icon { width: 18px; height: 18px; border-radius: 50%; color: #fff; font-style: normal; font-size: 10px; display: inline-grid; place-items: center; }
 .lg-emoji { font-size: 16px; line-height: 1; }
+
+/* Settings: a solid window (the HUD mustn't show through the text), a header pinned flush to the top,
+   Import level with Export, and the Playtest stats heading on the left like the others */
+.card.settings { background: rgba(22, 26, 32, 0.98); padding-top: 0; }
+.card.settings .set-head { top: 0; margin: 0 -22px 8px; padding: 16px 22px 12px; background: #161a20; }
+#set-backup { align-items: stretch; }
+#set-backup .filebtn { display: flex; align-items: center; justify-content: center; margin: 0; }
+#playtest-box summary { display: flex; align-items: center; justify-content: flex-start; gap: 8px; cursor: pointer; }
+#playtest-box summary h4 { margin: 0; }
+#set-backup button { margin-top: 0; }
