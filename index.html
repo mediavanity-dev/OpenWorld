@@ -103,7 +103,9 @@
     <div id="stick" class="stick"><div></div></div>
     <canvas id="minimap" class="minimap" aria-label="Minimap (tap for your journal map)"></canvas>
     <div id="tracker" class="tracker" aria-live="polite"></div>
-    <button id="compass" class="fab compass" hidden aria-label="Follow compass">🧭</button>
+    <button id="compass" class="fab compass" hidden aria-label="Turn the map with my phone's compass" title="Turn the map with my phone's compass">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.6v1.6M12 19.8v1.6M2.6 12h1.6M19.8 12h1.6" stroke="currentColor" stroke-width="1.6"/><path class="needle-n" d="M12 5.4l2.6 6.6h-5.2z" fill="#e5484d"/><path class="needle-s" d="M12 18.6l-2.6-6.6h5.2z" fill="currentColor" opacity="0.85"/><circle cx="12" cy="12" r="1.1" fill="#161a20"/></svg>
+    </button>
     <button id="ar-btn" class="fab ar-btn" hidden aria-label="Camera AR view" title="Camera AR view">📷</button>
     <div id="ar-compass" class="ar-compass" aria-hidden="true"><div class="ticks"></div><b id="ar-heading">N 0°</b></div>
     <img id="rephoto-ghost" alt="" hidden />
