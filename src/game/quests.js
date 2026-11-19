@@ -274,9 +274,9 @@ export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = n
   const value = human((poi.kind || '').split(':')[1]);
   const clues = [];
   if (year) clues.push({ key: 'age', label: 'How old?', text: `I was built in ${eraText(year)}.` });
-  else if (poi.tags?.species) clues.push({ key: 'fact', label: 'What am I?', text: `I’m a ${poi.tags.species}.` });
-  else if (poi.tags?.heritage) clues.push({ key: 'fact', label: 'What am I?', text: `I’m a protected heritage site (a ${value}).` });
-  else clues.push({ key: 'fact', label: 'What am I?', text: `I’m a ${value || 'place'}.` });
+  else if (poi.tags?.species) clues.push({ key: 'fact', label: 'What am I?', text: `I’m ${art(poi.tags.species)} ${poi.tags.species}.` });
+  else if (poi.tags?.heritage) clues.push({ key: 'fact', label: 'What am I?', text: `I’m a protected heritage site (${art(value || 'place')} ${value || 'place'}).` });
+  else clues.push({ key: 'fact', label: 'What am I?', text: `I’m ${art(value || 'place')} ${value || 'place'}.` });
   clues.push({ key: 'name', label: 'My name', text: `My name starts with “${[...poi.name][0].toUpperCase()}” and has ${words.length} word${words.length > 1 ? 's' : ''}.` });
   const a = rand() * Math.PI * 2, off = 15 + rand() * 35;
   const zc = offsetGeo(poi.lat, poi.lon, Math.cos(a) * off, Math.sin(a) * off);

@@ -417,3 +417,9 @@ test('summit: a named viewpoint near the top is the finish, and names the race',
   assert.equal(r.name, 'One Tree Hill');
   assert.match(r.title, /One Tree Hill/);
 });
+
+test('mystery clues say "an artwork", not "a artwork"', () => {
+  const art = at(0, 400, { ref: 'osm:node/77', name: 'Monument For A Dead Parrot', kind: 'tourism:artwork', tags: null });
+  const m = makeMystery(HOME, [art], {}, rng(1));
+  assert.ok(m.clues.some((c) => c.text === 'I’m an artwork.'));
+});
