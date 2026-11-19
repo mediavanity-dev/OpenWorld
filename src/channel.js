@@ -5,6 +5,9 @@
 
 import { OKAPI_KEYS } from './config.js';
 
+// The name players see: "OpenEarth" in the iPhone app (its App Store name), "OpenWorld" on the website.
+export const APP_NAME = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.() ? 'OpenEarth' : 'OpenWorld';
+
 export const CHANNEL = import.meta.env?.VITE_CHANNEL === 'beta' ? 'beta' : 'stable';
 export const BETA = CHANNEL === 'beta';
 const PREFIX = BETA ? 'openworld-beta' : 'openworld';

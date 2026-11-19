@@ -8,7 +8,7 @@
 // The last position changes every few seconds, so it lives under its own small key
 // instead of rewriting the whole profile each time.
 
-import { storeKey, stableKey } from '../channel.js';
+import { storeKey, stableKey, APP_NAME } from '../channel.js';
 import { storage } from '../storage.js';
 
 const KEY = storeKey('profile.v1');
@@ -33,10 +33,10 @@ export const MIGRATIONS = {
  * @param {{ version?: number, steps?: Record<number, (d: any) => any> }} [opts] (for tests)
  */
 export function migrate(d, { version = PROFILE_VERSION, steps = MIGRATIONS } = {}) {
-  if (!d || typeof d !== 'object' || typeof d.discoveries !== 'object') throw new Error('Not an OpenWorld profile');
+  if (!d || typeof d !== 'object' || typeof d.discoveries !== 'object') throw new Error(`Not an ${APP_NAME} profile`);
   const v0 = d.v ?? 1;
-  if (!Number.isInteger(v0) || v0 < 1) throw new Error('Not an OpenWorld profile');
-  if (v0 > version) throw new Error('This profile was saved by a newer version of OpenWorld. Update the app, then try again.');
+  if (!Number.isInteger(v0) || v0 < 1) throw new Error(`Not an ${APP_NAME} profile`);
+  if (v0 > version) throw new Error(`This profile was saved by a newer version of ${APP_NAME}. Update the app, then try again.`);
   let out = d;
   for (let v = v0; v < version; v++) {
     if (!steps[v]) throw new Error(`No upgrade from profile version ${v}`);

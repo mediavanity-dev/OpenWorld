@@ -12,6 +12,7 @@ import { esc, safeUrl } from '../util/html.js';
 import { buzz } from '../sensors.js';
 import { sfx } from '../sfx.js';
 import { olderThan } from '../game/facts.js';
+import { APP_NAME } from '../channel.js';
 import { skyNotes } from '../data/science.js';
 
 const listing = (a) => (a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`);
@@ -129,7 +130,7 @@ export function initExpeditions(ctx) {
     return '';
   }
 
-  // expeditions put aside with "This is a bit much for today"
+  // expeditions put aside with "Save this task for another day"
   function savedHtml() {
     const list = q().saved();
     if (!list.length) return '';
@@ -152,7 +153,7 @@ export function initExpeditions(ctx) {
     if (o.type === 'mystery') {
       const col = groupInfo(o.place.kind, o.place.cls).color;
       art = `<div class="qart mystery" style="--c:${col}"><span>?</span></div>`;
-      hook = `<p class="qriddle">“${esc(o.riddle)}”${o.fact ? `<span class="qfact">${esc(o.fact)}</span>` : ''}</p><p class="qhook">${isAct ? 'From where you started: to' : 'Somewhere to'} the <b>${o.sector}</b>, about ${fmtDist(o.dist)} away.${o.alike >= 2 ? ` One of ${o.alike} places like it in that direction.` : ''}</p>`;
+      hook = `<p class="qriddle">“${esc(o.riddle)}”${o.fact ? `<span class="qfact">${esc(o.fact)}</span>` : ''}</p><p class="qhook">${isAct && game.pos ? `From where you are now: to the <b>${sectorOf(bearingTo(game.pos, o))}</b>, about ${fmtDist(Math.max(50, Math.round(haversine(game.pos.lat, game.pos.lon, o.lat, o.lon) / 50) * 50))} away.` : `Somewhere to the <b>${o.sector}</b>, about ${fmtDist(o.dist)} away.`}${o.alike >= 2 ? ` One of ${o.alike} places like it in that direction.` : ''}</p>`;
       if (!isAct) meta.push(`${o.clues.length} clues to buy · each costs ★`);
       if (isAct) extra = cluesHtml(o);
     } else if (o.type === 'bounty') {
@@ -199,7 +200,7 @@ export function initExpeditions(ctx) {
     const btns = o.done ? `<span class="qdone">✓ Done${card ? ` ${starsHtml(card.grade === 'echo' ? 0 : card.stars)}` : ''}</span>`
       : isAct ? `${o.type === 'mystery' && o.live != null && o.live <= MYSTERY_HERE_M ? '<button class="primary qhere" data-qhere>📍 I’m here</button>' : ''}${o.type === 'water' && game.pos && haversine(game.pos.lat, game.pos.lon, o.lat, o.lon) <= MYSTERY_HERE_M ? '<button class="primary qhere" data-qwater>📍 I’m there!</button>' : ''}${o.type === 'bounty' ? `${!o.inHabitat && nearHabitat(o) ? '<button class="primary qhere" data-qthere>📍 I’m there!</button>' : ''}<button class="primary qhere" data-qsaw>👀 I saw it!</button>` : ''}<button data-qabandon>Give up</button>${o.type === 'mystery' || o.type === 'race' ? '<button data-qcant title="Private, fenced off, across water…? Swap it, no stars lost">Can’t get there</button>' : ''}<button class="primary" data-qclose>${o.type === 'race' ? (o.startedAt ? 'Back to the race' : 'Start the clock') : o.type === 'bounty' ? 'Go track it' : o.type === 'ground' ? 'Go explore' : 'Go find it'}</button>`
       : `${q().s.swaps > 0 && !locked && !o.event ? `<button data-qswap="${i}" title="Swap for a different one (once a day)">↻ Swap${' '}<small>(1 left today)</small></button>` : ''}<button class="primary" data-qaccept="${esc(o.id)}" ${locked || why ? 'disabled' : ''}>${locked ? 'One at a time' : why ? 'Not here' : 'Accept'}</button>`;
-    const later = !o.done && !o.event ? `<button class="qlater" data-qsave="${esc(o.id)}">This is a bit much for today: save it for another day</button>` : '';
+    const later = !o.done && !o.event ? `<button class="qlater" data-qsave="${esc(o.id)}">Save this task for another day</button>` : '';
     return `<article class="qcard ${o.type} r-${o.rarity} ${isAct ? 'active' : ''} ${o.done ? 'done' : ''}">
       <div class="qtop"><span class="qtype">${T.glyph} ${T.label} <small>${T.verb}</small></span><button class="qgem r-${o.rarity}" data-qabout title="What are cards? Tap to read">${RARITY_LABEL[o.rarity]} card ⓘ</button></div>
       ${isAct ? `<p class="qnow">✓ Accepted. ${o.type === 'race' ? (o.startedAt ? 'The clock is running.' : 'The clock starts when you head off.') : 'Read the details, then head off.'}</p>` : ''}
@@ -265,7 +266,7 @@ export function initExpeditions(ctx) {
   }
   async function share() {
     const url = shareLink();
-    try { if (navigator.share) { await navigator.share({ title: 'My OpenWorld explorer card', text: `${myCard().n} on OpenWorld: add me to your league!`, url }); return; } } catch (e) { if (e?.name === 'AbortError') return; }
+    try { if (navigator.share) { await navigator.share({ title: `My ${APP_NAME} explorer card`, text: `${myCard().n} on ${APP_NAME}: add me to your league!`, url }); return; } } catch (e) { if (e?.name === 'AbortError') return; }
     copy(url);
   }
   async function copy(url = shareLink()) {
@@ -369,7 +370,7 @@ export function initExpeditions(ctx) {
       na.textContent = '🧭';
     } else if (o.type === 'mystery') {
       nm.textContent = `Who am I? “${o.riddle}”`;
-      nd.textContent = `${o.live != null && o.live <= MYSTERY_HERE_M ? 'Standing at it? Tap here, then “I’m here” · ' : o.band === 'hot' ? 'Very close now! · ' : o.band === 'warm' ? 'Getting warm · ' : ''}${o.sector} of where you started · ${o.used.length}/${o.clues.length} clues · worth ${'★'.repeat(Math.max(1, 3 - o.used.length))}`;
+      nd.textContent = `${o.live != null && o.live <= MYSTERY_HERE_M ? 'Standing at it? Tap here, then “I’m here” · ' : o.band === 'hot' ? 'Very close now! · ' : o.band === 'warm' ? 'Getting warm · ' : ''}${game.pos ? `${sectorOf(bearingTo(game.pos, o))}, about ${fmtDist(Math.max(50, Math.round(haversine(game.pos.lat, game.pos.lon, o.lat, o.lon) / 50) * 50))}` : o.sector} · ${o.used.length}/${o.clues.length} clues · worth ${'★'.repeat(Math.max(1, 3 - o.used.length))}`;
       na.textContent = '🔍';
     } else if (o.type === 'bounty') {
       nm.textContent = `Wanted: ${o.sp.name}`;
@@ -410,7 +411,7 @@ export function initExpeditions(ctx) {
     const o = on() ? q().active() : null;
     if (!o || o.done) return null;
     if (o.type === 'race' || o.type === 'water') return { target: { lat: o.lat, lon: o.lon } };
-    if (o.type === 'mystery') return { target: o.band ? { lat: o.lat, lon: o.lon } : null };
+    if (o.type === 'mystery') return { target: { lat: o.lat, lon: o.lon }, rough: !o.band }; // rough: a wide arc for the sector only
     if (o.type === 'bounty') return o.habitat?.d && !o.inHabitat ? { target: { lat: o.habitat.lat, lon: o.habitat.lon } } : null;
     return null;
   }
