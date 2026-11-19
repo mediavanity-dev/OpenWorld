@@ -455,3 +455,20 @@ test('riddles: with no link from the map, the article is found by name and the f
   assert.equal(m.place.year, 1869);
   assert.ok(m.clues.some((c) => c.key === 'story' && !/Cutty|Sark/.test(c.text)));
 });
+
+test('re-dealing keeps a brought-back expedition, and today\'s event one when you\'ve only moved', () => {
+  const { game, q } = setup();
+  game.enter('roam', { to: HOME });
+  q.step();
+  const m = q.s.offers.find((o) => o?.type === 'mystery');
+  q.saveForLater(m.id);
+  q.restore(m.id);
+  const ev = { ...q.make('race'), id: 'ev1', event: { key: 'fullmoon', glyph: '🌕', title: 'Full moon tonight', blurb: '' } };
+  q.s.offers.push(ev);
+  q.deal('move');
+  assert.ok(q.s.offers.some((o) => o?.id === m.id), 'the brought-back expedition stays');
+  assert.ok(q.s.offers.some((o) => o?.id === 'ev1'), 'the event expedition stays after walking on');
+  q.deal(); // a new day
+  assert.ok(q.s.offers.some((o) => o?.id === m.id));
+  assert.ok(!q.s.offers.some((o) => o?.id === 'ev1'), 'a new day deals its own events');
+});

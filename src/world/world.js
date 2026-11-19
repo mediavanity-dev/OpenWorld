@@ -170,6 +170,17 @@ export class World {
   chunkAt(lat, lon) { const { i, j } = chunkIndex(lat, lon); return this.chunks.get(chunkKey(i, j))?.chunk || null; }
   isReadyAt(lat, lon) { return !!this.chunkAt(lat, lon); }
   groundAt(lat, lon) { return this.chunkAt(lat, lon)?.heightAt(lat, lon) ?? null; }
+  /** The most specific name for a spot: a named park it's in or near (in any loaded area), else its area. */
+  nameAt(lat, lon) {
+    const own = this.chunkAt(lat, lon);
+    let name = own?.namedAreaAt?.(lat, lon) || null;
+    if (!name) {
+      let best = null;
+      for (const ch of this.readyChunks()) { const n = ch.parkNear?.(lat, lon, 300); if (n && (!best || n.d < best.d)) best = n; }
+      name = best?.name || null;
+    }
+    return name || own?.areaName || null;
+  }
   habitatAt(lat, lon) { return this.chunkAt(lat, lon)?.habitatAt(lat, lon) ?? null; }
 
   findFeature(ref) {

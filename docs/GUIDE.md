@@ -275,7 +275,7 @@ opens by itself when you start. Pick a quest; tap the box (or the pill) to come 
   direction and rough distance. Buy clues if you're stuck (its age or type, its initial, a
   search circle on the minimap); each one costs a star. Visit the wrong place and it tells
   you which way to look. At historic places, guess its era before the reveal to win a star back.
-  Riddles are built from real data, never invented: an opening line for the kind of place and,
+  Riddles are built from real data, never invented (facts come from the place's own Wikidata entry, found through the map's link or, failing that, by its name near where it is): an opening line for the kind of place and,
   for well-known places, a real fact ("Nicholas Hawksmoor designed me."). Extra clues can come
   from its encyclopedia entry, always with the name blanked out.
 - **🎯 Bounty: track.** A "wanted" poster for an animal really recorded near you, and the

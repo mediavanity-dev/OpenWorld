@@ -734,11 +734,12 @@ export class Quests {
     if (s.blocked.length > 300) s.blocked.splice(0, s.blocked.length - 300);
     const i = s.offers.indexOf(o);
     s.active = null;
-    s.offers[i] = this.make(o.type) || null; // null: refilled when something fits
+    if (i >= TYPES.length) s.offers.splice(i, 1); // an extra card (event, brought back): it simply goes
+    else s.offers[i] = this.make(o.type) || null; // null: refilled when something fits
     this.profile.log(`Couldn't reach: ${o.title}${o.place?.name ? ` (${o.place.name})` : ''}`);
     this.profile.save();
-    this.emit('quest-info', 'Thanks. We won’t send you there again. Here’s a fresh one instead, no stars lost.');
-    return s.offers[i];
+    this.emit('quest-info', i >= TYPES.length ? 'Thanks. We won’t send you there again. No stars lost.' : 'Thanks. We won’t send you there again. Here’s a fresh one instead, no stars lost.');
+    return i < TYPES.length ? s.offers[i] : null;
   }
 
   // Can the player get to a point in this mode? (Home: only inside the home range.)
@@ -772,8 +773,12 @@ export class Quests {
     s.mode = this.game.mode;
     s.origin = { lat: this.game.pos.lat, lon: this.game.pos.lon };
     const at = keep ? s.offers.findIndex((o) => o && o.id === keep.id) : -1; // the active quest keeps its slot
+    // extras beyond the daily three: a saved expedition you brought back stays (it's yours), and so
+    // does today's event expedition when you've only walked on (a new day deals its own events)
+    const extras = s.offers.slice(TYPES.length).filter((o) => o && !o.done && o.id !== keep?.id && (o.restored || (o.event && why === 'move')));
     s.offers = TYPES.map((_, i) => (i === at ? keep : null));
     if (keep && at >= TYPES.length) s.offers.push(keep); // an event or restored quest in progress
+    s.offers.push(...extras);
     if (why !== 'move') s.swaps = 1;
     this._tries = 0;
     this._fillT = 0;
@@ -873,7 +878,7 @@ export class Quests {
       const ss = sunsetIn((t) => g.env.sun(pos.lat, pos.lon, new Date(t)).alt);
       const habitatAt = (a, b) => w.habitatAt(a, b);
       const waterName = (a, b) => w.chunkAt?.(a, b)?.waterNameNear?.(a, b) || null;
-      const placeName = (a, b) => { const ch = w.chunkAt?.(a, b), n = ch?.nameAt?.(a, b); return n && n !== ch?.areaName ? n : null; }; // a park, not the suburb
+      const placeName = (a, b) => { const n = w.nameAt?.(a, b); return n && n !== w.chunkAt?.(a, b)?.areaName ? n : null; }; // a park, not the suburb
       let r = makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside, snap, { habitatAt, waterName, placeName });
       if (!r) { r = makeRace(pos, (a, b) => w.groundAt(a, b), [...w.pois(pos.lat, pos.lon, 1900)].map((x) => x.poi), g.mode, ss, Math.random, inside, snap, { reach: 1800, habitatAt, waterName, placeName }); if (r) longer(r); }
       return r;
@@ -1185,7 +1190,7 @@ export class Quests {
     /** @type {any} */
     const card = {
       id: o.id, type: o.type, title: o.title, rarity: o.rarity, stars, grade, mode: g.mode, date: this.date(), secs,
-      area: g.world.chunkAt?.(o.lat ?? g.pos.lat, o.lon ?? g.pos.lon)?.nameAt?.(o.lat ?? g.pos.lat, o.lon ?? g.pos.lon) || null,
+      area: g.world.nameAt?.(o.lat ?? g.pos.lat, o.lon ?? g.pos.lon) || null,
       lat: +(o.lat ?? g.pos.lat).toFixed(5), lon: +(o.lon ?? g.pos.lon).toFixed(5),
       ...(o.type === 'mystery' ? { name: o.place.name, kind: o.place.kind, year: o.place.year, ref: o.ref, tags: o.place.tags ? { wikipedia: o.place.tags.wikipedia, wikidata: o.place.tags.wikidata } : null, clues: o.used.length, guessRight: o.guessRight ?? null } : {}),
       ...(o.type === 'bounty' ? { name: o.sp.name, sci: o.sp.sci, group: o.sp.group, spId: o.sp.id, img: o.sp.photo, credit: o.sp.credit, photo: !!extra.photo, seen: !!extra.seen } : {}),
