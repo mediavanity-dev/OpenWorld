@@ -3,7 +3,7 @@
 
 import { settings, saveSettings, startTier } from '../settings.js';
 import { startCompass, keepAwake, compassSupported, buzz } from '../sensors.js';
-import { BETA, FEATURES, featureAvailable } from '../channel.js';
+import { BETA, FEATURES, featureAvailable, APP_NAME } from '../channel.js';
 import { STABLE_PROFILE_KEY } from '../game/profile.js';
 import { storage } from '../storage.js';
 import { CHASE_GOAL_S } from '../game/metrics.js';
@@ -52,7 +52,7 @@ export function initSettingsPanel(ctx) {
   const tierInfo = () => { $('set-info').textContent = `Now: ${ctx.tier.label}${settings.quality === 'auto' ? ' (auto)' : ''}${ctx.batteryLow ? ' · battery low' : ''}`; };
 
   $('p-settings').onclick = open;
-  $('set-close').onclick = () => { $('settings').hidden = true; };
+  $('set-close').onclick = $('set-done-top').onclick = () => { $('settings').hidden = true; };
   $('set-quality').onchange = (e) => { settings.quality = e.target.value; saveSettings(); ctx.applyTier(startTier()); tierInfo(); };
   $('set-weather').onchange = (e) => { settings.weatherFx = e.target.checked; saveSettings(); };
   $('set-datasaver').onchange = (e) => { settings.dataSaver = e.target.checked; game.dataSaver = settings.dataSaver; saveSettings(); ctx.applyTier(ctx.tierName); };
@@ -177,7 +177,7 @@ function initNativeSettings(ctx) {
   $('set-notify').onchange = async (e) => {
     if (e.target.checked) {
       const ok = await N.notifications().then((m) => m.enable()).catch(() => false);
-      if (!ok) { e.target.checked = false; ctx.hud && toast('Notifications are off for OpenWorld in iPhone Settings → Notifications.', 'error'); return; }
+      if (!ok) { e.target.checked = false; ctx.hud && toast(`Notifications are off for ${APP_NAME} in iPhone Settings → Notifications.`, 'error'); return; }
     }
     settings.notify = e.target.checked; saveSettings(); replan();
   };

@@ -12,6 +12,7 @@ import { esc, safeUrl } from '../util/html.js';
 import { buzz } from '../sensors.js';
 import { sfx } from '../sfx.js';
 import { olderThan } from '../game/facts.js';
+import { APP_NAME } from '../channel.js';
 import { skyNotes } from '../data/science.js';
 
 const listing = (a) => (a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`);
@@ -129,7 +130,7 @@ export function initExpeditions(ctx) {
     return '';
   }
 
-  // expeditions put aside with "This is a bit much for today"
+  // expeditions put aside with "Save this task for another day"
   function savedHtml() {
     const list = q().saved();
     if (!list.length) return '';
@@ -199,7 +200,7 @@ export function initExpeditions(ctx) {
     const btns = o.done ? `<span class="qdone">✓ Done${card ? ` ${starsHtml(card.grade === 'echo' ? 0 : card.stars)}` : ''}</span>`
       : isAct ? `${o.type === 'mystery' && o.live != null && o.live <= MYSTERY_HERE_M ? '<button class="primary qhere" data-qhere>📍 I’m here</button>' : ''}${o.type === 'water' && game.pos && haversine(game.pos.lat, game.pos.lon, o.lat, o.lon) <= MYSTERY_HERE_M ? '<button class="primary qhere" data-qwater>📍 I’m there!</button>' : ''}${o.type === 'bounty' ? `${!o.inHabitat && nearHabitat(o) ? '<button class="primary qhere" data-qthere>📍 I’m there!</button>' : ''}<button class="primary qhere" data-qsaw>👀 I saw it!</button>` : ''}<button data-qabandon>Give up</button>${o.type === 'mystery' || o.type === 'race' ? '<button data-qcant title="Private, fenced off, across water…? Swap it, no stars lost">Can’t get there</button>' : ''}<button class="primary" data-qclose>${o.type === 'race' ? (o.startedAt ? 'Back to the race' : 'Start the clock') : o.type === 'bounty' ? 'Go track it' : o.type === 'ground' ? 'Go explore' : 'Go find it'}</button>`
       : `${q().s.swaps > 0 && !locked && !o.event ? `<button data-qswap="${i}" title="Swap for a different one (once a day)">↻ Swap${' '}<small>(1 left today)</small></button>` : ''}<button class="primary" data-qaccept="${esc(o.id)}" ${locked || why ? 'disabled' : ''}>${locked ? 'One at a time' : why ? 'Not here' : 'Accept'}</button>`;
-    const later = !o.done && !o.event ? `<button class="qlater" data-qsave="${esc(o.id)}">This is a bit much for today: save it for another day</button>` : '';
+    const later = !o.done && !o.event ? `<button class="qlater" data-qsave="${esc(o.id)}">Save this task for another day</button>` : '';
     return `<article class="qcard ${o.type} r-${o.rarity} ${isAct ? 'active' : ''} ${o.done ? 'done' : ''}">
       <div class="qtop"><span class="qtype">${T.glyph} ${T.label} <small>${T.verb}</small></span><button class="qgem r-${o.rarity}" data-qabout title="What are cards? Tap to read">${RARITY_LABEL[o.rarity]} card ⓘ</button></div>
       ${isAct ? `<p class="qnow">✓ Accepted. ${o.type === 'race' ? (o.startedAt ? 'The clock is running.' : 'The clock starts when you head off.') : 'Read the details, then head off.'}</p>` : ''}
@@ -265,7 +266,7 @@ export function initExpeditions(ctx) {
   }
   async function share() {
     const url = shareLink();
-    try { if (navigator.share) { await navigator.share({ title: 'My OpenWorld explorer card', text: `${myCard().n} on OpenWorld: add me to your league!`, url }); return; } } catch (e) { if (e?.name === 'AbortError') return; }
+    try { if (navigator.share) { await navigator.share({ title: `My ${APP_NAME} explorer card`, text: `${myCard().n} on ${APP_NAME}: add me to your league!`, url }); return; } } catch (e) { if (e?.name === 'AbortError') return; }
     copy(url);
   }
   async function copy(url = shareLink()) {

@@ -8,7 +8,7 @@ import { TAG_ICONS } from '../game/environment.js';
 import { ageText } from '../data/science.js';
 import { fmtDist, fmtElev } from '../units.js';
 import { esc, safeUrl } from '../util/html.js';
-import { SHOW_BEACONS } from '../channel.js';
+import { SHOW_BEACONS, APP_NAME } from '../channel.js';
 import { showLegend } from './mapLegend.js';
 import { WALK, FOUND } from '../names.js';
 
@@ -303,7 +303,7 @@ async function shareCard() {
   const g = c.getContext('2d');
   const grad = g.createLinearGradient(0, 0, 0, H); grad.addColorStop(0, '#16202c'); grad.addColorStop(1, '#0d1117');
   g.fillStyle = grad; g.fillRect(0, 0, W, H);
-  g.fillStyle = '#eef1f4'; g.font = 'bold 64px system-ui, sans-serif'; g.fillText('OpenWorld field journal', 70, 120);
+  g.fillStyle = '#eef1f4'; g.font = 'bold 64px system-ui, sans-serif'; g.fillText(`${APP_NAME} field journal`, 70, 120);
   g.fillStyle = '#a5adb7'; g.font = '34px system-ui, sans-serif'; g.fillText(new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }), 70, 175);
   const cells = [[s.present, `places ${FOUND}`, '#ff7a3d'], [s.species, 'species', '#5fd08a'], [s.rocks, 'rock units', '#c9a27a'], [s.exploredKm2.toFixed(1), 'km² explored', '#e1ebd2'], [fmtDist(s.walked), 'walked', '#78c8ff'], [s.daysActive, 'days out', '#ffd36b']];
   cells.forEach(([n, l, col], i) => {

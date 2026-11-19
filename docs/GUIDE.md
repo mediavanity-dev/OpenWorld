@@ -310,7 +310,7 @@ register, **I'm there!** appears within about 90 m of the spot.
 **Summit sprints** finish at a real named high place (a peak, hill, viewpoint or tower) when one is
 close to the top, and are named after it; otherwise after the park they're in.
 
-**Not today?** Every card has **This is a bit much for today: save it for another day**. Saved
+**Not today?** Every card has **Save this task for another day**. Saved
 expeditions wait under *Saved for another day* on the board (up to 6) and come back with **Bring it
 back** on any later day (one at a time; it says if it's far from where you are).
 

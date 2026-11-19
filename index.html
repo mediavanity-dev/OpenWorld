@@ -20,7 +20,7 @@
   <!-- Start screen -->
   <div id="start" class="modal">
     <div class="card">
-      <h1>OpenWorld</h1>
+      <h1 class="app-name">OpenWorld</h1>
       <p class="sub">The wildlife, rock, sky, and history hidden in the streets around you.</p>
       <ul class="hooks">
         <li>🔍 Solve riddles about real places nearby</li>
@@ -168,7 +168,7 @@
   <div id="about" class="modal" hidden>
     <div class="card journal about">
       <button class="close" id="about-close" aria-label="Close">✕</button>
-      <h2>OpenWorld</h2>
+      <h2 class="app-name">OpenWorld</h2>
       <p class="sub">The real Earth, abstracted: real places, weather, wildlife and rocks, drawn simply from open data.</p>
       <h4>Three ways to play</h4>
       <p><b style="color:var(--present)">Walk</b>: you are where your phone really is; walk to move. Finds are <i>walked</i>.<br>
@@ -197,8 +197,8 @@
 
   <!-- Settings -->
   <div id="settings" class="modal" hidden>
-    <div class="card">
-      <h2>Settings</h2>
+    <div class="card settings">
+      <div class="set-head"><h2>Settings</h2><button id="set-done-top" class="primary">Done</button></div>
       <div class="set">Your explorer
         <div class="row looks" id="set-look"><button data-look="hat">Wide hat</button><button data-look="cap">Cap</button><button data-look="beanie">Beanie</button><button data-look="hood">Hood</button></div>
       </div>
@@ -236,7 +236,7 @@
       </div>
       <div class="beta-box native-only" id="tipjar">
         <h4>Support <span class="app-name">OpenWorld</span></h4>
-        <p class="hint">OpenWorld is free, with no ads and nothing to unlock. If you enjoy it, you can leave a tip. It doesn't change the game; it helps keep it going.</p>
+        <p class="hint"><span class="app-name">OpenWorld</span> is free, with no ads and nothing to unlock. If you enjoy it, you can leave a tip. It doesn't change the game; it helps keep it going.</p>
         <div class="row" id="tip-btns"><span class="hint">Loading…</span></div>
         <p class="hint" id="tip-msg"></p>
       </div>
