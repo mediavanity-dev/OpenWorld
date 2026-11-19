@@ -22,7 +22,7 @@ import { isQuirk } from './journal.js';
 import { RULES } from './game.js';
 import { WALK } from '../names.js';
 import { placeFacts } from '../data/wikidata.js';
-import { wikiSummary } from '../data/wiki.js';
+import { wikiSummary, findArticle } from '../data/wiki.js';
 import { reachable as walkableTo, nearestPath, closedToPublic } from './reach.js';
 import { taxonDetails, seasonality, lastSightings } from '../data/science.js';
 import { downstream } from '../data/watershed.js';
@@ -101,34 +101,47 @@ export function rarityOfRace(gain, sunset) {
 // to Wikidata, a real fact in the first person ("Nicholas Hawksmoor designed me.") and
 // extra clues from its facts and its encyclopedia entry. The place's own name is always
 // blanked out of anything taken from outside.
+// Opening lines, chosen at random: one for the exact kind of place when there is one, else for its group.
 const RIDDLE = {
-  worship: ['I have heard more whispered wishes than anywhere else around here.', 'Bells, candles or silence: people bring me what they can’t say anywhere else.', 'I’ve seen weddings, farewells and every quiet Sunday in between.'],
-  history: ['I remember something this street has long forgotten.', 'Most people walk straight past me. They shouldn’t.', 'I’m a piece of the past that refused to leave.'],
-  museum: ['I keep other people’s treasures, and I’ll show you if you ask.', 'Everything inside me has a label and a story.', 'I collect what the world would otherwise lose.'],
-  sight: ['People come a long way just to stand in front of me.', 'Cameras point at me more than at anything else around here.', 'I’m the reason some visitors came to this part of town.'],
-  park: ['Green, open and full of birdsong. Dogs adore me.', 'Picnics, puddles and the odd lost frisbee: that’s me.', 'In the middle of all this, I’m where the town takes a breath.'],
-  nature: ['I was here long before the houses, and I’ll outlast them.', 'Nobody built me. I just happened, slowly.', 'Rain, roots and rock made me.'],
-  culture: ['Curtains, books or a stage: I’m where stories happen.', 'Come in quiet, leave with something new in your head.', 'Applause, whispers or turning pages: you’ll hear one of them inside me.'],
-  education: ['Every year a fresh crowd learns something inside me.', 'Bells ring here, but not for prayer.', 'I’ve watched generations grow up a little.'],
-  civic: ['Quietly, I keep this place running.', 'When something goes wrong around here, people come to me.', 'I serve everyone, and I belong to all of them.'],
-  sport: ['Sweat, shouting and the odd triumph: that’s me.', 'Win or lose, people leave me out of breath.', 'I keep the score around here.'],
+  worship: ["I have heard more whispered wishes than anywhere else around here.", "Bells, candles or silence: people bring me what they can’t say anywhere else.", "I’ve seen weddings, farewells and every quiet Sunday in between.", "Generations have sat on my benches and looked up.", "People take their hats off when they come inside me.", "I was built to point at something bigger than all of us.", "Ask the old families here: most of them have a story about me.", "My doors are older than anyone who walks through them."],
+  history: ["I remember something this street has long forgotten.", "Most people walk straight past me. They shouldn’t.", "I’m a piece of the past that refused to leave.", "Something happened here once, and I’m the proof.", "The town grew up around me, and nobody moved me.", "Read me closely: I’m a page from another century.", "I’ve outlived everyone who made me."],
+  museum: ["I keep other people’s treasures, and I’ll show you if you ask.", "Everything inside me has a label and a story.", "I collect what the world would otherwise lose.", "Look, don’t touch: that’s my only rule.", "Behind my walls, time stands still in glass cases.", "I’m a memory with opening hours.", "Some of what I hold is older than the country around me."],
+  sight: ["People come a long way just to stand in front of me.", "Cameras point at me more than at anything else around here.", "I’m the reason some visitors came to this part of town.", "If this place had a postcard, I’d be on it.", "People stop, look up, and say “oh”.", "Guidebooks mention me. Locals stop noticing me.", "Tour guides raise their umbrellas when they reach me."],
+  park: ["Green, open and full of birdsong. Dogs adore me.", "Picnics, puddles and the odd lost frisbee: that’s me.", "In the middle of all this, I’m where the town takes a breath.", "My grass has felt more bare feet than any carpet in town.", "Benches, trees and nobody in a hurry: come and sit.", "Every season I change my clothes, and everyone notices.", "Kites, prams and early joggers all find their way to me."],
+  nature: ["I was here long before the houses, and I’ll outlast them.", "Nobody built me. I just happened, slowly.", "Rain, roots and rock made me.", "No architect drew me. The weather did.", "I’m wild, right on the edge of everything tame.", "Animals know me better than people do."],
+  culture: ["Curtains, books or a stage: I’m where stories happen.", "Come in quiet, leave with something new in your head.", "Applause, whispers or turning pages: you’ll hear one of them inside me.", "People come to me to feel something.", "Every evening I become somewhere else entirely.", "I’m full of other people’s imagination."],
+  education: ["Every year a fresh crowd learns something inside me.", "Bells ring here, but not for prayer.", "I’ve watched generations grow up a little.", "Questions go in, answers come out, and more questions after that.", "Somewhere inside me, someone is trying not to fall asleep.", "Teachers come and go; I stay."],
+  civic: ["Quietly, I keep this place running.", "When something goes wrong around here, people come to me.", "I serve everyone, and I belong to all of them.", "Forms, queues and important decisions: they happen inside me.", "You might not notice me until you need me.", "I’m part of how this town looks after itself."],
+  sport: ["Sweat, shouting and the odd triumph: that’s me.", "Win or lose, people leave me out of breath.", "I keep the score around here.", "Bring trainers. Leave your excuses.", "Cheers, whistles and the thud of a ball: that’s my soundtrack.", "Somebody has broken a personal best on me."],
 };
 const RIDDLE_KIND = {
-  tree: ['I’m alive, I’m older than you, and I’ve never moved an inch.', 'I drink rain, eat sunlight and add a ring every year.', 'Birds live in me, and I don’t charge rent.'],
-  peak: ['Around here, nobody stands taller than me.', 'Everything around here is downhill from me.'],
-  fountain: ['I never stop talking, but I only ever say one thing.', 'Throw in a coin and I’ll keep your wish.', 'I’m always running, and I never leave.'],
-  clock: ['I tell everyone the same thing all day long.', 'I have hands but no fingers, and a face but no smile.'],
-  sundial: ['I only work when the weather is kind.', 'I tell the time with a shadow, and I take the night off.'],
-  memorial: ['I was made so that someone would not be forgotten.', 'I carry names so the town never loses them.', 'People stop beside me and go quiet.'],
-  statue: ['I’ve been standing still for a very long time.', 'I never blink, and the pigeons love my head.'],
-  artwork: ['Someone made me to make you stop and look.', 'I’m not useful. I’m here to make you wonder.'],
-  viewpoint: ['Stand on me and the whole place opens up.', 'Come for the view: I’m the best seat in town.'],
-  ruins: ['I used to be whole. Now I’m more interesting.', 'Time took my roof but left my story.'],
-  castle: ['Walls, gates and old quarrels: I’ve seen them all.', 'I was built to keep people out. Now I let everyone in.'],
-  windmill: ['I worked with the wind long before it was fashionable.', 'My arms turn, but I never wave.'],
-  spring: ['Water finds its own way out, right here.', 'I start small, and I never run dry.'],
+  tree: ["I’m alive, I’m older than you, and I’ve never moved an inch.", "I drink rain, eat sunlight and add a ring every year.", "Birds live in me, and I don’t charge rent.", "Count my rings and you’ll know my age; you’d need an axe, though.", "Every autumn I let go of everything, and every spring I start again."],
+  peak: ["Around here, nobody stands taller than me.", "Everything around here is downhill from me.", "Climb me and you can see where you’ve been.", "The wind always finds me first."],
+  fountain: ["I never stop talking, but I only ever say one thing.", "Throw in a coin and I’ll keep your wish.", "I’m always running, and I never leave.", "I’m a party trick with water, and I never get tired of it."],
+  clock: ["I tell everyone the same thing all day long.", "I have hands but no fingers, and a face but no smile.", "People check me and then hurry.", "Twice a day my hands point the same way."],
+  sundial: ["I only work when the weather is kind.", "I tell the time with a shadow, and I take the night off.", "The sun is my only battery.", "Clouds make me speechless."],
+  memorial: ["I was made so that someone would not be forgotten.", "I carry names so the town never loses them.", "People stop beside me and go quiet.", "Flowers appear at my feet on certain days.", "I’m a promise to remember."],
+  statue: ["I’ve been standing still for a very long time.", "I never blink, and the pigeons love my head.", "I’ve been in the same pose for longer than anyone can hold one.", "I’m someone, cast in something harder than skin."],
+  artwork: ["Someone made me to make you stop and look.", "I’m not useful. I’m here to make you wonder.", "Somebody had an idea, and here I am.", "Ask ten people what I mean and you’ll get ten answers.", "I’m the odd one out on this street, on purpose."],
+  viewpoint: ["Stand on me and the whole place opens up.", "Come for the view: I’m the best seat in town.", "From me, the town looks like a map.", "Bring your camera; I’ll do the rest."],
+  ruins: ["I used to be whole. Now I’m more interesting.", "Time took my roof but left my story.", "I’m what’s left when everyone stops repairing.", "Ivy and history are holding me up."],
+  castle: ["Walls, gates and old quarrels: I’ve seen them all.", "I was built to keep people out. Now I let everyone in.", "Kings and sieges came and went; my walls stayed."],
+  windmill: ["I worked with the wind long before it was fashionable.", "My arms turn, but I never wave.", "I turned wind into bread."],
+  spring: ["Water finds its own way out, right here.", "I start small, and I never run dry.", "Underground, I’ve been travelling for years to get here."],
+  bridge: ["I join two places that would rather be apart.", "Water goes under me, people go over me.", "I hold up everyone who crosses me, and I never complain."],
+  tower: ["I was built to be seen from far away.", "I’m taller than my neighbours, and I know it.", "From my top you could see the next town."],
+  lighthouse: ["I keep watch so ships don’t have to guess.", "My best work happens in the dark."],
+  well: ["Long before taps, everyone came to me.", "I’m a hole with a very important job."],
+  garden: ["Somebody plans every flower in me.", "Bees know my address.", "I’m nature with a gardener."],
+  water: ["Ducks know me better than you do.", "Skim a stone across me if you can.", "I reflect everything and keep nothing."],
+  city_gate: ["Everyone who came to town once had to pass through me.", "I was the way in, when there was a wall."],
+  bench: ["I’ve held more conversations than anyone in town.", "Sit down: someone wanted you to rest here."],
+  plaque: ["I’m small, but I’m here to tell you something.", "Read me: I’m the only one who still remembers."],
+  library: ["I’m quiet, but I’m full of voices.", "Take something home; just bring it back."],
+  theatre: ["Every night I pretend to be somewhere else.", "I’m where people pay to be told a story."],
+  marketplace: ["Haggling, smells and shouting: I’m busiest on certain days.", "I’ve been buying and selling here for centuries."],
 };
-const RIDDLE_ANY = ['I’m not on any postcard, but I’m worth finding.', 'I’ve been here all along. Have you noticed me?'];
+const RIDDLE_ANY = ["I’m not on any postcard, but I’m worth finding.", "I’ve been here all along. Have you noticed me?", "Most people around here couldn’t tell you where I am.", "I’m hiding in plain sight."];
 export function riddleFor(poi, rand = Math.random) {
   const value = (poi.kind || '').split(':')[1] || '';
   const list = RIDDLE_KIND[value] || RIDDLE[groupOf(poi.kind, poi.cls)] || RIDDLE_ANY;
@@ -141,15 +154,36 @@ const GENERIC = new Set(('st saint the of and a an old new great little upper lo
   + 'place court building centre center school college market hill river war').split(' '));
 const escRe = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Blank out the distinctive words of `name` (and words starting with them) in `text`. */
-export function redact(text, name) {
+// scripts written without spaces between words
+const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+export const isCJK = (s) => CJK.test(s || '');
+/**
+ * Blank a place's name out of a text. names: one name or several forms of it (local, English,
+ * its Wikipedia title, its Wikidata label). Names without spaces (Chinese, Japanese, Korean) also
+ * lose every run of two or more of their characters, since text may use part of the name.
+ */
+export function redact(text, names) {
   let out = text || '';
-  for (const w of (name || '').split(/[^\p{L}\p{N}]+/u)) {
-    if (w.length < 3 || GENERIC.has(w.toLowerCase())) continue;
-    out = out.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escRe(w)}[\\p{L}\\p{N}]*`, 'giu'), '…');
+  for (const name of (Array.isArray(names) ? names : [names]).filter(Boolean)) {
+    const whole = String(name).trim();
+    if (isCJK(whole)) { // word by word doesn't work here: blank the whole name and its parts
+      out = out.split(whole).join('…');
+      const ch = [...whole.replace(/\s+/g, '')];
+      for (let len = ch.length; len >= 2; len--) {
+        for (let i = 0; i + len <= ch.length; i++) { const part = ch.slice(i, i + len).join(''); if (isCJK(part)) out = out.split(part).join('…'); }
+      }
+    }
+    // "Royal Observatory, Greenwich": the part after a comma only says where (keep that as a hint)
+    for (const w of whole.replace(/,.*$/, '').split(/[^\p{L}\p{N}]+/u)) {
+      if (w.length < 3 || GENERIC.has(w.toLowerCase())) continue;
+      out = out.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escRe(w)}[\\p{L}\\p{N}]*`, 'giu'), '…');
+    }
   }
-  return out;
+  return out.replace(/…(?:\s*…)+/g, '…');
 }
-const art = (s) => (/^[aeiou]/i.test(s) ? 'an' : 'a');
+// "an artwork", "a church"; plurals ("ruins") take no article
+const art = (s) => (/[^s]s$/i.test(String(s || '').trim()) ? '' : /^[aeiou]/i.test(String(s || '').trim()) ? 'an' : 'a');
+const withArt = (s) => { const a = art(s); return a ? `${a} ${s}` : String(s); };
 const hasWords = (s) => /\p{L}{3,}/u.test((s || '').replace(/…/g, ''));
 const useless = (s) => !s || /wikimedia|disambiguation|category|list of/i.test(s);
 
@@ -161,12 +195,12 @@ export function factLines(f, name) {
     if (!label || useless(label) || redact(label, name) !== label) return;
     out[key] = redact(text, name);
   };
-  if (f?.namedAfter?.desc) add('namedAfter', f.namedAfter.desc, `I’m named after ${art(f.namedAfter.desc)} ${f.namedAfter.desc}.`);
+  if (f?.namedAfter?.desc) add('namedAfter', f.namedAfter.desc, `I’m named after ${withArt(f.namedAfter.desc)}.`);
   const maker = f?.architect ? ['designed', f.architect] : f?.creator ? ['made', f.creator] : null;
   if (maker) add('maker', maker[1].label, `${maker[1].label} ${maker[0]} me.`);
   if (f?.style) { const st = f.style.label.replace(/ architecture$/i, ''); add('style', st, `I was built in the ${st} style.`); }
-  if (f?.heritage) add('heritage', f.heritage.label, `I’m ${art(f.heritage.label)} ${f.heritage.label}.`);
-  if (f?.type) add('type', f.type.label, `I’m ${art(f.type.label)} ${f.type.label}.`);
+  if (f?.heritage) add('heritage', f.heritage.label, `I’m ${withArt(f.heritage.label)}.`);
+  if (f?.type) add('type', f.type.label, `I’m ${withArt(f.type.label)}.`);
   if (f?.religion) add('religion', f.religion.label, `My faith: ${f.religion.label}.`);
   if (f?.material) add('material', f.material.label, `I’m made of ${f.material.label}.`);
   return out;
@@ -197,7 +231,8 @@ export function storyLine(extract, name) {
  * Clues are only rebuilt while none has been bought, so nothing already paid for changes.
  */
 export function applyFacts(o, f, extract = null) {
-  const lines = factLines(f || {}, o.place.name);
+  const names = [o.place.name, o.place.nameEn, ...(o.place.aka || []), f?.label];
+  const lines = factLines(f || {}, names);
   if (f?.year && !o.place.year) {
     o.place.year = f.year;
     if (!o.startedAt) {
@@ -213,8 +248,8 @@ export function applyFacts(o, f, extract = null) {
   const clues = [];
   if (o.place.year) clues.push(keep('age') || { key: 'age', label: 'How old?', text: `I was built in ${eraText(o.place.year)}.` });
   clues.push(rest[0] ? { key: 'fact', label: 'What am I?', text: lines[rest[0]] } : keep('fact')
-    || { key: 'fact', label: 'What am I?', text: `I’m ${art(human((o.place.kind || '').split(':')[1]) || 'place')} ${human((o.place.kind || '').split(':')[1]) || 'place'}.` });
-  const story = storyLine(extract, o.place.name);
+    || { key: 'fact', label: 'What am I?', text: `I’m ${withArt(human((o.place.kind || '').split(':')[1]) || 'place')}.` });
+  const story = storyLine(extract, names);
   if (story) clues.push({ key: 'story', label: 'Encyclopedia', text: `“${story}”` });
   else if (rest[1]) clues.push({ key: 'detail', label: 'A detail', text: lines[rest[1]] });
   clues.push(keep('name'), keep('zone'));
@@ -274,10 +309,11 @@ export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = n
   const value = human((poi.kind || '').split(':')[1]);
   const clues = [];
   if (year) clues.push({ key: 'age', label: 'How old?', text: `I was built in ${eraText(year)}.` });
-  else if (poi.tags?.species) clues.push({ key: 'fact', label: 'What am I?', text: `I’m ${art(poi.tags.species)} ${poi.tags.species}.` });
-  else if (poi.tags?.heritage) clues.push({ key: 'fact', label: 'What am I?', text: `I’m a protected heritage site (${art(value || 'place')} ${value || 'place'}).` });
-  else clues.push({ key: 'fact', label: 'What am I?', text: `I’m ${art(value || 'place')} ${value || 'place'}.` });
-  clues.push({ key: 'name', label: 'My name', text: `My name starts with “${[...poi.name][0].toUpperCase()}” and has ${words.length} word${words.length > 1 ? 's' : ''}.` });
+  else if (poi.tags?.species) clues.push({ key: 'fact', label: 'What am I?', text: `I’m ${withArt(poi.tags.species)}.` });
+  else if (poi.tags?.heritage) clues.push({ key: 'fact', label: 'What am I?', text: `I’m a protected heritage site (${withArt(value || 'place')}).` });
+  else clues.push({ key: 'fact', label: 'What am I?', text: `I’m ${withArt(value || 'place')}.` });
+  if (isCJK(poi.name)) clues.push({ key: 'name', label: 'My name', text: `My name has ${[...poi.name.replace(/\s+/g, '')].length} characters and starts with “${[...poi.name][0]}”.` });
+  else clues.push({ key: 'name', label: 'My name', text: `My name starts with “${[...poi.name][0].toUpperCase()}” and has ${words.length} word${words.length > 1 ? 's' : ''}.` });
   const a = rand() * Math.PI * 2, off = 15 + rand() * 35;
   const zc = offsetGeo(poi.lat, poi.lon, Math.cos(a) * off, Math.sin(a) * off);
   clues.push({ key: 'zone', label: 'Search area', text: 'It’s inside the gold circle on your minimap.', zone: { lat: zc.lat, lon: zc.lon, r: 70 } });
@@ -289,7 +325,7 @@ export function makeMystery(pos, pois, discovered, rand = Math.random, avoid = n
     rarity: rarityOfPlace(poi),
     fact: inscriptionLine(poi),
     lat: poi.lat, lon: poi.lon, ref: poi.ref, group: c.grp,
-    place: { name: poi.name, kind: poi.kind, cls: poi.cls || null, tags: poi.tags || null, year },
+    place: { name: poi.name, nameEn: poi.nameEn || null, kind: poi.kind, cls: poi.cls || null, tags: poi.tags || null, year },
     clues, used: [],
   };
 }
@@ -623,21 +659,29 @@ export class Quests {
     this._tries = 0;
     this._wrong = new Set();
     // where real facts come from (swappable in tests)
-    this.lookup = { facts: placeFacts, summary: wikiSummary, taxon: taxonDetails, season: seasonality, sightings: lastSightings, downstream };
+    this.lookup = { facts: placeFacts, summary: wikiSummary, find: findArticle, taxon: taxonDetails, season: seasonality, sightings: lastSightings, downstream };
     this.tidy();
   }
 
   // Add real facts to a mystery once (Wikidata + its encyclopedia entry), in the background.
   async enrich(o) {
-    const tags = o.place?.tags;
-    if (o.enriched || this.game.dataSaver || !tags || (!tags.wikidata && !tags.wikipedia)) return;
+    if (o.enriched || this.game.dataSaver || !o.place) return;
     o.enriched = true;
+    let tags = o.place.tags;
     try {
+      if (!tags?.wikidata && !tags?.wikipedia) {
+        // no link from the map: look for the place's Wikipedia article by its name, where it is
+        const found = await this.lookup.find([o.place.name, o.place.nameEn], o.lat, o.lon).catch(() => null);
+        if (!found) return;
+        tags = o.place.tags = { ...(tags || {}), ...(found.qid ? { wikidata: found.qid } : {}), wikipedia: `en:${found.title}` };
+        (o.place.aka ||= []).push(found.title);
+      }
       const [facts, sum] = await Promise.all([
         tags.wikidata ? this.lookup.facts(tags.wikidata).catch(() => null) : null,
         this.lookup.summary(tags).catch(() => null),
       ]);
       if (!facts && !sum?.extract) return;
+      if (sum?.title) (o.place.aka ||= []).push(sum.title);
       applyFacts(o, facts, sum?.extract || null);
       this.profile.save();
       this.emit('quest-dealt', null);

@@ -423,3 +423,35 @@ test('mystery clues say "an artwork", not "a artwork"', () => {
   const m = makeMystery(HOME, [art], {}, rng(1));
   assert.ok(m.clues.some((c) => c.text === 'I’m an artwork.'));
 });
+
+test('riddles everywhere: every form of the name is blanked, including names without spaces', async () => {
+  const { redact } = await import('../src/game/quests.js');
+  // English article about a Japanese place: the English name is blanked too
+  assert.equal(redact('Sensō-ji is an ancient Buddhist temple in Asakusa.', ['浅草寺', 'Sensō-ji']), '…-ji is an ancient Buddhist temple in Asakusa.'); // very short parts stay as hints, like "St … Church"
+  // a Japanese text using part of the name
+  assert.ok(!/浅草/.test(redact('浅草の寺として知られる', ['浅草寺'])));
+  // "Royal Observatory, Greenwich": the place after the comma stays as a hint
+  assert.equal(redact('It overlooks Greenwich Park.', ['Royal Observatory, Greenwich']), 'It overlooks Greenwich Park.');
+});
+
+test('riddles: a name in Chinese, Japanese or Korean gets a character-count clue', () => {
+  const p = at(0, 400, { ref: 'osm:node/88', name: '天龍像', kind: 'tourism:artwork', tags: null });
+  const m = makeMystery(HOME, [p], {}, rng(1));
+  assert.ok(m.clues.some((c) => c.text === 'My name has 3 characters and starts with “天”.'));
+  const r = makeMystery(HOME, [at(0, 400, { ref: 'osm:node/89', name: 'Old Ruins', kind: 'historic:ruins', tags: null })], {}, rng(1));
+  assert.ok(r.clues.some((c) => c.text === 'I’m ruins.'));
+});
+
+test('riddles: with no link from the map, the article is found by name and the facts follow', async () => {
+  const { game, q } = setup({ pois: [at(0, 400, { ref: 'osm:node/90', name: 'Cutty Sark', kind: 'tourism:attraction', tags: null })] });
+  game.dataSaver = false;
+  q.lookup.find = async (names) => (names.includes('Cutty Sark') ? { title: 'Cutty Sark', qid: 'Q171255' } : null);
+  q.lookup.facts = async () => ({ year: 1869, type: { label: 'clipper' }, label: 'Cutty Sark' });
+  q.lookup.summary = async () => ({ title: 'Cutty Sark', extract: 'Cutty Sark is a British clipper ship built in 1869.' });
+  game.enter('roam', { to: HOME });
+  const m = q.make('mystery');
+  await q.enrich(m); await new Promise((r) => setTimeout(r, 0));
+  assert.equal(m.place.tags.wikidata, 'Q171255');
+  assert.equal(m.place.year, 1869);
+  assert.ok(m.clues.some((c) => c.key === 'story' && !/Cutty|Sark/.test(c.text)));
+});
