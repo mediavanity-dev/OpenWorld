@@ -156,7 +156,7 @@ export function initAvatar(ctx) {
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.06;
   group.add(figure, ring, accuracyRing, shadow);
-  let stride = 0, last = null;
+  let stride = 0, last = null, amp = 0, spd = 0;
   ctx.scene.add(group);
   queueMicrotask(() => { api.setLook(ctx.settings?.avatar || 'hat'); api.setOutfit(ctx.settings?.outfit || 'field'); });
 
@@ -223,12 +223,20 @@ export function initAvatar(ctx) {
       // walking: legs swing and the body bobs with the distance covered
       const moved = last ? Math.hypot(o.x - last.x, o.z - last.z) : 0;
       last = { x: o.x, z: o.z };
-      const speed = rdt > 0 ? moved / rdt : 0;
-      if (speed > 0.3 && speed < 15 && !ctx.settings?.reduceMotion) stride += moved * 2.4;
-      else stride *= 0.85;
-      const swing = Math.sin(stride) * Math.min(0.6, speed / 4);
+      const raw = rdt > 0 && moved < 50 ? moved / rdt : 0;
+      spd += (raw - spd) * Math.min(1, rdt * (raw < spd ? 9 : 5)); // smoothed (frames without a position update don't stall it); stops quickly
+      const speed = spd;
+      // Whatever the speed (Walk's real pace, the joystick's walk, Roam's fast travel), the legs keep a
+      // stride a person could manage: a walk, or above ~8 m/s a quick run with a forward lean.
+      const moving = speed > 0.3 && !ctx.settings?.reduceMotion; // over 50 m in a frame is a jump, not a step
+      const fast = moving && speed > 8;
+      if (moving) stride += rdt * (fast ? 4.5 : Math.min(2.2, speed)) * 2.6;
+      const want = moving ? (fast ? 0.85 : Math.min(0.6, speed / 4 + 0.15)) : 0;
+      amp += (want - amp) * Math.min(1, rdt * 8);
+      const swing = Math.sin(stride) * amp;
       legL.rotation.x = swing; legR.rotation.x = -swing;
-      body.position.y = 1.12 + Math.abs(Math.sin(stride)) * 0.05 * Math.min(1, speed / 2);
+      body.position.y = 1.12 + Math.abs(Math.sin(stride)) * 0.06 * amp;
+      figure.rotation.x += ((fast ? -0.18 : 0) - figure.rotation.x) * Math.min(1, rdt * 6); // lean into a run
       ring.scale.setScalar(Math.max(1, controls.dist / 40));
       const acc = game.mode === 'present' && game.fix?.source === 'device' ? game.fix.accuracy : 0;
       accuracyRing.visible = acc > 4 && acc < 300;
