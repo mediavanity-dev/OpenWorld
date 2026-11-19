@@ -39,21 +39,27 @@ const browser = spawn(browserPath, [
   '--no-first-run', '--no-default-browser-check', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
   // never pause the game loop (requestAnimationFrame) because the headless window seems hidden
   '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
-  `--window-size=${process.env.SMOKE_SIZE || '1280,800'}`, 'about:blank',
-], { stdio: 'ignore' });
+  `--window-size=${process.env.SMOKE_SIZE || '1280,800'}`,
+  // CI runners: newer Ubuntu images can block Chrome's sandbox at start-up ("browser did not start");
+  // it only ever loads our own build here, so run without it there
+  ...(process.env.CI ? ['--no-sandbox', '--disable-dev-shm-usage'] : []),
+  'about:blank',
+], { stdio: ['ignore', 'ignore', 'pipe'] });
+let browserErr = '';
+browser.stderr.on('data', (d) => { browserErr = (browserErr + d).slice(-4000); });
 
 let failures = [];
 let exitCode = 1;
 try {
   // the browser writes the port it picked into its profile folder
   let target, debugPort;
-  for (let k = 0; k < 75 && !target; k++) {
+  for (let k = 0; k < 150 && !target; k++) { // up to 30 s: CI machines can be slow to start Chrome
     try {
       debugPort ||= +readFileSync(join(profileDir, 'DevToolsActivePort'), 'utf8').split(/\r?\n/)[0];
       target = (await (await fetch(`http://127.0.0.1:${debugPort}/json`)).json()).find((t) => t.type === 'page');
     } catch { await sleep(200); }
   }
-  if (!target) throw new Error('browser did not start');
+  if (!target) throw new Error(`browser did not start${browserErr ? `. Chrome said:\n${browserErr.trim().split('\n').slice(-12).join('\n')}` : ''}`);
   const ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
   let id = 0;
