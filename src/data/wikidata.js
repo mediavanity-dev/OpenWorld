@@ -7,7 +7,8 @@
 import { cachedJson } from './cache.js';
 
 const API = 'https://www.wikidata.org/w/api.php';
-const LANG = (typeof navigator !== 'undefined' && navigator.language || 'en').slice(0, 2).toLowerCase();
+// the game's language (riddles are English sentences: the facts dropped into them must be English too)
+const LANG = 'en';
 const TTL = 30 * 864e5;
 
 // the statements we use, and what they mean for a place
@@ -67,6 +68,7 @@ export async function placeFacts(qid) {
   const j = await cachedJson(`wd:${qid}`, `${API}?action=wbgetentities&ids=${qid}&props=claims&format=json&origin=*`, opts);
   const entity = j?.entities?.[qid];
   if (!entity?.claims) return null;
+  const ownLabel = (await cachedJson(`wdn:${qid}`, `${API}?action=wbgetentities&ids=${qid}&props=labels&languages=en&format=json&origin=*`, opts))?.entities?.[qid]?.labels?.en?.value || null;
   const ids = referencedIds(entity).slice(0, 40);
   const refs = {};
   if (ids.length) {
@@ -74,5 +76,5 @@ export async function placeFacts(qid) {
     const r = await cachedJson(`wdl:${ids.join(',')}:${LANG}`, `${API}?action=wbgetentities&ids=${ids.join('|')}&props=labels|descriptions&languages=${langs}&format=json&origin=*`, opts);
     for (const [id, e] of Object.entries(r?.entities || {})) refs[id] = { label: pick(/** @type {any} */ (e).labels, LANG), desc: pick(/** @type {any} */ (e).descriptions, LANG) };
   }
-  return factsFrom(entity, refs);
+  return { ...factsFrom(entity, refs), label: ownLabel };
 }

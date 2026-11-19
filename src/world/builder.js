@@ -132,17 +132,23 @@ export function makeChunk(p, { anisotropy = 4 } = {}) {
     snapshot: null, detail: false,
     // the most specific name for a spot: a named park it's inside (smallest wins), else the area
     nameAt(lat, lon) {
+      return this.namedAreaAt(lat, lon) || this.parkNear(lat, lon, 300)?.name || p.areaName || null;
+    },
+    // the smallest named park polygon containing the spot, or null
+    namedAreaAt(lat, lon) {
       let best = null;
       for (const a of p.named || []) if ((!best || a.area < best.area) && inRings(lat, lon, a.rings)) best = a;
-      if (best) return best.name;
-      // city parks often come only as a named point: the nearest park marker close by
-      let near = null, nd = 300;
+      return best?.name || null;
+    },
+    // city parks often come only as a named point: the nearest park marker within maxM ({ name, d })
+    parkNear(lat, lon, maxM = 300) {
+      let near = null, nd = maxM;
       for (const q of pois) {
         if (!/^leisure:(park|garden|nature_reserve)|^park/.test(q.kind || '')) continue;
         const d = haversine(lat, lon, q.lat, q.lon);
         if (d < nd) { nd = d; near = q; }
       }
-      return near?.name || p.areaName || null;
+      return near ? { name: near.name, d: nd } : null;
     },
     // the name of the pond, lake or river labelled nearest a spot (within maxM metres), or null
     waterNameNear(lat, lon, maxM = 350) {

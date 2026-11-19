@@ -533,7 +533,7 @@ $('b-journal').onclick = () => openJournal();
 $('b-here').onclick = () => {
   if (!game.pos) return;
   const ch = world.chunkAt(game.pos.lat, game.pos.lon);
-  showHere(game.pos, { game, areaName: ch?.nameAt?.(game.pos.lat, game.pos.lon) ?? ch?.areaName, elevation: world.groundAt(game.pos.lat, game.pos.lon) });
+  showHere(game.pos, { game, areaName: world.nameAt(game.pos.lat, game.pos.lon) ?? ch?.areaName, elevation: world.groundAt(game.pos.lat, game.pos.lon) });
 };
 
 // battery-aware quality

@@ -143,7 +143,7 @@ export function localProgress(game, profile) {
   const ch = game.pos && game.world.chunkAt?.(game.pos.lat, game.pos.lon);
   const pois = (ch?.pois || []).filter((p) => p.cls !== 'geocache');
   const placesFound = pois.filter((p) => profile.data.discoveries[p.ref]).length;
-  return { wild, found, area: ch?.nameAt?.(game.pos.lat, game.pos.lon) || ch?.areaName || null, places: pois.length, placesFound };
+  return { wild, found, area: game.world.nameAt?.(game.pos.lat, game.pos.lon) || ch?.areaName || null, places: pois.length, placesFound };
 }
 function wildHere(profile) {
   const { wild, found } = localProgress(ctx.game, profile);

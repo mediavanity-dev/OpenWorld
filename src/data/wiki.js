@@ -2,9 +2,11 @@
 // Fetched only when the player opens a place card.
 
 import { tryJson } from './net.js';
+import { cachedJson } from './cache.js';
 
 const memo = new Map();
-const LANG = (navigator.language || 'en').slice(0, 2).toLowerCase();
+// the game is in English: summaries in English first (place cards and riddle clues alike)
+const LANG = 'en';
 
 function json(url) {
   return tryJson(url, { init: { headers: { 'Api-User-Agent': 'OpenWorld-game (github.com/mediavanity-dev/OpenWorld)' } } });
@@ -46,3 +48,29 @@ export async function wikiSummary(tags) {
   memo.set(key, p);
   return p;
 }
+
+// ---------- a place's article, found by its name near where it is (no OSM wikipedia/wikidata tag needed)
+const norm = (s) => String(s || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+  .replace(/\s*\(.*?\)\s*/g, ' ').replace(/,.*$/, '').replace(/^the\s+/, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+/** Does an article title name this place? (exact, or one starts with the other and is long enough) */
+export function titleMatches(title, names) {
+  const t = norm(title);
+  return names.filter(Boolean).map(norm).some((n) => n.length >= 3 && (t === n || (n.length >= 6 && (t.startsWith(`${n} `) || n.startsWith(`${t} `) && t.length >= 6))));
+}
+/**
+ * The English Wikipedia article about a named place within ~150 m, and its Wikidata id:
+ * { title, qid } or null. One geosearch per place, cached for 30 days.
+ * @param {string[]} names  its names (local, English)
+ */
+export async function findArticle(names, lat, lon) {
+  if (!names.some(Boolean)) return null;
+  const j = await cachedJson(`wfind:${lat.toFixed(4)},${lon.toFixed(4)}`,
+    `https://en.wikipedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${lat.toFixed(5)}|${lon.toFixed(5)}&ggsradius=150&ggslimit=20&prop=pageprops|coordinates&ppprop=wikibase_item&format=json&origin=*`,
+    { ttl: 30 * 864e5, timeout: 10000 });
+  const pages = Object.values(j?.query?.pages || {}).filter((pg) => titleMatches(pg.title, names));
+  if (!pages.length) return null;
+  pages.sort((a, b) => (a.index ?? 0) - (b.index ?? 0)); // geosearch order: nearest first
+  const pg = pages[0];
+  return { title: pg.title, qid: pg.pageprops?.wikibase_item || null };
+}
+

@@ -93,7 +93,7 @@ export function initArMode(ctx) {
       g.fillStyle = '#fff'; g.fillText(el.textContent, (r.left + 7) * dpr, (r.top + r.height / 2) * dpr);
     }
     const snap = environment.snapshot(game.pos.lat, game.pos.lon);
-    const area = world.chunkAt(game.pos.lat, game.pos.lon)?.nameAt?.(game.pos.lat, game.pos.lon);
+    const area = world.nameAt(game.pos.lat, game.pos.lon);
     const lines = [[area, `${game.pos.lat.toFixed(4)}, ${game.pos.lon.toFixed(4)}`].filter(Boolean).join(' · '),
       [new Date().toLocaleString(), snap.weather, snap.tempC != null ? fmtTemp(snap.tempC) : null, snap.sun].filter(Boolean).join(' · ')];
     const bh = 64 * dpr;

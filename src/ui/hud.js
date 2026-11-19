@@ -98,13 +98,21 @@ export function initHud(ctx) {
   }
 
   // loading progress, or what's missing right now (busy free servers), instead of silence
+  // The detail server (trees, opening hours) can take minutes on a busy day: say so after 20 s, and
+  // go quiet after 90 s (it keeps trying in the background; the game never waits for it).
+  let detailSince = 0;
+  setInterval(() => worldStatus(), 5000);
   function worldStatus() {
     const s = world.status();
     let text = '';
+    const waiting = !settings.dataSaver && s.detail + s.detailFailed < s.ready;
+    if (!waiting) detailSince = 0; else detailSince ||= Date.now();
+    const slow = (Date.now() - detailSince) / 1000;
     if (s.loading) text = `Loading world… ${s.ready}/${s.ready + s.loading} areas`;
     else if (s.error) text = `${s.error} area(s) failed to load, retrying`;
-    else if (!settings.dataSaver && s.detail + s.detailFailed < s.ready) text = `Adding trees & place details… ${s.detail}/${s.ready}`;
-    if (!text) {
+    else if (waiting && slow < 20) text = `Adding trees & place details… ${s.detail}/${s.ready}`;
+    else if (waiting && slow < 90) text = 'Trees and opening hours are slow today (a busy free map server). Play on: they’ll appear when ready.';
+    if (!text && !waiting) {
       const down = unhealthy().map((k) => MISSING[k]).filter(Boolean);
       if (s.detailFailed && !settings.dataSaver && !down.includes(MISSING['place details'])) down.push(MISSING['place details']);
       if (down.length) text = `Unavailable right now: ${[...new Set(down)].join(', ')} (busy free servers; retrying later)`;
