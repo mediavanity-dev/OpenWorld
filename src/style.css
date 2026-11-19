@@ -710,6 +710,8 @@ html.native .native-only { display: block; }
 .rv-card.habitat .hb-btns { display: flex; gap: 8px; margin-top: 10px; }
 .rv-card.habitat .hb-btns button { flex: 1; padding: 10px; font-weight: 600; }
 .rv-card.habitat .hb-inat { display: block; margin-top: 10px; text-align: center; font-size: 13px; }
+.rv-card.habitat .hb-apps { margin: 8px 0 0; text-align: center; font-size: 12px; color: var(--muted, #a5adb7); }
+.rv-card.habitat .hb-apps small { opacity: .8; }
 .qbtns .qhere + .qhere { margin-left: 0; }
 #set-look { margin-top: 6px; }
 #set-look button { flex: 1; padding: 7px 4px; }

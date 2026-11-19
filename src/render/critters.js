@@ -15,8 +15,9 @@ const shade = (hex, k) => `#${new THREE.Color(hex).multiplyScalar(k).getHexStrin
  * One figure per group. Each returns { g, anim(t), fly } where fly = it floats and bobs.
  * Sizes are roughly 1–1.6 m: larger than life, so they read on a phone screen.
  * @param {string} group  iNaturalist iconic group
+ * @param {string} [season]  'spring' | 'summer' | 'autumn' | 'winter' where it is (plants only)
  */
-export function figureFor(group) {
+export function figureFor(group, season = 'summer') {
   const col = GROUP_STYLE[group]?.color || '#5fd08a';
   const main = lam(col), dark = lam(shade(col, 0.55)), light = lam(shade(col, 1.35));
   const g = new THREE.Group();
@@ -115,15 +116,30 @@ export function figureFor(group) {
       anim = (t) => { foot.scale.z = 1 + Math.sin(t / 500) * 0.06; };
       break;
     }
-    case 'Plantae': { // a flowering stem with two leaves
-      const stem = mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.1, 5), main, 0, 0.55, 0);
-      const leaf = (s, y) => { const l = mesh(new THREE.IcosahedronGeometry(0.16, 0), main, s * 0.17, y, 0); l.scale.set(1.6, 0.35, 0.8); return l; };
-      const flower = new THREE.Group(); flower.position.y = 1.12;
-      const petal = lam('#f2a7c8');
-      for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; const p = mesh(new THREE.IcosahedronGeometry(0.12, 0), petal, Math.cos(a) * 0.16, 0, Math.sin(a) * 0.16); p.scale.set(1.2, 0.5, 1.2); flower.add(p); }
-      flower.add(mesh(new THREE.IcosahedronGeometry(0.09, 0), lam('#f5d04a')));
-      g.add(stem, leaf(-1, 0.45), leaf(1, 0.7), flower);
-      anim = (t) => { g.rotation.z = Math.sin(t / 900) * 0.08; };
+    case 'Plantae': { // a stem that follows the local season (see plantSeason)
+      const stem = mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.1, 5), season === 'winter' ? lam('#7a5a3c') : main, 0, 0.55, 0);
+      const leafMat = season === 'autumn' ? null : season === 'spring' ? lam('#9be07a') : main;
+      const AUTUMN = ['#e0672a', '#f2a33a', '#c8402e'];
+      const leaf = (s, y, k) => { const l = mesh(new THREE.IcosahedronGeometry(0.16, 0), leafMat || lam(AUTUMN[k % 3]), s * 0.17, y, 0); l.scale.set(1.6, 0.35, 0.8); return l; };
+      g.add(stem);
+      if (season === 'winter') { // a bare twig: a side shoot and a couple of closed buds
+        const shoot = mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.4, 4), lam('#7a5a3c'), 0.12, 0.75, 0); shoot.rotation.z = -0.7;
+        g.add(shoot, mesh(new THREE.IcosahedronGeometry(0.06, 0), lam('#a0603a'), 0, 1.12, 0), mesh(new THREE.IcosahedronGeometry(0.05, 0), lam('#a0603a'), 0.25, 0.9, 0));
+      } else if (season === 'spring') { // fresh small leaves and fat green buds
+        const l1 = leaf(-1, 0.5, 0), l2 = leaf(1, 0.75, 1); l1.scale.multiplyScalar(0.7); l2.scale.multiplyScalar(0.7);
+        g.add(l1, l2, mesh(new THREE.IcosahedronGeometry(0.1, 0), lam('#7cc85a'), 0, 1.13, 0), mesh(new THREE.IcosahedronGeometry(0.07, 0), lam('#f2a7c8'), 0, 1.22, 0));
+      } else if (season === 'autumn') { // turning leaves, one falling, and a seed head
+        const fall = leaf(1, 0.2, 2); fall.position.x = 0.35;
+        g.add(leaf(-1, 0.45, 0), leaf(1, 0.7, 1), leaf(-1, 0.95, 2), fall, mesh(new THREE.IcosahedronGeometry(0.1, 0), lam('#8a6a3c'), 0, 1.13, 0));
+        const base = anim; anim = (t) => { base(t); fall.position.y = 0.2 + ((t / 2600) % 1) * -0.18; fall.rotation.y = t / 700; };
+      } else { // summer (and the tropics): in full flower
+        const flower = new THREE.Group(); flower.position.y = 1.12;
+        const petal = lam('#f2a7c8');
+        for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; const p = mesh(new THREE.IcosahedronGeometry(0.12, 0), petal, Math.cos(a) * 0.16, 0, Math.sin(a) * 0.16); p.scale.set(1.2, 0.5, 1.2); flower.add(p); }
+        flower.add(mesh(new THREE.IcosahedronGeometry(0.09, 0), lam('#f5d04a')));
+        g.add(leaf(-1, 0.45, 0), leaf(1, 0.7, 1), flower);
+      }
+      const sway = anim; anim = (t) => { sway(t); g.rotation.z = Math.sin(t / 900) * 0.08; };
       break;
     }
     case 'Fungi': { // a mushroom with a spotted cap
@@ -139,6 +155,13 @@ export function figureFor(group) {
     }
   }
   return { g, anim, fly };
+}
+
+/** The season at a latitude today: flipped south of the equator; the tropics stay in leaf. */
+export function plantSeason(lat, date = new Date()) {
+  if (lat == null || Math.abs(lat) < 23.5) return 'summer';
+  const m = (date.getMonth() + (lat < 0 ? 6 : 0)) % 12; // 0 = January (north)
+  return m <= 1 || m === 11 ? 'winter' : m <= 4 ? 'spring' : m <= 7 ? 'summer' : 'autumn';
 }
 
 export function initCritters(ctx) {
@@ -163,7 +186,7 @@ export function initCritters(ctx) {
       if (!m) {
         m = new THREE.Mesh(hitGeo, hitMat); // the tap target
         m.userData.critter = c;
-        const fig = figureFor(c.sp.group);
+        const fig = figureFor(c.sp.group, plantSeason(game.pos?.lat));
         fig.g.userData.yaw = Math.random() * Math.PI * 2;
         fig.g.rotation.y = fig.g.userData.yaw;
         fig.g.traverse((o) => { o.raycast = () => {}; }); // taps hit the sphere

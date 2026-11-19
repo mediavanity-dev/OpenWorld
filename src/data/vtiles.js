@@ -138,7 +138,22 @@ export async function loadBaseTile(z, x, y) {
     if (buf.byteLength < 3e6) cachePut(key, buf);
   }
   const vt = new VectorTile(new PbfReader(new Uint8Array(buf)));
-  return normalizeTile(vt);
+  const out = normalizeTile(vt);
+  dropStalePoints(out, z, y);
+  return out;
+}
+
+// Old bulk imports (the US GNIS import above all) left bare points for churches, schools and post
+// offices, often stale: Burlington's "Saint Jean Baptist Church" point sits 30 m from the building
+// mapped as "Saint John's Club", which that society founded. When such a lone point has a differently
+// named, differently used place mapped as a building or area within ~40 m, trust the building.
+const STALE_CLS = new Set(['place_of_worship', 'school', 'college', 'post', 'town_hall', 'library']);
+export function dropStalePoints(out, z, y) {
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * (y + 0.5) / 2 ** z)));
+  const r = 40 / (40075016 * Math.cos(lat) / 2 ** z / out.extent); // 40 m in tile units
+  const areas = out.pois.filter((q) => !q.ref.startsWith('osm:node/'));
+  out.pois = out.pois.filter((p) => !(p.ref.startsWith('osm:node/') && STALE_CLS.has(p.cls) &&
+    areas.some((q) => q.cls !== p.cls && q.name !== p.name && Math.hypot(q.px - p.px, q.py - p.py) < r)));
 }
 
 function emptyFabric() { return { extent: 4096, buildings: [], areas: [], lines: [], pois: [], streets: [], walk: [], waterNames: [], waterways: [], areaName: null }; }
