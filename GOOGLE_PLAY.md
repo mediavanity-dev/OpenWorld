@@ -52,7 +52,7 @@ One-time scripts (already run; safe to re-run):
 
 ## App content answers (Play Console → Policy → App content)
 
-- Privacy policy: the existing privacy page, once it names Android/Google Play (not yet changed: public repo).
+- Privacy policy: the existing privacy page (its URL is in fastlane/metadata/en-US/privacy_url.txt); it names Android and Google Play since 2026-11-23.
 - Ads: none. App access: everything available without an account. Data safety: no data collected or shared; purchases are handled by Google Play.
 - Health apps: No health features.
 
