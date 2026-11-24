@@ -18,6 +18,8 @@ on:
   # A push to the android branch builds too: workflow_dispatch only appears once the file is on the default branch.
   push:
     branches: [android]
+    # Listing text, graphics and notes don't change the app: no build for those.
+    paths-ignore: ['**.md', 'fastlane/**', 'design/**']
   workflow_dispatch:
     inputs:
       track:
