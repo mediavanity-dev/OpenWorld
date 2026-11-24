@@ -559,6 +559,13 @@ export function makeRace(pos, groundAt, pois, mode, sunsetMs, rand = Math.random
  * A night-sky quest (meteor shower, full moon): reach open green ground, away from streets,
  * after dark. Built like a race (same finish line rules) with a generous clock.
  */
+/** The name a finished quest's card gets (races and water), for "done this lately?" */
+export function cardName(o) {
+  if (o.type === 'water') return o.kind === 'confluence' ? `Where the ${o.a} meets the ${o.b}` : `Source of the ${o.a}`;
+  if (o.type === 'race') return o.kind === 'summit' ? o.name || 'High ground' : o.name;
+  return o.name || o.title;
+}
+
 export function makeSkyQuest(pos, habitatAt, mode, ev, inside = (_p) => true, snap = (lat, lon) => ({ lat, lon }), reach = 900) {
   const open = (h) => ['park', 'wood', 'farmland', 'scrub', 'wetland'].includes(h);
   for (let r = 150; r <= reach; r += 40) {
@@ -841,21 +848,33 @@ export class Quests {
     const g = this.game, pos = g.pos, w = g.world;
     const pois = [...w.pois(pos.lat, pos.lon, 900)].map((x) => x.poi);
     for (const o of this.s.offers) if (o?.ref) avoid.add(o.ref);
+    // Don't deal what you've already finished: a place never again (while anything new is left),
+    // a species or a race/water destination not for a while (nature comes round again)
+    const since = (days) => new Date(Date.parse(this.date()) - days * 864e5).toISOString().slice(0, 10);
+    const done = (t, days) => this.s.cards.filter((c) => c.type === t && (!days || c.date >= since(days)));
+    const pastPlaces = new Set(done('mystery').map((c) => c.ref).filter(Boolean));
+    const pastSpecies = new Set(done('bounty', 45).map((c) => c.spId));
+    const recentNames = new Set([...done('race', 30), ...done('water', 30)].map((c) => c.name));
+    const fresh = (mk) => { let o = null; for (let k = 0; k < 5; k++) { o = mk(); if (!o || !recentNames.has(cardName(o))) return o; } return o; };
     const inside = (p) => this.inside(p) && !this.isBlocked(p);
     // finish lines on public ways (where the map has path data; elsewhere the point stands)
     const snap = (lat, lon) => { const n = nearestPath(w, lat, lon, 60); return !n.known ? { lat, lon } : n.d <= 60 ? { lat: n.lat, lon: n.lon } : null; };
     const near = (p) => inside(p) && walkableTo(w, p);
     if (type === 'mystery') {
       // nearby first; if nothing fits, a long expedition further out (rarer, it's a real walk)
-      let m = makeMystery(pos, pois, this.profile.data.discoveries, Math.random, avoid, near);
-      if (!m) { m = makeMystery(pos, [...w.pois(pos.lat, pos.lon, 2600)].map((x) => x.poi), this.profile.data.discoveries, Math.random, avoid, near, [800, 2500]); if (m) longer(m); }
+      const all = new Set([...avoid, ...pastPlaces]);
+      let m = makeMystery(pos, pois, this.profile.data.discoveries, Math.random, all, near);
+      if (!m) { m = makeMystery(pos, [...w.pois(pos.lat, pos.lon, 2600)].map((x) => x.poi), this.profile.data.discoveries, Math.random, all, near, [800, 2500]); if (m) longer(m); }
+      if (!m) m = makeMystery(pos, pois, this.profile.data.discoveries, Math.random, avoid, near); // everything near is done: a repeat beats an empty slot
       if (m) this.enrich(m);
       return m;
     }
     if (type === 'bounty') {
       if (!g.wild.species.length) return null;
       const bounty = (plants) => makeBounty(pos, g.wild.species, this.profile.data.species || {}, (a, b) => w.habitatAt(a, b), Math.random, avoid, inside, plants);
-      return bounty(false) || bounty(true); // animals first, then plants and fungi
+      const all = new Set([...avoid, ...pastSpecies]);
+      const bountyOf = (plants, av) => makeBounty(pos, g.wild.species, this.profile.data.species || {}, (a, b) => w.habitatAt(a, b), Math.random, av, inside, plants);
+      return bountyOf(false, all) || bountyOf(true, all) || bounty(false) || bounty(true); // animals first, then plants and fungi; repeats last
     }
     if (type === 'water') {
       const ways = [];
@@ -864,7 +883,7 @@ export class Quests {
       // water's edges are often fenced, private or wild: the finish is the nearest public path,
       // up to 300 m away ("as close as the paths go", which the card then says)
       const wsnap = (lat, lon) => { const n = nearestPath(w, lat, lon, 300); return !n.known ? { lat, lon } : n.d <= 300 ? { lat: n.lat, lon: n.lon, off: n.d } : null; };
-      const o = makeWater(pos, ways, Math.random, inside, wsnap);
+      const o = fresh(() => makeWater(pos, ways, Math.random, inside, wsnap));
       if (o) this.waterFacts(o);
       return o;
     }
@@ -879,7 +898,7 @@ export class Quests {
       const habitatAt = (a, b) => w.habitatAt(a, b);
       const waterName = (a, b) => w.chunkAt?.(a, b)?.waterNameNear?.(a, b) || null;
       const placeName = (a, b) => { const n = w.nameAt?.(a, b); return n && n !== w.chunkAt?.(a, b)?.areaName ? n : null; }; // a park, not the suburb
-      let r = makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside, snap, { habitatAt, waterName, placeName });
+      let r = fresh(() => makeRace(pos, (a, b) => w.groundAt(a, b), pois, g.mode, ss, Math.random, inside, snap, { habitatAt, waterName, placeName }));
       if (!r) { r = makeRace(pos, (a, b) => w.groundAt(a, b), [...w.pois(pos.lat, pos.lon, 1900)].map((x) => x.poi), g.mode, ss, Math.random, inside, snap, { reach: 1800, habitatAt, waterName, placeName }); if (r) longer(r); }
       return r;
     }
@@ -977,7 +996,7 @@ export class Quests {
   /** "I'm there!" for a water expedition: within MYSTERY_HERE_M of the spot. */
   imThere() {
     const o = this.active(), g = this.game;
-    if (!o || o.type !== 'water' || !g.pos || (g.sharpEnough && !g.sharpEnough())) return false;
+    if (!o || !(o.type === 'water' || o.kind === 'sky') || !g.pos || (g.sharpEnough && !g.sharpEnough())) return false;
     if (haversine(g.pos.lat, g.pos.lon, o.lat, o.lon) > MYSTERY_HERE_M) return false;
     this.complete(o);
     return true;
