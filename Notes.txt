@@ -1,0 +1,8 @@
+Rendering order:
+  Water on top of trees
+  Roads on top of trees
+  Roads on top of water
+  Buildings on top of trees
+  Buildings on top of roads
+  Buildings on top of water
+  

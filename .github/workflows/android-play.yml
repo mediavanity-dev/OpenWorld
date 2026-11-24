@@ -1,0 +1,100 @@
+# Builds the Android app on a GitHub-hosted Linux runner, signs the AAB with
+# the upload key, keeps it as an artifact and (once the service account
+# exists) uploads it to a Google Play track. Run it from the Actions tab:
+# "Android → Google Play" → Run workflow.
+#
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   ANDROID_KEYSTORE_B64        base64 of upload.jks
+#   ANDROID_KEYSTORE_PASSWORD   its password
+#   ANDROID_KEY_ALIAS           upload
+#   ANDROID_KEY_PASSWORD        same as the store password for PKCS12
+#   PLAY_SERVICE_ACCOUNT_JSON   (optional) service account key; without it, only the artifact is made
+#
+# The very first AAB of an app must be uploaded in Play Console by hand
+# (download the "app-release" artifact). After that this workflow uploads.
+name: Android → Google Play
+
+on:
+  # A push to the android branch builds too: workflow_dispatch only appears once the file is on the default branch.
+  push:
+    branches: [android]
+  workflow_dispatch:
+    inputs:
+      track:
+        description: Play track (internal, alpha = closed testing, production)
+        default: internal
+      status:
+        description: completed (rolls out) or draft (finish in Play Console)
+        default: completed
+
+env:
+  PACKAGE_NAME: com.mediavanity.openworld        # = capacitor.config.json appId
+  WEB_BUILD: npm run build:app             # the script that fills webDir
+  VERSION_CODE_OFFSET: 100             # raise if a code was already used
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HAS_PLAY_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install and build web app
+        run: |
+          npm ci
+          $WEB_BUILD
+          npx cap sync android
+
+      - name: Write upload keystore
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_B64" || { echo "::error::ANDROID_KEYSTORE_B64 secret is missing in this repo"; exit 1; }
+          printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+
+      - name: Build signed AAB
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/upload.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          export VERSION_CODE=$(( GITHUB_RUN_NUMBER + VERSION_CODE_OFFSET ))
+          # Same version as the iOS app (MARKETING_VERSION), else package.json
+          VERSION_NAME=$(grep -m1 -oE 'MARKETING_VERSION = [0-9.]+' ../ios/App/App.xcodeproj/project.pbxproj 2>/dev/null | awk '{print $3}')
+          export VERSION_NAME=${VERSION_NAME:-$(node -p "require('../package.json').version")}
+          echo "versionCode $VERSION_CODE, versionName $VERSION_NAME"
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease
+          # Fail if it isn't signed with the upload key
+          jarsigner -verify app/build/outputs/bundle/release/app-release.aab | grep -q "jar verified"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Upload to Google Play
+        if: env.HAS_PLAY_KEY == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ env.PACKAGE_NAME }}
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          tracks: ${{ inputs.track || 'internal' }}
+          status: ${{ inputs.status || 'completed' }}

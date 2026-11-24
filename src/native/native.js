@@ -67,11 +67,28 @@ const nativeGeo = {
 const raw = registerPlugin('OpenWorld');
 export const app = new Proxy({}, { get: (_, k) => (k === 'then' ? undefined : raw[k]) });
 
+// Android back button/gesture: close the open card or panel, else go back in the page's history,
+// else leave (Android keeps the app in the background). Without a handler, Android closes the app
+// from any screen.
+function androidBack() {
+  const App = registerPlugin('App'); // @capacitor/app
+  App.addListener('backButton', ({ canGoBack }) => {
+    const open = [...document.querySelectorAll('dialog[open]')].pop();
+    if (open) { open.close(); return; }
+    for (const el of document.querySelectorAll('[aria-label="Close"], [aria-label="Close old photo"], .close')) {
+      if (el.offsetParent !== null) { el.click(); return; }
+    }
+    if (canGoBack) history.back();
+    else App.minimizeApp();
+  }).catch(() => {});
+}
+
 export async function startNative() {
   await nativeStorage().catch((e) => console.warn('native storage unavailable, using the web view’s', e));
   useNativeHaptics((pattern) => { hapticsFor(pattern).catch(() => {}); });
   useNativeGeolocation(nativeGeo);
   document.documentElement.classList.add('native');
+  if (globalThis.Capacitor?.getPlatform?.() === 'android') androidBack();
   // the App Store name (the website keeps OpenWorld)
   document.title = 'OpenEarth';
   const rename = () => { for (const el of document.querySelectorAll('#start h1, .app-name')) el.textContent = 'OpenEarth'; };

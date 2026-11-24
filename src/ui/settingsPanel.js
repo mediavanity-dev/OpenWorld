@@ -179,7 +179,7 @@ function initNativeSettings(ctx) {
   $('set-notify').onchange = async (e) => {
     if (e.target.checked) {
       const ok = await N.notifications().then((m) => m.enable()).catch(() => false);
-      if (!ok) { e.target.checked = false; ctx.hud && toast(`Notifications are off for ${APP_NAME} in iPhone Settings → Notifications.`, 'error'); return; }
+      if (!ok) { e.target.checked = false; ctx.hud && toast((globalThis.Capacitor?.getPlatform?.() === 'android' ? `Notifications are off for ${APP_NAME}: open the phone’s Settings → Apps → ${APP_NAME} → Notifications.` : `Notifications are off for ${APP_NAME} in iPhone Settings → Notifications.`), 'error'); return; }
     }
     settings.notify = e.target.checked; saveSettings(); replan();
   };
@@ -202,7 +202,7 @@ function initNativeSettings(ctx) {
     const b = e.target.closest('[data-tip]');
     if (!b) return;
     const msg = $('tip-msg');
-    b.disabled = true; msg.textContent = 'Opening the App Store…';
+    b.disabled = true; msg.textContent = `Opening ${globalThis.Capacitor?.getPlatform?.() === 'android' ? 'Google Play' : 'the App Store'}…`;
     let r;
     try { r = await N.app.tip({ id: b.dataset.tip }); } catch (err) { r = { error: String(err?.message || err) }; }
     b.disabled = false;
