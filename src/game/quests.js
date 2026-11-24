@@ -142,10 +142,38 @@ const RIDDLE_KIND = {
   marketplace: ["Haggling, smells and shouting: I’m busiest on certain days.", "I’ve been buying and selling here for centuries."],
 };
 const RIDDLE_ANY = ["I’m not on any postcard, but I’m worth finding.", "I’ve been here all along. Have you noticed me?", "Most people around here couldn’t tell you where I am.", "I’m hiding in plain sight."];
-export function riddleFor(poi, rand = Math.random) {
+// A second line, true of every place of its group, for riddles with no real fact to add:
+// opening line × second line keeps two riddles for the same kind of place from reading alike.
+const RIDDLE_MORE = {
+  worship: ["My doors open wider on some days than others.", "Look up when you find me: I was built to point that way.", "Some of my visitors come every week; some only once in their lives.", "Footsteps get quieter as they come through my doors.", "Some of the oldest songs in town are sung inside me.", "My calendar runs on feasts and festivals, not school terms."],
+  history: ["You might need to read the small print to understand me.", "Your grandparents’ grandparents might have known me.", "I’m older than the shops around me.", "I don’t move, but the town around me never stops changing.", "If walls could talk, mine would need a long time.", "Look for the details nobody bothers to make any more."],
+  museum: ["Some of what I keep is older than the town.", "My best things are often kept behind glass.", "I change my displays more often than you’d think.", "Ask at my door: there’s usually more to see than you expect."],
+  sight: ["Locals take me for granted; visitors don’t.", "You’ll know me when you see the people looking.", "I look different in every season.", "Someone, somewhere, has me as their phone background."],
+  park: ["My busiest hours are after school and at weekends.", "Squirrels, pigeons and dogs all think they own me.", "I look completely different in each season.", "Some of my trees are older than the streets around me.", "Nobody pays to come in, and nobody wants to leave."],
+  nature: ["Wear sensible shoes to visit me.", "Mud is part of my charm.", "Birds knew about me long before people did.", "No two visits to me are quite the same."],
+  culture: ["My busiest time is the evening.", "Tickets, cards or just curiosity will get you in.", "Some nights I’m packed; some days I’m silent.", "I’m a building full of other worlds."],
+  education: ["My busiest hours start early in the morning.", "Holidays make me very quiet.", "Somewhere inside me there’s a board covered in writing.", "I can be noisy at break time."],
+  civic: ["I keep office hours.", "Somebody inside me is probably filling in a form.", "Most people only visit me when they have to.", "My work affects everyone, even if they never come inside."],
+  sport: ["Weekends are my big days.", "I know the sound of a whistle.", "Some people come to play; more come to watch.", "Mud, grass or boards: I take a pounding."],
+};
+const pickFresh = (list, seen, rand) => {
+  const fresh = list.filter((l) => !seen.has(l));
+  const from = fresh.length ? fresh : list; // all seen: start round again
+  return from[Math.floor(rand() * from.length)];
+};
+/**
+ * The riddle's opening line for a place, avoiding lines in `seen` until the kind's list runs out.
+ * @param {Set<string>} [seen]  lines this player has already been given
+ */
+export function riddleFor(poi, rand = Math.random, seen = new Set()) {
   const value = (poi.kind || '').split(':')[1] || '';
   const list = RIDDLE_KIND[value] || RIDDLE[groupOf(poi.kind, poi.cls)] || RIDDLE_ANY;
-  return list[Math.floor(rand() * list.length)];
+  return pickFresh(list, seen, rand);
+}
+/** A second line true of the place's whole group (or null): only for riddles with no fact. */
+export function riddleMore(poi, rand = Math.random, seen = new Set()) {
+  const list = RIDDLE_MORE[groupOf(poi.kind, poi.cls)];
+  return list ? pickFresh(list, seen, rand) : null;
 }
 
 // words of a name that would give it away (generic words like "church" or "park" stay)
@@ -241,7 +269,7 @@ export function applyFacts(o, f, extract = null) {
     }
   }
   const lead = ['namedAfter', 'maker', 'style', 'heritage'].find((k) => lines[k]);
-  if (lead && !o.fact) o.fact = lines[lead]; // (an inscription, when there is one, stays)
+  if (lead && (!o.fact || o.factGeneric)) { o.fact = lines[lead]; o.factGeneric = false; } // (an inscription, when there is one, stays)
   if (o.used.length) return o;
   const rest = ['type', 'heritage', 'maker', 'style', 'religion', 'material', 'namedAfter'].filter((k) => lines[k] && lines[k] !== o.fact);
   const keep = (k) => o.clues.find((c) => c.key === k);
@@ -866,6 +894,13 @@ export class Quests {
       let m = makeMystery(pos, pois, this.profile.data.discoveries, Math.random, all, near);
       if (!m) { m = makeMystery(pos, [...w.pois(pos.lat, pos.lon, 2600)].map((x) => x.poi), this.profile.data.discoveries, Math.random, all, near, [800, 2500]); if (m) longer(m); }
       if (!m) m = makeMystery(pos, pois, this.profile.data.discoveries, Math.random, avoid, near); // everything near is done: a repeat beats an empty slot
+      if (m) { // lines this player hasn't had yet; remembered (the last 400)
+        const seen = new Set(this.s.riddleSeen ||= []), poi = { kind: m.place.kind, cls: m.place.cls };
+        m.riddle = riddleFor(poi, Math.random, seen);
+        if (!m.fact) { m.fact = riddleMore(poi, Math.random, seen); m.factGeneric = !!m.fact; } // a real fact (enrich) replaces it
+        this.s.riddleSeen.push(m.riddle, ...(m.fact ? [m.fact] : []));
+        if (this.s.riddleSeen.length > 400) this.s.riddleSeen.splice(0, this.s.riddleSeen.length - 400);
+      }
       if (m) this.enrich(m);
       return m;
     }
